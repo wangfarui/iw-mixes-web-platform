@@ -43,7 +43,7 @@
         <div class="footer-content">
           <a href="https://beian.miit.gov.cn/"><span>鄂ICP备2024050235号-1</span></a>&nbsp;&nbsp;
           <a href="https://beian.mps.gov.cn/#/query/webSearch?code=42018502007471" rel="noreferrer" target="_blank">
-            <el-image src="https://itwray-bucket.oss-cn-wuhan-lr.aliyuncs.com/img/beian.png" style="width: 20px; height: 20px" fit='contain' />
+            <el-image src="https://itwray-bucket.oss-cn-wuhan-lr.aliyuncs.com/img/beian.png" style="width: 15px; height: 15px" fit='contain' />
             <span>鄂公网安备42018502007471</span>
           </a>
         </div>

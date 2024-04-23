@@ -13,12 +13,17 @@ const router = createRouter({
       children: [
         {
           path: '/meal',
-          name: '点餐',
+          name: '点餐列表',
           component: Meal
         },
         {
+          path: '/meal/add',
+          name: '点餐',
+          component: () => import('@/views/meal/MealAdd.vue')
+        },
+        {
           path: '/dishes',
-          name: '菜品',
+          name: '菜品列表',
           component: Dishes
         }
       ]
