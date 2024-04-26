@@ -16,8 +16,8 @@ service.interceptors.response.use(success => {
     const code = success.data.status || 200;
     if (code == 200) {
         //说明请求成功
-        if (success.data.message) {
-            ElMessage.success(success.data.message)
+        if (success.data.code == 500) {
+            ElMessage.error(success.data.message)
         }
         //返回服务端返回的 JSON
         return success.data;

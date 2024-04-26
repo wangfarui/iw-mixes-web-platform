@@ -1,11 +1,16 @@
 <template>
   <div>
     <el-button type="primary" @click="handleMealAdd">点餐</el-button>
+    <el-button type="primary" @click="searchPage">刷新</el-button>
   </div>
   <div>
-    <el-table :data="list" style="width: 100%" @row-dblclick="handleClick">
+    <el-table :data="page.list" style="width: 100%" @row-dblclick="handleClick">
       <el-table-column prop="mealDate" label="用餐日期" width="180" />
-      <el-table-column prop="mealTimeStr" label="用餐时间" width="180" />
+      <el-table-column prop="mealTime" label="用餐时间" width="180">
+        <template #default="{ row }">
+          {{ getStatusLabel(row.mealTime) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="diners" label="用餐人数" width="180" />
       <el-table-column prop="remark" label="备注" />
       <el-table-column label="操作">
@@ -24,11 +29,11 @@
       </el-table-column>
     </el-table>
     <el-pagination
-        :current-page="currentPage"
-        :page-size="pageSize"
+        :current-page="page.dto.currentPage"
+        :page-size="page.dto.pageSize"
         :page-sizes="[10, 20, 50, 100]"
         layout="sizes, prev, pager, next"
-        :total="total"
+        :total="page.total"
         :background="true"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
@@ -37,50 +42,84 @@
 </template>
 
 <script setup lang="ts">
-import {reactive, ref} from 'vue'
-import type { FormInstance } from 'element-plus'
+import {onMounted, reactive} from 'vue'
 import router from '@/router'
-import type {MealListData} from "@/api/types";
+import type {MealListData, MealPageDto} from "@/api/types";
+import {queryMealPage, queryMealDetail, deleteMeal} from "@/api/meal";
 
-const list = reactive([
-  {
-    id: -1,
-    mealDate: new Date().toLocaleDateString(),
-    mealTimeStr: '',
-    diners: 0,
-    remark: ''
+const page = reactive({
+  dto: {
+    currentPage: 1,
+    pageSize: 10
+  } as MealPageDto,
+  total: 0,
+  list: [
+
+  ] as Array<MealListData>
+})
+
+onMounted(() => {
+  searchPage()
+})
+
+function searchPage() {
+  queryMealPage(page.dto).then(data => {
+    console.log(data);
+    page.total = data.data.total;
+    page.list = data.data.records;
+  }).catch(err => {
+    console.log(err)
+  })
+}
+
+const getStatusLabel = (status: number) => {
+  // 根据枚举值返回相应的标签
+  if (status === 1) {
+    return '早餐';
+  } else if (status === 2) {
+    return '午餐';
+  } else if (status === 3) {
+    return '晚餐';
+  } else {
+    return ''
   }
-] as Array<MealListData>)
+};
 
 function handleMealAdd() {
   router.push({path: '/meal/add'})
 }
 
 const handleClick = (row: MealListData) => {
-  console.log("row")
-  // 查询详情数据
-  console.log(row)
+  queryMealDetail(row.id).then(res => {
+    router.push({path: '/meal/add', query: {
+      operate: "show",
+      data: JSON.stringify(res.data)
+    }})
+  })
 }
 
 const handleEdit = (index: number, row: MealListData) => {
-  //
-  console.log(index, row)
+  queryMealDetail(row.id).then(res => {
+    router.push({path: '/meal/add', query: {
+      operate: "update",
+      data: JSON.stringify(res.data)
+    }})
+  })
 }
 const handleDelete = (index: number, row: MealListData) => {
-  console.log(index, row)
+  deleteMeal(row.id).then(res => {
+    searchPage();
+  })
 }
-
-const total = ref(100);
-const currentPage = ref(1);
-const pageSize = ref(10);
 
 const handleSizeChange = (val: number) => {
-  pageSize.value = val;
-  console.log(`${val} items per page`)
+  page.dto.currentPage = 1;
+  page.dto.pageSize = val;
+  searchPage();
 }
 const handleCurrentChange = (val: number) => {
-  currentPage.value = val;
-  console.log(`current page: ${val}`)
+  page.dto.currentPage = val;
+  searchPage();
 }
 
 </script>
