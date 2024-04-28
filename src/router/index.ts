@@ -25,6 +25,11 @@ const router = createRouter({
           path: '/dishes',
           name: '菜品列表',
           component: Dishes
+        },
+        {
+          path: '/dishes/add',
+          name: '新增菜品',
+          component: () => import('@/views/dishes/DishesAdd.vue')
         }
       ]
     }

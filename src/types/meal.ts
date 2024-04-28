@@ -1,7 +1,3 @@
-export type UserLoginVO = {
-    username: string
-    password: string
-}
 
 export type MealListData =  {
     id: number,

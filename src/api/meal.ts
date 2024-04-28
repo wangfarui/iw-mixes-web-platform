@@ -1,5 +1,5 @@
 import request from "@/utils/request";
-import type * as MealType from "@/api/types";
+import type * as MealType from "@/types/meal";
 
 
 // 用餐分页列表

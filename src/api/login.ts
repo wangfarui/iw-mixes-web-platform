@@ -1,5 +1,5 @@
 import request from "@/utils/request";
-import type {UserLoginVO} from "@/api/types";
+import type {UserLoginVO} from "@/types/types";
 
 
 // 登录

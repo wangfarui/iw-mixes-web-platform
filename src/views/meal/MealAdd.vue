@@ -13,6 +13,7 @@
       </el-form-item>
       <el-form-item label="用餐时间" prop="mealTime">
         <el-select v-model="formData.mealTime" placeholder="请选择用餐时间" style="width: 400px">
+          <el-option label="任意时间" :value="0"/>
           <el-option label="早餐" :value="1"/>
           <el-option label="午餐" :value="2"/>
           <el-option label="晚餐" :value="3"/>
@@ -42,12 +43,12 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, watch} from "vue";
-import type {FormInstance} from "element-plus";
-import router from "@/router";
-import { useRoute } from 'vue-router';
-import {addMeal, updateMeal} from "@/api/meal";
-import type {MealUpdateDto} from "@/api/types";
+import {ref, computed, watch} from "vue"
+import type {FormInstance} from "element-plus"
+import router from "@/router"
+import { useRoute } from 'vue-router'
+import {addMeal, updateMeal} from "@/api/meal"
+import type {MealUpdateDto} from "@/types/types"
 
 const formData = ref({
   id: 0,
@@ -61,26 +62,25 @@ const formRef = ref<FormInstance>()
 
 const operate = ref("add")
 
-const route = useRoute();
+const route = useRoute()
 // 解析查询参数并将数据设置给表单
 const parseQueryData = () => {
   // @ts-ignore
-  const data: string = route.query.data;
+  const data: string = route.query.data
   if (data) {
-    formData.value = JSON.parse(data);
+    formData.value = JSON.parse(data)
   }
   if (route.query.operate) {
-    operate.value = route.query.operate as string;
+    operate.value = route.query.operate as string
   }
-  console.log(route.query)
-};
+}
 
-const queryParams = computed(() => route.query);
-watch(queryParams, parseQueryData, { immediate: true });
+const queryParams = computed(() => route.query)
+watch(queryParams, parseQueryData, { immediate: true })
 
 const disabledDate = (time: Date) => {
-  const today = new Date().setHours(0, 0, 0, 0); // 获取当前日期的时间戳，忽略时分秒
-  return time.getTime() < today; // 返回一个布尔值，指示是否禁用该日期
+  const today = new Date().setHours(0, 0, 0, 0) // 获取当前日期的时间戳，忽略时分秒
+  return time.getTime() < today // 返回一个布尔值，指示是否禁用该日期
 }
 
 const handleDialogConfirm = (formEl: FormInstance | undefined) => {
@@ -88,13 +88,11 @@ const handleDialogConfirm = (formEl: FormInstance | undefined) => {
   if (operate.value === "add") {
     // 保存点餐记录
     addMeal(formData.value).then(res => {
-      console.log(res)
       router.push({path: '/meal'})
     })
   } else if (operate.value === "update") {
     // 修改点餐记录
     updateMeal(formData.value).then(res => {
-      console.log(res)
       router.push({path: '/meal'})
     })
   } else {
