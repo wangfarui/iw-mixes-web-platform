@@ -4,7 +4,7 @@
       <!-- 顶栏容器 -->
       <el-header class="header">
         <div class="left">
-          <span class="logo">IW Project</span>
+          <span class="logo">IW点餐系统</span>
         </div>
         <div class="right">
           <el-dropdown trigger="hover">

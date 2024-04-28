@@ -4,7 +4,7 @@
 
 <template>
 <div>
-  123
+  菜品列表
 </div>
 </template>
 
