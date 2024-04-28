@@ -33,6 +33,37 @@
         />
       </el-form-item>
     </el-form>
+
+    <el-divider />
+
+    <div style="margin-bottom:10px">所选菜品&nbsp;&nbsp;<el-button type="primary" @click="handleSelectDishes">选菜</el-button></div>
+    <div class="flex gap-2">
+      <div v-if="selectDishes.dishesList.length == 0">还未选菜哦～</div>
+      <div v-else>
+        <el-tag v-for="dishes in selectDishes.dishesList"
+                type="primary"
+                :key="dishes.dishesId"
+                closable
+                @close="closeTag(dishes.dishesId)"
+        >
+          {{dishes.dishesName}}
+        </el-tag>
+      </div>
+    </div>
+
+    <el-dialog
+        v-model="selectDishes.show"
+        title="选择菜品"
+        width="750"
+        align-center
+        :close-on-click-modal = "false"
+    >
+      <DishesTable permission="select" ref="childComponent"/>
+      <el-button type="primary" @click="confirmSelectDishes">确定</el-button>
+    </el-dialog>
+
+    <el-divider />
+
     <div class="dialog-footer">
       <el-button @click="router.back()">返回</el-button>
       <el-button type="primary" v-if="operate != 'show'" @click="handleDialogConfirm(formRef)">
@@ -43,23 +74,33 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, watch} from "vue"
+import {ref, computed, watch, reactive, onMounted} from "vue"
 import type {FormInstance} from "element-plus"
 import router from "@/router"
 import { useRoute } from 'vue-router'
 import {addMeal, updateMeal} from "@/api/meal"
-import type {MealUpdateDto} from "@/types/types"
+import type {MealMenuAddDto, MealUpdateDto} from "@/types/meal"
+import DishesTable from "@/views/dishes/DishesTable.vue";
+
+const selectDishes = reactive({
+  show: false,
+  dishesList: [
+
+  ] as Array<MealMenuAddDto>
+})
 
 const formData = ref({
   id: 0,
   mealDate: new Date(),
   mealTime: 0,
   diners: 0,
-  remark: ''
+  remark: '',
+  mealMenuList: []
 } as MealUpdateDto)
 
-const formRef = ref<FormInstance>()
+const childComponent = ref(null)
 
+const formRef = ref<FormInstance>()
 const operate = ref("add")
 
 const route = useRoute()
@@ -68,10 +109,12 @@ const parseQueryData = () => {
   // @ts-ignore
   const data: string = route.query.data
   if (data) {
-    formData.value = JSON.parse(data)
+    const dataJson: MealUpdateDto = JSON.parse(data)
+    formData.value = dataJson
+    selectDishes.dishesList = dataJson.mealMenuList as Array<MealMenuAddDto>
   }
   if (route.query.operate) {
-    operate.value = route.query.operate as string
+    operate.value = route.params.operate as string
   }
 }
 
@@ -85,12 +128,13 @@ const disabledDate = (time: Date) => {
 
 const handleDialogConfirm = (formEl: FormInstance | undefined) => {
   if (!formEl) return
-  if (operate.value === "add") {
+  formData.value.mealMenuList = selectDishes.dishesList
+  if (operate.value == "add") {
     // 保存点餐记录
     addMeal(formData.value).then(res => {
       router.push({path: '/meal'})
     })
-  } else if (operate.value === "update") {
+  } else if (operate.value == "update") {
     // 修改点餐记录
     updateMeal(formData.value).then(res => {
       router.push({path: '/meal'})
@@ -102,8 +146,36 @@ const handleDialogConfirm = (formEl: FormInstance | undefined) => {
 
   formEl.resetFields()
 }
+
+function handleSelectDishes() {
+  selectDishes.show = true
+}
+
+const closeTag = (dishesId: number) => {
+  selectDishes.dishesList = selectDishes.dishesList.filter(item => item.dishesId !== dishesId);
+}
+
+function confirmSelectDishes() {
+  // @ts-ignore
+  const multipleSelection = childComponent.value.multipleSelection;
+  if (multipleSelection.length != 0) {
+    for (const item of multipleSelection) {
+      if (selectDishes.dishesList.some(dishes => dishes.dishesId === item.id)) {
+        continue
+      }
+      selectDishes.dishesList.push({
+        dishesId: item.id,
+        dishesName: item.dishesName
+      })
+    }
+  }
+  selectDishes.show = false
+}
+
 </script>
 
 <style scoped>
-
+.gap-2 .el-tag {
+  margin: 5px 10px;
+}
 </style>

@@ -72,8 +72,7 @@ function searchPage() {
     page.total = data.data.total
     page.list = data.data.records
     loading.value = false
-  }).catch(err => {
-    console.log(err)
+  }).finally(() => {
     loading.value = false
   })
 }
@@ -113,8 +112,11 @@ const handleEdit = (index: number, row: MealListData) => {
   })
 }
 const handleDelete = (index: number, row: MealListData) => {
+  loading.value = true
   deleteMeal(row.id).then(res => {
     searchPage()
+  }).finally(() => {
+    loading.value = false
   })
 }
 
