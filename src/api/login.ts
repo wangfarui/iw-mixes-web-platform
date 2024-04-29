@@ -4,7 +4,7 @@ import type {UserLoginVO} from "@/types/types";
 
 // 登录
 export const login = (user: UserLoginVO) => {
-    return request.post('/iw-auth/login/password', user);
+    return request.post('/iw-eat/login/doLogin', user);
 }
 
 export function logout() {

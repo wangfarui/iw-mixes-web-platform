@@ -10,13 +10,27 @@ const service = axios.create({
 })
 
 //这个是请求拦截器，如果是使用 JWT 或者其他令牌登录的话，那么可以在请求拦截器中统一添加令牌
-service.interceptors.request.use();
+service.interceptors.request.use(
+    (config) => {
+        // 从sessionStorage中获取iwtoken的值
+        const iwtoken = window.sessionStorage.getItem("iwtoken");
+        if (iwtoken) {
+            // 设置默认的header参数
+            config.headers["iwtoken"] = iwtoken;
+        }
+        return config;
+    },
+    (error) => {
+        Promise.reject(error);
+    }
+);
+
 service.interceptors.response.use(success => {
     //获取服务端返回的状态码，如果服务端没有设置状态码，默认就是 200
     const code = success.data.status || 200;
     if (code == 200) {
         //说明请求成功
-        if (success.data.code == 500) {
+        if (success.data.code != 200) {
             ElMessage.error(success.data.message)
         }
         //返回服务端返回的 JSON

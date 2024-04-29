@@ -15,7 +15,7 @@
             <template #dropdown>
               <el-dropdown-menu slot="dropdown">
                 <el-dropdown-item><el-icon><Edit /></el-icon>修改资料</el-dropdown-item>
-                <el-dropdown-item><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
+                <el-dropdown-item @click="logout"><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -55,6 +55,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import {RouterView} from 'vue-router'
+import router from "@/router";
 import { getCurrentInstance } from "vue";
 import {Edit, SwitchButton, KnifeFork, Food, House} from '@element-plus/icons-vue'
 
@@ -68,6 +69,10 @@ const user = reactive({
 // 默认选中的菜单项
 const menuActive = ref("/")
 
+function logout() {
+  window.sessionStorage.removeItem("iwtoken");
+  router.push({path: '/login'})
+}
 
 </script>
 
