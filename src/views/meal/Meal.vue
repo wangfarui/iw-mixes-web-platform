@@ -9,7 +9,7 @@
         <el-table-column prop="mealDate" label="用餐日期" width="180" />
         <el-table-column prop="mealTime" label="用餐时间" width="180">
           <template #default="{ row }">
-            {{ getStatusLabel(row.mealTime) }}
+            {{ dict.getDictName('mealTime', row.mealTime) }}
           </template>
         </el-table-column>
         <el-table-column prop="diners" label="用餐人数" width="180" />
@@ -48,6 +48,11 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {MealListData, MealPageDto} from "@/types/meal"
 import {queryMealPage, queryMealDetail, deleteMeal} from "@/api/meal"
+import {useDictStore} from "@/stores";
+import {useMealStore} from "@/stores/meal";
+
+const dict = useDictStore();
+const meal = useMealStore();
 
 const loading = ref(false)
 
@@ -77,40 +82,29 @@ function searchPage() {
   })
 }
 
-const getStatusLabel = (status: number) => {
-  // 根据枚举值返回相应的标签
-  if (status === 1) {
-    return '早餐'
-  } else if (status === 2) {
-    return '午餐'
-  } else if (status === 3) {
-    return '晚餐'
-  } else {
-    return ''
-  }
-}
-
 function handleMealAdd() {
+  meal.initFormData()
   router.push({path: '/meal/add'})
 }
 
 const handleClick = (row: MealListData) => {
   queryMealDetail(row.id).then(res => {
-    router.push({path: '/meal/add', query: {
-      operate: "show",
-      data: JSON.stringify(res.data)
-    }})
+    meal.operate = 'show'
+    meal.formData = res.data
+    meal.selectDishes.dishesList = res.data.mealMenuList
+    router.push({path: '/meal/add'})
   })
 }
 
 const handleEdit = (index: number, row: MealListData) => {
   queryMealDetail(row.id).then(res => {
-    router.push({path: '/meal/add', query: {
-      operate: "update",
-      data: JSON.stringify(res.data)
-    }})
+    meal.operate = 'update'
+    meal.formData = res.data
+    meal.selectDishes.dishesList = res.data.mealMenuList
+    router.push({path: '/meal/add'})
   })
 }
+
 const handleDelete = (index: number, row: MealListData) => {
   loading.value = true
   deleteMeal(row.id).then(res => {
@@ -125,6 +119,7 @@ const handleSizeChange = (val: number) => {
   page.dto.pageSize = val
   searchPage()
 }
+
 const handleCurrentChange = (val: number) => {
   page.dto.currentPage = val
   searchPage()
