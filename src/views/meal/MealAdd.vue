@@ -1,9 +1,9 @@
 <template>
   <div>
-    <el-form ref="formRef" :model="meal.formData" label-width="auto" style="max-width: 500px">
+    <el-form ref="formRef" :model="mealStore.formData" label-width="auto" style="max-width: 500px">
       <el-form-item label="用餐日期" prop="mealDate">
         <el-date-picker
-            v-model="meal.formData.mealDate"
+            v-model="mealStore.formData.mealDate"
             type="date"
             placeholder="请选择一个日期"
             clearable
@@ -12,7 +12,7 @@
         />
       </el-form-item>
       <el-form-item label="用餐时间" prop="mealTime">
-        <el-select v-model="meal.formData.mealTime" placeholder="请选择用餐时间" style="width: 400px">
+        <el-select v-model="mealStore.formData.mealTime" placeholder="请选择用餐时间" style="width: 400px">
           <el-option label="任意时间" :value="0"/>
           <el-option label="早餐" :value="1"/>
           <el-option label="午餐" :value="2"/>
@@ -20,11 +20,11 @@
         </el-select>
       </el-form-item>
       <el-form-item label="用餐人数" prop="diners">
-        <el-input-number v-model="meal.formData.diners" :min="0" :max="99" :precision="0"/>
+        <el-input-number v-model="mealStore.formData.diners" :min="0" :max="99" :precision="0"/>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
         <el-input
-            v-model="meal.formData.remark"
+            v-model="mealStore.formData.remark"
             maxlength="255"
             :rows="3"
             type="textarea"
@@ -38,9 +38,9 @@
 
     <div style="margin-bottom:10px">所选菜品&nbsp;&nbsp;<el-button type="primary" @click="handleSelectDishes">选菜</el-button></div>
     <div class="flex gap-2">
-      <div v-if="meal.selectDishes.dishesList.length == 0">还未选菜哦～</div>
+      <div v-if="mealStore.selectDishes.dishesList.length == 0">还未选菜哦～</div>
       <div v-else>
-        <el-tag v-for="dishes in meal.selectDishes.dishesList"
+        <el-tag v-for="dishes in mealStore.selectDishes.dishesList"
                 type="primary"
                 :key="dishes.dishesId"
                 closable
@@ -52,7 +52,7 @@
     </div>
 
     <el-dialog
-        v-model="meal.selectDishes.show"
+        v-model="mealStore.selectDishes.show"
         title="选择菜品"
         width="750"
         align-center
@@ -66,7 +66,7 @@
 
     <div class="dialog-footer">
       <el-button @click="router.back()">返回</el-button>
-      <el-button type="primary" v-if="meal.operate != 'show'" @click="handleDialogConfirm(formRef)">
+      <el-button type="primary" v-if="mealStore.operate != 'show'" @click="handleDialogConfirm(formRef)">
         保存
       </el-button>
     </div>
@@ -81,7 +81,7 @@ import {addMeal, updateMeal} from "@/api/meal"
 import DishesTable from "@/views/dishes/DishesTable.vue";
 import {useMealStore} from "@/stores/meal";
 
-const meal = useMealStore();
+const mealStore = useMealStore();
 
 const childComponent = ref(null)
 
@@ -94,31 +94,31 @@ const disabledDate = (time: Date) => {
 
 const handleDialogConfirm = (formEl: FormInstance | undefined) => {
   if (!formEl) return
-  meal.formData.mealMenuList = meal.selectDishes.dishesList
-  if (meal.operate == "add") {
+  mealStore.formData.mealMenuList = mealStore.selectDishes.dishesList
+  if (mealStore.operate == "add") {
     // 保存点餐记录
-    addMeal(meal.formData).then(res => {
+    addMeal(mealStore.formData).then(res => {
       router.push({path: '/meal'})
     })
-  } else if (meal.operate == "update") {
+  } else if (mealStore.operate == "update") {
     // 修改点餐记录
-    updateMeal(meal.formData).then(res => {
+    updateMeal(mealStore.formData).then(res => {
       router.push({path: '/meal'})
     })
   } else {
     console.log("未知操作")
-    console.log(meal.operate)
+    console.log(mealStore.operate)
   }
 
   formEl.resetFields()
 }
 
 function handleSelectDishes() {
-  meal.selectDishes.show = true
+  mealStore.selectDishes.show = true
 }
 
 const closeTag = (dishesId: number) => {
-  meal.selectDishes.dishesList = meal.selectDishes.dishesList.filter(item => item.dishesId !== dishesId);
+  mealStore.selectDishes.dishesList = mealStore.selectDishes.dishesList.filter(item => item.dishesId !== dishesId);
 }
 
 function confirmSelectDishes() {
@@ -126,16 +126,16 @@ function confirmSelectDishes() {
   const multipleSelection = childComponent.value.multipleSelection;
   if (multipleSelection.length != 0) {
     for (const item of multipleSelection) {
-      if (meal.selectDishes.dishesList.some(dishes => dishes.dishesId === item.id)) {
+      if (mealStore.selectDishes.dishesList.some(dishes => dishes.dishesId === item.id)) {
         continue
       }
-      meal.selectDishes.dishesList.push({
+      mealStore.selectDishes.dishesList.push({
         dishesId: item.id,
         dishesName: item.dishesName
       })
     }
   }
-  meal.selectDishes.show = false
+  mealStore.selectDishes.show = false
 }
 
 </script>

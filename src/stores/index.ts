@@ -10,17 +10,22 @@ type DictData = {
 export const useDictStore = defineStore('dict', () => {
 
     const dictDataMap: DictData = reactive({
+        'mealTime': {
+            '0': '任意时间',
+            '1': '早餐',
+            '2': '午餐',
+            '3': '晚餐'
+        },
         'dishesType': {
             '0': '',
             '1': '荤',
             '2': '素',
             '3': '荤素'
         },
-        'mealTime': {
-            '0': '任意时间',
-            '1': '早餐',
-            '2': '午餐',
-            '3': '晚餐'
+        'dishesStatus': {
+            '1': '启用',
+            '2': '禁用',
+            '3': '售空'
         }
     })
     function getDictName(dictKey: string, dictCode: string | number) {

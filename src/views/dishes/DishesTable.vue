@@ -45,7 +45,7 @@
       <el-table-column prop="dishesName" label="菜品名称" width="180"/>
       <el-table-column prop="dishesType" label="菜品分类" width="100">
         <template #default="{ row }">
-          {{ getDishesTypeLabel(row.dishesType) }}
+          {{ dictStore.getDictName('dishesType', row.dishesType) }}
         </template>
       </el-table-column>
       <el-table-column prop="difficultyFactor" label="难度系数" width="100"/>
@@ -53,7 +53,7 @@
       <el-table-column prop="prices" label="价格" width="100" :formatter="formatPrices"/>
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
-          {{ getStatusLabel(row.status) }}
+          {{ dictStore.getDictName('dishesStatus', row.status) }}
         </template>
       </el-table-column>
       <el-table-column v-if="permission == 1" label="操作">
@@ -90,6 +90,11 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {DishesListData, DishesPageDto} from "@/types/dishes"
 import {queryDishesPage, queryDishesDetail, deleteDishes} from "@/api/dishes"
+import {useDictStore} from "@/stores";
+import {useDishesStore} from "@/stores/dishes";
+
+const dictStore = useDictStore()
+const dishesStore = useDishesStore()
 
 const props = defineProps<{
   permission?: string
@@ -157,52 +162,21 @@ function formatPrices(row: any, column: any, cellValue: any, index: number) {
   return cellValue + '元'
 }
 
-const getDishesTypeLabel = (dishesType: number) => {
-  // 根据枚举值返回相应的标签
-  if (dishesType === 1) {
-    return '荤'
-  } else if (dishesType === 2) {
-    return '素'
-  } else if (dishesType === 3) {
-    return '荤素'
-  } else {
-    return ''
-  }
-}
-
-const getStatusLabel = (status: number) => {
-  // 根据枚举值返回相应的标签
-  if (status === 1) {
-    return '启用'
-  } else if (status === 2) {
-    return '禁用'
-  } else if (status === 3) {
-    return '售空'
-  } else {
-    return ''
-  }
-}
-
 const handleClick = (row: DishesListData) => {
+  // 非编辑状态 不可双击查询详情
   if (permission.value != 1) return;
   queryDishesDetail(row.id).then(res => {
-    router.push({
-      path: '/dishes/add', query: {
-        operate: "show",
-        data: JSON.stringify(res.data)
-      }
-    })
+    dishesStore.operate = 'show'
+    dishesStore.formData = res.data
+    router.push({path: '/dishes/add'})
   })
 }
 
 const handleEdit = (index: number, row: DishesListData) => {
   queryDishesDetail(row.id).then(res => {
-    router.push({
-      path: '/dishes/add', query: {
-        operate: "update",
-        data: JSON.stringify(res.data)
-      }
-    })
+    dishesStore.operate = 'update'
+    dishesStore.formData = res.data
+    router.push({path: '/dishes/add'})
   })
 }
 const handleDelete = (index: number, row: DishesListData) => {

@@ -10,8 +10,12 @@
 <script setup lang="ts">
 import router from '@/router'
 import DishesTable from "@/views/dishes/DishesTable.vue";
+import {useDishesStore} from "@/stores/dishes";
+
+const dishesStore = useDishesStore()
 
 function handleDishesAdd() {
+  dishesStore.initFormData()
   router.push({path: '/dishes/add'})
 }
 

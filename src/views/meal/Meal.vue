@@ -9,7 +9,7 @@
         <el-table-column prop="mealDate" label="用餐日期" width="180" />
         <el-table-column prop="mealTime" label="用餐时间" width="180">
           <template #default="{ row }">
-            {{ dict.getDictName('mealTime', row.mealTime) }}
+            {{ dictStore.getDictName('mealTime', row.mealTime) }}
           </template>
         </el-table-column>
         <el-table-column prop="diners" label="用餐人数" width="180" />
@@ -51,8 +51,8 @@ import {queryMealPage, queryMealDetail, deleteMeal} from "@/api/meal"
 import {useDictStore} from "@/stores";
 import {useMealStore} from "@/stores/meal";
 
-const dict = useDictStore();
-const meal = useMealStore();
+const dictStore = useDictStore();
+const mealStore = useMealStore();
 
 const loading = ref(false)
 
@@ -83,24 +83,24 @@ function searchPage() {
 }
 
 function handleMealAdd() {
-  meal.initFormData()
+  mealStore.initFormData()
   router.push({path: '/meal/add'})
 }
 
 const handleClick = (row: MealListData) => {
   queryMealDetail(row.id).then(res => {
-    meal.operate = 'show'
-    meal.formData = res.data
-    meal.selectDishes.dishesList = res.data.mealMenuList
+    mealStore.operate = 'show'
+    mealStore.formData = res.data
+    mealStore.selectDishes.dishesList = res.data.mealMenuList
     router.push({path: '/meal/add'})
   })
 }
 
 const handleEdit = (index: number, row: MealListData) => {
   queryMealDetail(row.id).then(res => {
-    meal.operate = 'update'
-    meal.formData = res.data
-    meal.selectDishes.dishesList = res.data.mealMenuList
+    mealStore.operate = 'update'
+    mealStore.formData = res.data
+    mealStore.selectDishes.dishesList = res.data.mealMenuList
     router.push({path: '/meal/add'})
   })
 }
