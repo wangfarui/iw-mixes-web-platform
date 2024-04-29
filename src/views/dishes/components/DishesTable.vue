@@ -168,7 +168,7 @@ const handleClick = (row: DishesListData) => {
   queryDishesDetail(row.id).then(res => {
     dishesStore.operate = 'show'
     dishesStore.formData = res.data
-    router.push({path: '/dishes/add'})
+    router.push({path: '/dishes/detail'})
   })
 }
 
@@ -176,7 +176,7 @@ const handleEdit = (index: number, row: DishesListData) => {
   queryDishesDetail(row.id).then(res => {
     dishesStore.operate = 'update'
     dishesStore.formData = res.data
-    router.push({path: '/dishes/add'})
+    router.push({path: '/dishes/edit'})
   })
 }
 const handleDelete = (index: number, row: DishesListData) => {

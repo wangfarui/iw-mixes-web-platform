@@ -9,7 +9,7 @@
 
 <script setup lang="ts">
 import router from '@/router'
-import DishesTable from "@/views/dishes/DishesTable.vue";
+import DishesTable from "@/views/dishes/components/DishesTable.vue";
 import {useDishesStore} from "@/stores/dishes";
 
 const dishesStore = useDishesStore()
