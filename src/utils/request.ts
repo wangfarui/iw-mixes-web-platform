@@ -6,7 +6,8 @@ import router from "@/router";
 axios.defaults.headers['Content-Type'] = 'application/json;charset=utf-8'
 
 const service = axios.create({
-    timeout: 10000
+    timeout: 30000,
+    baseURL: '//api.itwray.com'
 })
 
 //这个是请求拦截器，如果是使用 JWT 或者其他令牌登录的话，那么可以在请求拦截器中统一添加令牌
