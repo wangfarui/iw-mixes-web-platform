@@ -48,10 +48,10 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {MealListData, MealPageDto} from "@/types/meal"
 import {queryMealPage, queryMealDetail, deleteMeal} from "@/api/meal"
-import {useDictStore} from "@/stores";
+import {useCommonStore} from "@/stores";
 import {useMealStore} from "@/stores/meal";
 
-const dictStore = useDictStore();
+const dictStore = useCommonStore();
 const mealStore = useMealStore();
 
 const loading = ref(false)

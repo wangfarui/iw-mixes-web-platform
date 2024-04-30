@@ -35,7 +35,7 @@
       </div>
       <template #footer>
         <div style="display: flex;justify-content: center">
-          <el-button>重置</el-button>
+          <el-button @click="resetForm">重置</el-button>
           <el-button type="primary" @click="loginHandle">登录</el-button>
         </div>
       </template>
@@ -72,6 +72,11 @@ const svg = `
         " style="stroke-width: 4px; fill: rgba(0, 0, 0, 0)"/>
       `
 
+function resetForm() {
+  data.userInfo.username = ''
+  data.userInfo.password = ''
+}
+
 function loginHandle() {
   if (userInfo.value.username == '' || userInfo.value.password == '') {
     ElMessage.warning('用户名和密码不能为空')
@@ -82,6 +87,7 @@ function loginHandle() {
     loading.value = false;
     //1. 先把用户信息保存起来，后面用
     //这里保存的数据格式是 key-value 形式的，value 只能是字符串，不能是 JSON 对象
+    window.sessionStorage.setItem("username", data.data.name);
     window.sessionStorage.setItem("iwtoken", data.data.tokenValue);
     //获取到请求地址栏的 redirect 参数 http://localhost:5173/?redirect=/per/emp
     // let redirect = proxy.$router.currentRoute.value.query.redirect;

@@ -90,10 +90,10 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {DishesListData, DishesPageDto} from "@/types/dishes"
 import {queryDishesPage, queryDishesDetail, deleteDishes} from "@/api/dishes"
-import {useDictStore} from "@/stores";
+import {useCommonStore} from "@/stores";
 import {useDishesStore} from "@/stores/dishes";
 
-const dictStore = useDictStore()
+const dictStore = useCommonStore()
 const dishesStore = useDishesStore()
 
 const props = defineProps<{

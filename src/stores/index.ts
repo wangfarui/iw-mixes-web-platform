@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue';
+import type {UserInfoVo} from "@/types/types";
 
 type DictData = {
     [key: string]: {
@@ -7,7 +8,11 @@ type DictData = {
     };
 };
 
-export const useDictStore = defineStore('dict', () => {
+export const useCommonStore = defineStore('common', () => {
+
+    const userInfo: UserInfoVo = reactive({
+        name: ''
+    })
 
     const dictDataMap: DictData = reactive({
         'mealTime': {
@@ -28,11 +33,12 @@ export const useDictStore = defineStore('dict', () => {
             '3': '售空'
         }
     })
+
     function getDictName(dictKey: string, dictCode: string | number) {
         let dictMap = dictDataMap[dictKey]
         if (dictMap == undefined) return ''
         return dictMap[dictCode.toString()]
     }
 
-    return { getDictName }
+    return { userInfo, getDictName }
 })

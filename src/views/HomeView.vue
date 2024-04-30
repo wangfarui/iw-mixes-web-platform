@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import {ref, reactive, onMounted} from 'vue'
 import {RouterView} from 'vue-router'
 import router from "@/router";
 import { getCurrentInstance } from "vue";
@@ -68,6 +68,10 @@ const user = reactive({
 
 // 默认选中的菜单项
 const menuActive = ref("/")
+
+onMounted(() => {
+  user.name = window.sessionStorage.getItem("username");
+})
 
 function logout() {
   window.sessionStorage.removeItem("iwtoken");
