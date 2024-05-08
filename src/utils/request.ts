@@ -36,10 +36,12 @@ service.interceptors.response.use(success => {
         if (success.data.code == 401) {
             window.sessionStorage.removeItem('iwtoken')
             router.replace('/login');
+            return Promise.reject(success.data.message);
         }
         //说明请求成功
         if (success.data.code != 200) {
             ElMessage.error(success.data.message)
+            return Promise.reject(success.data.message);
         }
         //返回服务端返回的 JSON
         return success.data;

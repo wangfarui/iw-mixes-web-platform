@@ -111,6 +111,7 @@ const handleDialogConfirm = (formEl: FormInstance | undefined) => {
   }
 
   formEl.resetFields()
+  mealStore.selectDishes.dishesList = []
 }
 
 function handleSelectDishes() {
