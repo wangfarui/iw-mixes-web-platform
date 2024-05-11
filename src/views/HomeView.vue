@@ -61,7 +61,7 @@ import {Edit, SwitchButton, KnifeFork, Food, House} from '@element-plus/icons-vu
 
 const { proxy } = getCurrentInstance()!;
 
-const user = reactive({
+const user: any = reactive({
   name: "Admin",
   avatar: "https://itwray-bucket.oss-cn-wuhan-lr.aliyuncs.com/img/touxiang.jpeg"
 })

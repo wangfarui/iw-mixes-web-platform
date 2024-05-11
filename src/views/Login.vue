@@ -50,8 +50,7 @@ import {getCurrentInstance} from "vue";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
-const {proxy} = getCurrentInstance();
-
+const {proxy} = getCurrentInstance()
 
 const data = reactive({
   userInfo: {

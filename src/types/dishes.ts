@@ -19,6 +19,7 @@ export type DishesPageDto = {
 
 export type DishesAddDto = {
     dishesName: string,
+    dishesImage?: string,
     dishesType?: number,
     difficultyFactor?: number,
     useTime?: number,

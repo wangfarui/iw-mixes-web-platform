@@ -11,6 +11,7 @@ export const useDishesStore = defineStore('dishes', () => {
         formData.value = {
             id: 0,
             dishesName: '',
+            dishesImage: '',
             dishesType: 0,
             difficultyFactor: 0,
             useTime: 0,
