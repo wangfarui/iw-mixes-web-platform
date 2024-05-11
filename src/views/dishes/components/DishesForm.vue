@@ -6,6 +6,7 @@
       </el-form-item>
       <el-form-item label="菜品封面图" prop="dishesImage">
         <el-upload
+            v-loading.fullscreen.lock="fullscreenLoading"
             class="avatar-uploader"
             :action="uploadAction"
             name="file"
@@ -77,6 +78,7 @@ import type { UploadProps } from 'element-plus'
 
 const dishesStore = useDishesStore()
 
+const fullscreenLoading = ref(false)
 const formRef = ref<FormInstance>()
 const uploadAction = ref('')
 const iwHeaders = {"iwtoken": window.sessionStorage.getItem("iwtoken")}
@@ -102,6 +104,7 @@ const handleAvatarSuccess: UploadProps['onSuccess'] = (
     uploadFile
 ) => {
   dishesStore.formData.dishesImage = response.data.fileUrl
+  fullscreenLoading.value = false
 }
 
 const beforeAvatarUpload: UploadProps['beforeUpload'] = (rawFile) => {
@@ -112,6 +115,7 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (rawFile) => {
     ElMessage.error('图片大小不能超过10MB!')
     return false
   }
+  fullscreenLoading.value = true
   return true
 }
 
