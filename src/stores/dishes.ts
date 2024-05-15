@@ -1,10 +1,13 @@
 import {ref, reactive} from 'vue'
 import { defineStore } from 'pinia'
-import type {DishesUpdateDto} from "@/types/dishes";
+import type {DishesCreationMethodAddDto, DishesMaterialAddDto, DishesUpdateDto} from "@/types/dishes";
 
 export const useDishesStore = defineStore('dishes', () => {
     const operate = ref("add")
-    const formData = ref({} as DishesUpdateDto)
+    const formData = ref({
+        dishesMaterialList: [{}],
+        dishesCreationMethodList: [{}]
+    } as DishesUpdateDto)
 
     function initFormData() {
         operate.value = "add"
@@ -16,7 +19,9 @@ export const useDishesStore = defineStore('dishes', () => {
             difficultyFactor: 0,
             useTime: 0,
             prices: 0,
-            status: 1
+            status: 1,
+            dishesMaterialList: [{}] as Array<DishesMaterialAddDto>,
+            dishesCreationMethodList: [{}] as Array<DishesCreationMethodAddDto>
         }
     }
 

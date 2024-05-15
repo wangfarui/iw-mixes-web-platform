@@ -64,7 +64,7 @@
           <el-button
               size="small"
               type="danger"
-              @click="handleDelete(scope.$index, scope.row)"
+              @click="handleDelete(scope.row)"
           >
             删除
           </el-button>
@@ -82,6 +82,20 @@
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
     />
+
+    <el-dialog v-model="confirmDelete" title="提示" width="200" center>
+    <span>
+      确定删除吗
+    </span>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="confirmDelete = false;">取消</el-button>
+          <el-button type="primary" @click="handleConfirmDelete">
+            确定
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -121,6 +135,8 @@ const page = reactive({
 })
 
 const multipleSelection = ref<DishesListData[]>([])
+const confirmDelete = ref(false)
+const waitDeleteRow = ref<DishesListData>()
 
 defineExpose({
   multipleSelection
@@ -179,11 +195,24 @@ const handleEdit = (index: number, row: DishesListData) => {
     router.push({path: '/dishes/edit'})
   })
 }
-const handleDelete = (index: number, row: DishesListData) => {
+
+const handleDelete = (row: DishesListData) => {
+  waitDeleteRow.value = row
+  confirmDelete.value = true
+}
+
+const handleConfirmDelete = () => {
+  if (!waitDeleteRow.value) {
+    confirmDelete.value = false
+    return
+  }
+
   loading.value = true
-  deleteDishes(row.id).then(res => {
+  deleteDishes(waitDeleteRow.value.id).then(res => {
     searchPage()
   }).finally(() => {
+    waitDeleteRow.value = undefined
+    confirmDelete.value = false
     loading.value = false
   })
 }
