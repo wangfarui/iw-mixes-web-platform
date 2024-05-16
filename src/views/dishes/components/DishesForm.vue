@@ -18,7 +18,7 @@
             :before-upload="beforeAvatarUpload"
         >
           <el-image v-if="dishesStore.formData.dishesImage"
-                    style="width: 100px; height: 100px" :src="dishesStore.formData.dishesImage" fit="fill" />
+                    style="width: 100px; height: 100px" :src="dishesStore.formData.dishesImage" fit="fill"/>
           <el-icon v-else class="avatar-uploader-icon">
             <Plus/>
           </el-icon>
@@ -59,10 +59,10 @@
         />
       </el-form-item>
 
-      <div>
+      <div class="material-item">
         所需食材：
         <div v-for="(item, index) in dishesStore.formData.dishesMaterialList" :key="index" class="dishes-item">
-          <el-row :gutter="20" align="middle">
+          <el-row :gutter="5" align="middle">
             <el-col :span="6">
               <el-form-item label="食材名称">
                 <el-input v-model="item.materialName" maxlength="16" placeholder="输入食材名称"></el-input>
@@ -73,30 +73,32 @@
                 <el-input v-model="item.materialDosage" maxlength="16" placeholder="输入食材用量"></el-input>
               </el-form-item>
             </el-col>
+            <el-col :span="4">
+              <el-form-item label="食材价格">
+                <el-input-number v-model="item.materialPrice" :precision="2" :step="1" :min="0" :max="9999.99"/>
+              </el-form-item>
+            </el-col>
             <el-col :span="3">
               <el-form-item label="是否需要购买">
                 <el-switch v-model="item.isPurchase"></el-switch>
               </el-form-item>
             </el-col>
-            <el-col :span="2">
-              <el-form-item>
-                <div v-if="index !== 0">
-                  <el-button @click="removeItem(dishesStore.formData.dishesMaterialList, index)" type="danger"
-                             icon="el-icon-delete">移除
-                  </el-button>
-                </div>
-              </el-form-item>
+            <el-col :span="1" style="margin-right: 10px">
+              <el-button @click="removeItem(dishesStore.formData.dishesMaterialList, index)" type="danger">
+                移除
+              </el-button>
             </el-col>
-            <el-col :span="2">
-              <div style="display: flex;justify-content: space-between;">
-                <el-button v-if="index !== 0" @click="moveItemUp(dishesStore.formData.dishesMaterialList, index)"
-                           type="primary" icon="el-icon-arrow-up">上移
-                </el-button>
-                <el-button v-if="index !== dishesStore.formData.dishesMaterialList.length - 1"
-                           @click="moveItemDown(dishesStore.formData.dishesMaterialList, index)" type="primary"
-                           icon="el-icon-arrow-down">下移
-                </el-button>
-              </div>
+            <el-col :span="1" style="margin-right: 10px">
+              <el-button v-if="index !== 0" @click="moveItemUp(dishesStore.formData.dishesMaterialList, index)"
+                         type="primary">
+                上移
+              </el-button>
+            </el-col>
+            <el-col :span="1">
+              <el-button v-if="index !== dishesStore.formData.dishesMaterialList.length - 1"
+                         @click="moveItemDown(dishesStore.formData.dishesMaterialList, index)" type="primary">
+                下移
+              </el-button>
             </el-col>
           </el-row>
         </div>
@@ -110,7 +112,7 @@
         <div v-for="(item, index) in dishesStore.formData.dishesCreationMethodList" :key="index" class="dishes-item">
           <el-row>
             <el-col :span="4">
-              步骤{{ (index+1).toString() }}
+              步骤{{ (index + 1).toString() }}
             </el-col>
             <el-col :span="20">
               <el-button v-if="index !== 0" @click="moveItemUp(dishesStore.formData.dishesCreationMethodList, index)"
@@ -122,18 +124,16 @@
                          icon="el-icon-arrow-down">
                 下移
               </el-button>
-                <el-button v-if="index !== 0" style="text-align: end"
-                           @click="removeItem(dishesStore.formData.dishesCreationMethodList, index)" type="danger"
-                           icon="el-icon-delete" >
-                  移除
-                </el-button>
+              <el-button style="text-align: end"
+                         @click="removeItem(dishesStore.formData.dishesCreationMethodList, index)" type="danger"
+                         icon="el-icon-delete">
+                移除
+              </el-button>
             </el-col>
           </el-row>
-          <div>
-            +步骤图<el-text type="info">（清晰的步骤会让制作过程更轻松）</el-text>
+          <div style="margin-bottom: 5px">
             <el-upload
                 v-loading.fullscreen.lock="fullscreenLoading"
-                class="avatar-uploader"
                 :action="uploadAction"
                 name="file"
                 method="post"
@@ -144,10 +144,13 @@
                 :before-upload="beforeAvatarUpload"
             >
               <el-image v-if="item.stepImage"
-                        style="width: 100px; height: 100px" :src="item.stepImage" fit="fill" />
-              <el-icon v-else class="avatar-uploader-icon">
-                <Plus/>
-              </el-icon>
+                        style="width: 100px; height: 100px" :src="item.stepImage" fit="fill"/>
+              <div v-else>
+                <el-icon  class="avatar-uploader-icon">
+                  <Plus/>
+                </el-icon>
+                <el-text type="info">（清晰的步骤图会让制作过程更轻松）</el-text>
+              </div>
             </el-upload>
           </div>
           <div>
@@ -297,14 +300,19 @@ const handleDialogConfirm = async (formEl: FormInstance | undefined) => {
 </script>
 
 <style scoped>
+.material-item .el-form-item {
+  margin-bottom: 0
+}
+
 .el-icon.avatar-uploader-icon {
   font-size: 28px;
   color: #8c939d;
-  width: 178px;
-  height: 178px;
+  width: 78px;
+  height: 78px;
   text-align: center;
   background-color: #fafafa;
 }
+
 .dishes-item {
   margin: 10px 0;
   padding: 10px;

@@ -37,6 +37,7 @@ export type DishesUpdateDto = DishesAddDto & {
 export type DishesMaterialAddDto = {
     materialName?: string, // 食材名称
     materialDosage?: string, // 食材用量
+    materialPrice?: number, // 食材价格
     isPurchase: boolean // 是否需要购买 0否 1是
 }
 
