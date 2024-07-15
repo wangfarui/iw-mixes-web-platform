@@ -1,4 +1,4 @@
-import request from "@/utils/request";
+import request from "@/api/request";
 import type * as DishesType from "@/types/dishes";
 
 // 菜品分页列表

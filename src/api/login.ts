@@ -1,4 +1,4 @@
-import request from "@/utils/request";
+import request from "@/api/request";
 import type {UserLoginVO} from "@/types/types";
 
 

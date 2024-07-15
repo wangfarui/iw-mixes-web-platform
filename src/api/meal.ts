@@ -1,4 +1,4 @@
-import request from "@/utils/request";
+import request from "@/api/request";
 import type * as MealType from "@/types/meal";
 
 

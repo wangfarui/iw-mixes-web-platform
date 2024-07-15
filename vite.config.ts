@@ -3,11 +3,6 @@ import {fileURLToPath, URL} from 'node:url'
 import {loadEnv} from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// const baseUrl = {
-//   dev: `./`,
-//   prod: `https://eat.itwray.com`
-// };
-
 export default ({ command, mode }) => {
   // 获取环境变量
   const envParams = loadEnv(mode, './');
@@ -29,7 +24,6 @@ export default ({ command, mode }) => {
         }
       },
     },
-    // base: baseUrl[VITE_BUILD_ENV],
     plugins: [
       vue(),
     ],

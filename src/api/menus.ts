@@ -1,4 +1,4 @@
-import request from "@/utils/request";
+import request from "@/api/request";
 import type {AxiosResponse} from "axios";
 
 // 假设菜单数据的类型是 Menu
