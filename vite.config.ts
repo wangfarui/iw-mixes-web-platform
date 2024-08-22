@@ -11,18 +11,19 @@ export default ({ command, mode }) => {
   return {
     server: {
       proxy: {
-        // with options: http://localhost:5173/api/bar-> http://jsonplaceholder.typicode.com/bar
-        '/iw-auth': {
-          target: 'http://localhost:18001',
-          changeOrigin: true,
-          // rewrite: (path) => path.replace(/^\/api/, ''),
+        '/auth-service': {
+          target: 'http://localhost:18000',
+          changeOrigin: true
         },
-        '/iw-eat': {
-          target: 'http://localhost:18003',
-          changeOrigin: true,
-          // rewrite: (path) => path.replace(/^\/api/, ''),
+        '/eat-service': {
+          target: 'http://localhost:18000',
+          changeOrigin: true
+        },
+        '/bookkeeping-service': {
+          target: 'http://localhost:18000',
+          changeOrigin: true
         }
-      },
+      }
     },
     plugins: [
       vue(),

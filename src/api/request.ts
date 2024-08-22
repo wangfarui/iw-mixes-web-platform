@@ -35,6 +35,7 @@ service.interceptors.response.use(success => {
         // 未授权
         if (success.data.code == 401) {
             window.sessionStorage.removeItem('iwtoken')
+            ElMessage.error("登录状态失效，请重新登录");
             router.replace('/login');
             return Promise.reject(success.data.message);
         }
@@ -56,7 +57,7 @@ service.interceptors.response.use(success => {
         router.replace('/login');
     }
     //HTTP 状态码不是 200，就会进入到这个回调中
-    ElMessage.error(error);
+    ElMessage.error("请求失败");
     return Promise.reject(error);
 })
 
