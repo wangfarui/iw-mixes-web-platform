@@ -2,6 +2,8 @@ import {createRouter, createWebHistory} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import Meal from '@/views/meal/Meal.vue'
 import Dishes from '@/views/dishes/Dishes.vue'
+import Bookkeeping from '@/views/bookkeeping/Bookkeeping.vue'
+import DictManagement from '@/views/dict/DictManagement.vue'
 import Login from "@/views/Login.vue";
 
 const router = createRouter({
@@ -56,6 +58,16 @@ const router = createRouter({
                     path: '/dishes/detail',
                     name: '菜品详情',
                     component: () => import('@/views/dishes/DishesDetail.vue')
+                },
+                {
+                    path: '/bookkeeping',
+                    name: '记账记录',
+                    component: Bookkeeping
+                },
+                {
+                    path: '/dict',
+                    name: '字典管理',
+                    component: DictManagement
                 }
             ]
         }

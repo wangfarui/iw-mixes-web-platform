@@ -1,3 +1,3 @@
-# iw-mixes-eat
+# iw-mixes-web-platform
 
-Iw Mixes项目-点餐系统
+Iw Mixes项目-Web管理平台

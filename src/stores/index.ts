@@ -31,6 +31,10 @@ export const useCommonStore = defineStore('common', () => {
             '1': '启用',
             '2': '禁用',
             '3': '售空'
+        },
+        'recordCategory' : {
+            '1': '支出',
+            '2': '收入'
         }
     })
 

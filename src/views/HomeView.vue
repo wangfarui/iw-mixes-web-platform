@@ -4,7 +4,7 @@
       <!-- 顶栏容器 -->
       <el-header class="header">
         <div class="left">
-          <span class="logo">IW点餐系统</span>
+          <span class="logo">IW管理平台</span>
         </div>
         <div class="right">
           <el-dropdown trigger="hover">
@@ -24,17 +24,38 @@
 
       <el-container>
         <!-- 侧边容器 -->
-        <el-aside width="150px">
+        <el-aside width="250px">
           <el-menu router>
             <el-menu-item index="/"><el-icon><House /></el-icon>首页</el-menu-item>
-            <el-menu-item index="/meal"><el-icon><Food /></el-icon>点餐</el-menu-item>
-            <el-menu-item index="/dishes"><el-icon><KnifeFork /></el-icon>菜品</el-menu-item>
+            <el-sub-menu index="1">
+              <template #title>
+                <el-icon><Dish /></el-icon>
+                <span>餐饮管理</span>
+              </template>
+              <el-menu-item index="/meal"><el-icon><Food /></el-icon>点餐记录</el-menu-item>
+              <el-menu-item index="/dishes"><el-icon><KnifeFork /></el-icon>菜品管理</el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="2">
+              <template #title>
+                <el-icon><Wallet /></el-icon>
+                <span>财务管理</span>
+              </template>
+              <el-menu-item index="/bookkeeping"><el-icon><ShoppingCart /></el-icon>记账记录</el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="3">
+              <template #title>
+                <el-icon><Setting /></el-icon>
+                <span>基础设置</span>
+              </template>
+              <el-menu-item index="/dict"><el-icon><Memo /></el-icon>字典列表</el-menu-item>
+            </el-sub-menu>
+
           </el-menu>
         </el-aside>
 
         <!-- 主容器 -->
         <el-main>
-          <div v-if="proxy!.$router.currentRoute.value.path=='/'" style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">欢迎来到IW点餐系统！</div>
+          <div v-if="proxy!.$router.currentRoute.value.path=='/'" style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">欢迎来到IW管理平台！</div>
           <RouterView/>
         </el-main>
       </el-container>
@@ -57,7 +78,7 @@ import {ref, reactive, onMounted} from 'vue'
 import {RouterView} from 'vue-router'
 import router from "@/router";
 import { getCurrentInstance } from "vue";
-import {Edit, SwitchButton, KnifeFork, Food, House} from '@element-plus/icons-vue'
+import {Edit, SwitchButton, KnifeFork, Dish, Food, House, Wallet, ShoppingCart, Setting, Memo} from '@element-plus/icons-vue'
 
 const { proxy } = getCurrentInstance()!;
 
