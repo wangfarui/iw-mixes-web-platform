@@ -68,6 +68,16 @@ const router = createRouter({
                     path: '/dict',
                     name: '字典管理',
                     component: DictManagement
+                },
+                {
+                    path: '/dict/add',
+                    name: '新增字典',
+                    component: () => import('@/views/dict/DictAdd.vue')
+                },
+                {
+                    path: '/dict/edit/:id',
+                    name: '修改字典',
+                    component: () => import('@/views/dict/DictEdit.vue')
                 }
             ]
         }

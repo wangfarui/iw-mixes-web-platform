@@ -17,5 +17,5 @@ exit
 EOF
 
 # 5. 切换到本地目录并拷贝iw-mixes-eat目录到远程服务器
-cd /Users/wangfarui/workspaces/wfr/iw-mixes-eat || exit 1
+cd /Users/wangfarui/workspaces/wfr/iw-mixes-web-platform || exit 1
 scp -r ./dist aliyun183:/usr/share/nginx/iw-mixes-eat

@@ -45,10 +45,14 @@
 
 <script setup>
 import {reactive, toRefs} from "vue";
-import {login} from "@/api/login.ts";
+import {login, getDictTypeList} from "@/api/login.ts";
 import {getCurrentInstance} from "vue";
 import router from '@/router'
 import {ElMessage} from "element-plus";
+
+import {useCommonStore} from "@/stores";
+
+const dictStore = useCommonStore();
 
 const {proxy} = getCurrentInstance()
 
@@ -92,7 +96,12 @@ function loginHandle() {
     // let redirect = proxy.$router.currentRoute.value.query.redirect;
     //2. 跳转
     router.push({path: '/'})
-    // proxy.$router.replace(redirect ? redirect : '/home');
+
+    // 3. 加载字典数据
+    getDictTypeList().then(data => {
+      dictStore.setDictObject('dictType', data.data)
+    })
+
   }).catch(err => {
     // alert(JSON.stringify(err));
     loading.value = false;
