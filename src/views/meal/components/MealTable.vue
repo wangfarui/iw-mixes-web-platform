@@ -9,7 +9,7 @@
         <el-table-column prop="mealDate" label="用餐日期" width="180"/>
         <el-table-column prop="mealTime" label="用餐时间" width="180">
           <template #default="{ row }">
-            {{ dictStore.getDictName('mealTime', row.mealTime) }}
+            {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.EAT_MEAL_TIME, row.mealTime) }}
           </template>
         </el-table-column>
         <el-table-column prop="diners" label="用餐人数" width="180"/>
@@ -51,7 +51,7 @@ import {queryMealPage, queryMealDetail, deleteMeal} from "@/api/meal"
 import {useCommonStore} from "@/stores";
 import {useMealStore} from "@/stores/meal";
 
-const dictStore = useCommonStore();
+const commonStore = useCommonStore();
 const mealStore = useMealStore();
 
 const loading = ref(false)

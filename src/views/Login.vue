@@ -45,14 +45,14 @@
 
 <script setup>
 import {reactive, toRefs} from "vue";
-import {login, getDictTypeList} from "@/api/login.ts";
+import {login, getDictTypeList, getAllDictList} from "@/api/login.ts";
 import {getCurrentInstance} from "vue";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
 import {useCommonStore} from "@/stores";
 
-const dictStore = useCommonStore();
+const commonStore = useCommonStore();
 
 const {proxy} = getCurrentInstance()
 
@@ -97,10 +97,16 @@ function loginHandle() {
     //2. 跳转
     router.push({path: '/'})
 
-    // 3. 加载字典数据
+    // 3. 加载字典类型
     getDictTypeList().then(data => {
-      dictStore.setDictObject('dictType', data.data)
+      commonStore.setDictTypeArray(data.data)
     })
+
+    // 4. 加载所有数据字典
+    getAllDictList().then(data => {
+      commonStore.setDictDataArrayMap(data.data)
+    })
+
 
   }).catch(err => {
     // alert(JSON.stringify(err));

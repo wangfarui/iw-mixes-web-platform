@@ -15,7 +15,7 @@ export const useDishesStore = defineStore('dishes', () => {
             id: 0,
             dishesName: '',
             dishesImage: '',
-            dishesType: 0,
+            dishesType: 1,
             difficultyFactor: 0,
             useTime: 0,
             prices: 0,

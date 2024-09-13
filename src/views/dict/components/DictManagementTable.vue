@@ -16,8 +16,8 @@
           <div class="search-input">
             <span class="label">字典类型:</span>
             <el-select v-model="page.dto.dictType" clearable placeholder="请选择字典类型">
-              <el-option v-for="item in dictStore.getDictArray('dictType')"
-                         :key="item.value"
+              <el-option v-for="item in commonStore.getDictTypeArray()"
+                         :key="item.code"
                          :label="item.name"
                          :value="item.code"
               />
@@ -44,7 +44,7 @@
       <el-table :data="page.list" style="width: 100%" @row-dblclick="handleClick">
         <el-table-column prop="dictType" label="字典类型" width="180">
           <template #default="{ row }">
-            {{ dictStore.getDictName('dictType', row.dictType) }}
+            {{ commonStore.getDictTypeName(row.dictType) }}
           </template>
         </el-table-column>
         <el-table-column prop="dictCode" label="字典code" width="180">
@@ -95,7 +95,7 @@ import type {DictListData, DictPageDto} from "@/types/dict"
 import {queryDictPage, queryDictDetail, deleteDict} from "@/api/dict"
 import {useCommonStore} from "@/stores";
 
-const dictStore = useCommonStore();
+const commonStore = useCommonStore();
 
 const loading = ref(false)
 

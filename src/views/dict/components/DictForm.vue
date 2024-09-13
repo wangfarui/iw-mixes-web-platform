@@ -3,8 +3,8 @@
     <el-form ref="formRef" :model="formData" label-width="auto" style="max-width: 500px">
       <el-form-item label="字典类型" prop="dictType">
         <el-select v-model="formData.dictType" placeholder="请选择字典类型" style="width: 400px">
-          <el-option v-for="item in dictStore.getDictArray('dictType')"
-                     :key="item.value"
+          <el-option v-for="item in commonStore.getDictTypeArray()"
+                     :key="item.code"
                      :label="item.name"
                      :value="item.code"
           />
@@ -49,7 +49,7 @@ import {addDict, updateDict, queryDictDetail} from "@/api/dict"
 import type {DictUpdateDto} from "@/types/dict";
 import {useCommonStore} from "@/stores";
 
-const dictStore = useCommonStore();
+const commonStore = useCommonStore();
 const route = useRoute();
 
 const formData = ref({

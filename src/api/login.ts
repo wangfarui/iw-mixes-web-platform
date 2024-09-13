@@ -12,6 +12,11 @@ export const getDictTypeList = () => {
     return request.get('/auth-service/dict/getDictTypeList');
 }
 
+// 查询所有数据字典集合
+export const getAllDictList = () => {
+    return request.get('/auth-service/dict/getAllDictList');
+}
+
 export function logout() {
     return request({
         url: '/api/logout',

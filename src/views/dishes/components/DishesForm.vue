@@ -26,10 +26,11 @@
       </el-form-item>
       <el-form-item label="菜品分类" prop="dishesType">
         <el-select v-model="dishesStore.formData.dishesType" placeholder="请选择菜品分类" style="width: 400px">
-          <el-option label="未知" :value="0"/>
-          <el-option label="荤" :value="1"/>
-          <el-option label="素" :value="2"/>
-          <el-option label="荤素" :value="3"/>
+          <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_TYPE)"
+                     :key="item.dictCode"
+                     :label="item.dictName"
+                     :value="item.dictCode"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="难度系数" prop="difficultyFactor">
@@ -43,9 +44,11 @@
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="dishesStore.formData.status" placeholder="请选择菜品状态" style="width: 400px">
-          <el-option label="启用" :value="1"/>
-          <el-option label="禁用" :value="2"/>
-          <el-option label="售空" :value="3"/>
+          <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_STATUS)"
+                     :key="item.dictCode"
+                     :label="item.dictName"
+                     :value="item.dictCode"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
@@ -186,6 +189,9 @@ import router from "@/router"
 import {addDishes, updateDishes} from "@/api/dishes"
 import type {DishesCreationMethodAddDto, DishesUpdateDto} from "@/types/dishes"
 import {useDishesStore} from "@/stores/dishes";
+import {useCommonStore} from "@/stores";
+
+const commonStore = useCommonStore();
 
 import type {UploadProps} from 'element-plus'
 

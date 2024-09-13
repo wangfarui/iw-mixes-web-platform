@@ -12,10 +12,11 @@
           <div class="search-input">
             <span class="label">菜品分类:</span>
             <el-select v-model="page.dto.dishesType" clearable placeholder="请选择菜品分类">
-              <el-option label="未知" :value="0"/>
-              <el-option label="荤" :value="1"/>
-              <el-option label="素" :value="2"/>
-              <el-option label="荤素" :value="3"/>
+              <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_TYPE)"
+                         :key="item.dictCode"
+                         :label="item.dictName"
+                         :value="item.dictCode"
+              />
             </el-select>
           </div>
         </el-col>
@@ -23,9 +24,11 @@
           <div class="search-input">
             <span class="label">状态:</span>
             <el-select v-model="page.dto.status" clearable placeholder="请选择菜品状态">
-              <el-option label="启用" :value="1"/>
-              <el-option label="禁用" :value="2"/>
-              <el-option label="售空" :value="3"/>
+              <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_STATUS)"
+                         :key="item.dictCode"
+                         :label="item.dictName"
+                         :value="item.dictCode"
+              />
             </el-select>
           </div>
         </el-col>
@@ -45,7 +48,7 @@
       <el-table-column prop="dishesName" label="菜品名称" width="180"/>
       <el-table-column prop="dishesType" label="菜品分类" width="100">
         <template #default="{ row }">
-          {{ dictStore.getDictName('dishesType', row.dishesType) }}
+          {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.EAT_DISHES_TYPE, row.dishesType) }}
         </template>
       </el-table-column>
       <el-table-column prop="difficultyFactor" label="难度系数" width="100"/>
@@ -53,7 +56,7 @@
       <el-table-column prop="prices" label="价格" width="100" :formatter="formatPrices"/>
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
-          {{ dictStore.getDictName('dishesStatus', row.status) }}
+          {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.EAT_DISHES_STATUS, row.status) }}
         </template>
       </el-table-column>
       <el-table-column v-if="permission == 1" label="操作">
@@ -107,7 +110,7 @@ import {queryDishesPage, queryDishesDetail, deleteDishes} from "@/api/dishes"
 import {useCommonStore} from "@/stores";
 import {useDishesStore} from "@/stores/dishes";
 
-const dictStore = useCommonStore()
+const commonStore = useCommonStore()
 const dishesStore = useDishesStore()
 
 const props = defineProps<{

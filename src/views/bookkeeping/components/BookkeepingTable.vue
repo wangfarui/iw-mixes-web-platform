@@ -1,7 +1,7 @@
 <template>
   <div v-loading="loading">
     <div>
-      <el-button type="primary" @click="handleBookkeepingAdd">新增</el-button>
+<!--      <el-button type="primary" @click="handleBookkeepingAdd">新增</el-button>-->
       <el-button type="primary" @click="searchPage">刷新</el-button>
     </div>
     <div>
@@ -9,25 +9,32 @@
         <el-table-column prop="recordTime" label="记录时间" width="180"/>
         <el-table-column prop="recordCategory" label="记录类型" width="180">
           <template #default="{ row }">
-            {{ dictStore.getDictName('recordCategory', row.recordCategory) }}
+            {{
+              commonStore.getDictNameByCode(commonStore.dictTypeEnum.BOOKKEEPING_RECORD_CATEGORY, row.recordCategory)
+            }}
           </template>
         </el-table-column>
         <el-table-column prop="recordSource" label="记录来源" width="180"/>
         <el-table-column prop="amount" label="金额" width="180"/>
-        <el-table-column label="操作">
-          <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.$index, scope.row)">
-              编辑
-            </el-button>
-            <el-button
-                size="small"
-                type="danger"
-                @click="handleDelete(scope.$index, scope.row)"
-            >
-              删除
-            </el-button>
+        <el-table-column prop="recordType" label="记录分类" width="180">
+          <template #default="{ row }">
+            {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.BOOKKEEPING_RECORD_TYPE, row.recordType) }}
           </template>
         </el-table-column>
+<!--        <el-table-column label="操作">-->
+<!--          <template #default="scope">-->
+<!--            <el-button size="small" @click="handleEdit(scope.$index, scope.row)">-->
+<!--              编辑-->
+<!--            </el-button>-->
+<!--            <el-button-->
+<!--                size="small"-->
+<!--                type="danger"-->
+<!--                @click="handleDelete(scope.$index, scope.row)"-->
+<!--            >-->
+<!--              删除-->
+<!--            </el-button>-->
+<!--          </template>-->
+<!--        </el-table-column>-->
       </el-table>
       <el-pagination
           :current-page="page.dto.currentPage"
@@ -50,7 +57,7 @@ import type {BookkeepingListData, BookkeepingPageDto} from "@/types/bookkeeping"
 import {queryBookkeepingPage, queryBookkeepingDetail, deleteBookkeeping} from "@/api/bookkeeping"
 import {useCommonStore} from "@/stores";
 
-const dictStore = useCommonStore();
+const commonStore = useCommonStore();
 
 const loading = ref(false)
 
@@ -79,26 +86,15 @@ function searchPage() {
 }
 
 function handleBookkeepingAdd() {
-  // bookkeepingStore.initFormData()
   router.push({path: '/bookkeeping/add'})
 }
 
 const handleClick = (row: BookkeepingListData) => {
-  queryBookkeepingDetail(row.id).then(res => {
-    // BookkeepingStore.operate = 'show'
-    // BookkeepingStore.formData = res.data
-    // BookkeepingStore.selectDishes.dishesList = res.data.BookkeepingMenuList
-    router.push({path: '/bookkeeping/detail'})
-  })
+  router.push({path: '/bookkeeping/detail'})
 }
 
 const handleEdit = (index: number, row: BookkeepingListData) => {
-  queryBookkeepingDetail(row.id).then(res => {
-    // BookkeepingStore.operate = 'update'
-    // BookkeepingStore.formData = res.data
-    // BookkeepingStore.selectDishes.dishesList = res.data.BookkeepingMenuList
-    router.push({path: '/bookkeeping/edit'})
-  })
+  router.push({path: '/bookkeeping/edit'})
 }
 
 const handleDelete = (index: number, row: BookkeepingListData) => {
