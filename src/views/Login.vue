@@ -50,9 +50,9 @@ import {getCurrentInstance} from "vue";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
-import {useCommonStore} from "@/stores";
+import {useDictStore} from "@/stores/dict";
 
-const commonStore = useCommonStore();
+const dictStore = useDictStore();
 
 const {proxy} = getCurrentInstance()
 
@@ -99,12 +99,12 @@ function loginHandle() {
 
     // 3. 加载字典类型
     getDictTypeList().then(data => {
-      commonStore.setDictTypeArray(data.data)
+      dictStore.setDictTypeArray(data.data)
     })
 
     // 4. 加载所有数据字典
     getAllDictList().then(data => {
-      commonStore.setDictDataArrayMap(data.data)
+      dictStore.setDictDataArrayMap(data.data)
     })
 
 

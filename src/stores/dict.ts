@@ -1,6 +1,5 @@
 import {defineStore} from 'pinia'
 import {reactive} from 'vue';
-import type {UserInfoVo} from "@/types/types";
 
 type DictTypeObject = {
     code: number,
@@ -17,11 +16,10 @@ type DictArrayMap = {
     [key: string]: Array<DictSimpleObject>;
 };
 
-export const useCommonStore = defineStore('common', () => {
-
-    const userInfo: UserInfoVo = reactive({
-        name: ''
-    })
+/**
+ * 字典Store
+ */
+export const useDictStore = defineStore('common', () => {
 
     // getDictTypeList
     const dictTypeArray: Array<DictTypeObject> = reactive([])
@@ -110,7 +108,7 @@ export const useCommonStore = defineStore('common', () => {
     }
 
     return {
-        userInfo, dictTypeEnum,
+        dictTypeEnum,
         setDictTypeArray, getDictTypeArray, getDictTypeName,
         setDictDataArrayMap, getDictDataArray, getDictNameById, getDictNameByCode
     }

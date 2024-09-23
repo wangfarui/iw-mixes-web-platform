@@ -13,7 +13,7 @@
       </el-form-item>
       <el-form-item label="用餐时间" prop="mealTime">
         <el-select v-model="mealStore.formData.mealTime" placeholder="请选择用餐时间" style="width: 400px">
-          <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_MEAL_TIME)"
+          <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.EAT_MEAL_TIME)"
                      :key="item.dictCode"
                      :label="item.dictName"
                      :value="item.dictCode"
@@ -81,9 +81,9 @@ import router from "@/router"
 import {addMeal, updateMeal} from "@/api/meal"
 import DishesTable from "@/views/dishes/components/DishesTable.vue";
 import {useMealStore} from "@/stores/meal";
-import {useCommonStore} from "@/stores";
+import {useDictStore} from "@/stores/dict";
 
-const commonStore = useCommonStore();
+const dictStore = useDictStore();
 const mealStore = useMealStore();
 
 const childComponent = ref(null)

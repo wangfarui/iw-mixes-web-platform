@@ -26,7 +26,7 @@
       </el-form-item>
       <el-form-item label="菜品分类" prop="dishesType">
         <el-select v-model="dishesStore.formData.dishesType" placeholder="请选择菜品分类" style="width: 400px">
-          <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_TYPE)"
+          <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.EAT_DISHES_TYPE)"
                      :key="item.dictCode"
                      :label="item.dictName"
                      :value="item.dictCode"
@@ -44,7 +44,7 @@
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="dishesStore.formData.status" placeholder="请选择菜品状态" style="width: 400px">
-          <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_STATUS)"
+          <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.EAT_DISHES_STATUS)"
                      :key="item.dictCode"
                      :label="item.dictName"
                      :value="item.dictCode"
@@ -189,9 +189,9 @@ import router from "@/router"
 import {addDishes, updateDishes} from "@/api/dishes"
 import type {DishesCreationMethodAddDto, DishesUpdateDto} from "@/types/dishes"
 import {useDishesStore} from "@/stores/dishes";
-import {useCommonStore} from "@/stores";
+import {useDictStore} from "@/stores/dict";
 
-const commonStore = useCommonStore();
+const dictStore = useDictStore();
 
 import type {UploadProps} from 'element-plus'
 

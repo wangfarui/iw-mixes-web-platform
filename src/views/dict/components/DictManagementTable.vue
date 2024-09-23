@@ -16,7 +16,7 @@
           <div class="search-input">
             <span class="label">字典类型:</span>
             <el-select v-model="page.dto.dictType" clearable placeholder="请选择字典类型">
-              <el-option v-for="item in commonStore.getDictTypeArray()"
+              <el-option v-for="item in dictStore.getDictTypeArray()"
                          :key="item.code"
                          :label="item.name"
                          :value="item.code"
@@ -44,7 +44,7 @@
       <el-table :data="page.list" style="width: 100%" @row-dblclick="handleClick">
         <el-table-column prop="dictType" label="字典类型" width="180">
           <template #default="{ row }">
-            {{ commonStore.getDictTypeName(row.dictType) }}
+            {{ dictStore.getDictTypeName(row.dictType) }}
           </template>
         </el-table-column>
         <el-table-column prop="dictCode" label="字典code" width="180">
@@ -93,9 +93,9 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {DictListData, DictPageDto} from "@/types/dict"
 import {queryDictPage, queryDictDetail, deleteDict} from "@/api/dict"
-import {useCommonStore} from "@/stores";
+import {useDictStore} from "@/stores/dict";
 
-const commonStore = useCommonStore();
+const dictStore = useDictStore();
 
 const loading = ref(false)
 

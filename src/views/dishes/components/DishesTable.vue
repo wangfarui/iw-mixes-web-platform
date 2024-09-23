@@ -12,7 +12,7 @@
           <div class="search-input">
             <span class="label">菜品分类:</span>
             <el-select v-model="page.dto.dishesType" clearable placeholder="请选择菜品分类">
-              <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_TYPE)"
+              <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.EAT_DISHES_TYPE)"
                          :key="item.dictCode"
                          :label="item.dictName"
                          :value="item.dictCode"
@@ -24,7 +24,7 @@
           <div class="search-input">
             <span class="label">状态:</span>
             <el-select v-model="page.dto.status" clearable placeholder="请选择菜品状态">
-              <el-option v-for="item in commonStore.getDictDataArray(commonStore.dictTypeEnum.EAT_DISHES_STATUS)"
+              <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.EAT_DISHES_STATUS)"
                          :key="item.dictCode"
                          :label="item.dictName"
                          :value="item.dictCode"
@@ -48,7 +48,7 @@
       <el-table-column prop="dishesName" label="菜品名称" width="180"/>
       <el-table-column prop="dishesType" label="菜品分类" width="100">
         <template #default="{ row }">
-          {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.EAT_DISHES_TYPE, row.dishesType) }}
+          {{ dictStore.getDictNameByCode(dictStore.dictTypeEnum.EAT_DISHES_TYPE, row.dishesType) }}
         </template>
       </el-table-column>
       <el-table-column prop="difficultyFactor" label="难度系数" width="100"/>
@@ -56,7 +56,7 @@
       <el-table-column prop="prices" label="价格" width="100" :formatter="formatPrices"/>
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
-          {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.EAT_DISHES_STATUS, row.status) }}
+          {{ dictStore.getDictNameByCode(dictStore.dictTypeEnum.EAT_DISHES_STATUS, row.status) }}
         </template>
       </el-table-column>
       <el-table-column v-if="permission == 1" label="操作">
@@ -107,10 +107,10 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {DishesListData, DishesPageDto} from "@/types/dishes"
 import {queryDishesPage, queryDishesDetail, deleteDishes} from "@/api/dishes"
-import {useCommonStore} from "@/stores";
+import {useDictStore} from "@/stores/dict";
 import {useDishesStore} from "@/stores/dishes";
 
-const commonStore = useCommonStore()
+const dictStore = useDictStore()
 const dishesStore = useDishesStore()
 
 const props = defineProps<{

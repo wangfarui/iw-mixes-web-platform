@@ -10,7 +10,7 @@
         <el-table-column prop="recordCategory" label="记录类型" width="180">
           <template #default="{ row }">
             {{
-              commonStore.getDictNameByCode(commonStore.dictTypeEnum.BOOKKEEPING_RECORD_CATEGORY, row.recordCategory)
+              dictStore.getDictNameByCode(dictStore.dictTypeEnum.BOOKKEEPING_RECORD_CATEGORY, row.recordCategory)
             }}
           </template>
         </el-table-column>
@@ -18,7 +18,7 @@
         <el-table-column prop="amount" label="金额" width="180"/>
         <el-table-column prop="recordType" label="记录分类" width="180">
           <template #default="{ row }">
-            {{ commonStore.getDictNameByCode(commonStore.dictTypeEnum.BOOKKEEPING_RECORD_TYPE, row.recordType) }}
+            {{ dictStore.getDictNameByCode(dictStore.dictTypeEnum.BOOKKEEPING_RECORD_TYPE, row.recordType) }}
           </template>
         </el-table-column>
 <!--        <el-table-column label="操作">-->
@@ -55,9 +55,9 @@ import {ref, onMounted, reactive} from 'vue'
 import router from '@/router'
 import type {BookkeepingListData, BookkeepingPageDto} from "@/types/bookkeeping"
 import {queryBookkeepingPage, queryBookkeepingDetail, deleteBookkeeping} from "@/api/bookkeeping"
-import {useCommonStore} from "@/stores";
+import {useDictStore} from "@/stores/dict";
 
-const commonStore = useCommonStore();
+const dictStore = useDictStore();
 
 const loading = ref(false)
 
