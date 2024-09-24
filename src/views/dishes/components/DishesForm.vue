@@ -203,10 +203,10 @@ const uploadAction = ref('')
 const iwHeaders = {"iwtoken": window.sessionStorage.getItem("iwtoken")}
 
 if (import.meta.env.VITE_BUILD_ENV === 'dev') {
-  uploadAction.value = 'http://localhost:18003/iw-eat/file/upload'
+  uploadAction.value = 'http://localhost:18000/auth-service/file/upload'
   // 在开发环境下执行的逻辑
 } else if (import.meta.env.VITE_BUILD_ENV === 'prod') {
-  uploadAction.value = 'https://api.itwray.com/iw-eat/file/upload'
+  uploadAction.value = 'https://api.itwray.com/auth-service/file/upload'
 } else {
   console.log("无法识别环境" + import.meta.env.VITE_BUILD_ENV)
 }
