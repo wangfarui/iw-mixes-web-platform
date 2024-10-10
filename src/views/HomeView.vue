@@ -44,6 +44,13 @@
             </el-sub-menu>
             <el-sub-menu index="3">
               <template #title>
+                <el-icon><Wallet /></el-icon>
+                <span>积分管理</span>
+              </template>
+              <el-menu-item index="/points/task"><el-icon><Tickets /></el-icon>积分任务</el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="4">
+              <template #title>
                 <el-icon><Setting /></el-icon>
                 <span>基础设置</span>
               </template>
@@ -78,7 +85,7 @@ import {ref, reactive, onMounted} from 'vue'
 import {RouterView} from 'vue-router'
 import router from "@/router";
 import { getCurrentInstance } from "vue";
-import {Edit, SwitchButton, KnifeFork, Dish, Food, House, Wallet, ShoppingCart, Setting, Memo} from '@element-plus/icons-vue'
+import {Edit, SwitchButton, KnifeFork, Dish, Food, House, Wallet, ShoppingCart, Setting, Memo, Tickets} from '@element-plus/icons-vue'
 
 const { proxy } = getCurrentInstance()!;
 

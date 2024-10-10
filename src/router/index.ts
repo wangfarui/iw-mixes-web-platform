@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import Meal from '@/views/meal/Meal.vue'
 import Dishes from '@/views/dishes/Dishes.vue'
 import Bookkeeping from '@/views/bookkeeping/Bookkeeping.vue'
+import PointsTask from '@/views/points/PointsTask.vue'
 import DictManagement from '@/views/dict/DictManagement.vue'
 import Login from "@/views/Login.vue";
 
@@ -63,6 +64,11 @@ const router = createRouter({
                     path: '/bookkeeping',
                     name: '记账记录',
                     component: Bookkeeping
+                },
+                {
+                    path: '/points/task',
+                    name: '积分任务',
+                    component: PointsTask
                 },
                 {
                     path: '/dict',
