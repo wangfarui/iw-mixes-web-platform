@@ -99,12 +99,13 @@ export const useDictStore = defineStore('common', () => {
      * 根据字典类型和字典code 获取字典名称
      * @param dictType DictType#code
      * @param dictCode DictSimpleObject#dictCode
+     * @param defaultName 默认名称
      */
-    function getDictNameByCode(dictType: string, dictCode: number) {
+    function getDictNameByCode(dictType: string, dictCode: number, defaultName: string = "") {
         let dictArr = dictArrayMap[dictType]
-        if (dictArr == undefined) return ''
+        if (dictArr == undefined) return defaultName
         const item = dictArr.find(obj => obj.dictCode === dictCode);
-        return item ? item.dictName : '';
+        return item ? item.dictName : defaultName;
     }
 
     return {
