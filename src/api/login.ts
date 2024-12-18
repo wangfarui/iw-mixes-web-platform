@@ -2,9 +2,14 @@ import request from "@/api/request";
 import type {UserLoginVO} from "@/types/types";
 
 
-// 登录
-export const login = (user: UserLoginVO) => {
+// 账号密码登录
+export const loginByPasswordApi = (user: UserLoginVO) => {
     return request.post('/auth-service/login/password', user);
+}
+
+// 账号密码登录
+export const loginByVerificationCodeApi = (user: UserLoginVO) => {
+    return request.post('/auth-service/login/verificationCode', user);
 }
 
 // 查询字典类型集合
@@ -15,6 +20,11 @@ export const getDictTypeList = () => {
 // 查询所有数据字典集合
 export const getAllDictList = () => {
     return request.get('/auth-service/dict/getAllDictList');
+}
+
+// 获取验证码
+export const getVerificationCodeApi = (phoneNumber: string) => {
+    return request.get('/auth-service/register/getVerificationCode?phoneNumber=' + phoneNumber);
 }
 
 export function logout() {

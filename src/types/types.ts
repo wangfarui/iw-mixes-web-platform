@@ -1,6 +1,8 @@
 export type UserLoginVO = {
-    username: string
-    password: string
+    account?: string
+    password?: string
+    phoneNumber?: string
+    verificationCode?: string
 }
 
 export type UserInfoVo = {

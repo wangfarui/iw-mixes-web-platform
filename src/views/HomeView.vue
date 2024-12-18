@@ -98,7 +98,7 @@ const user: any = reactive({
 const menuActive = ref("/")
 
 onMounted(() => {
-  user.name = window.sessionStorage.getItem("username");
+  user.name = window.sessionStorage.getItem("name");
 })
 
 function logout() {
