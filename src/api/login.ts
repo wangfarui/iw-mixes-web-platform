@@ -1,5 +1,5 @@
 import request from "@/api/request";
-import type {UserLoginVO} from "@/types/types";
+import type {UserLoginVO, UserPasswordEditDto} from "@/types/types";
 
 
 // 账号密码登录
@@ -22,9 +22,19 @@ export const getAllDictList = () => {
     return request.get('/auth-service/dict/getAllDictList');
 }
 
-// 获取验证码
+// 注册获取验证码
 export const getVerificationCodeApi = (phoneNumber: string) => {
     return request.get('/auth-service/register/getVerificationCode?phoneNumber=' + phoneNumber);
+}
+
+// 用户根据操作行为获取验证码
+export const getVerificationCodeByActionApi = (action: number) => {
+    return request.get('/auth-service/user/verificationCode?action=' + action);
+}
+
+// 修改密码
+export const editPasswordApi = (passwordEditDto: UserPasswordEditDto) => {
+    return request.post('/auth-service/user/editPassword', passwordEditDto);
 }
 
 export function logout() {
