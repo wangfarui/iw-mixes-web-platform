@@ -16,7 +16,7 @@
                 <el-input v-model="userInfo.account" placeholder="请输入用户名或手机号" clearable/>
               </el-col>
             </el-row>
-            <el-row style="margin-top: 5px">
+            <el-row align="middle" style="margin-top: 5px">
               <el-col :span="4">密码：</el-col>
               <el-col :span="20">
                 <el-input
@@ -32,14 +32,14 @@
             </el-row>
           </div>
         </el-tab-pane>
-        <el-tab-pane label="手机号登录">
+        <el-tab-pane label="手机号登录" v-loading="verificationCodeLoading">
           <el-row align="middle">
             <el-col :span="5">手机号：</el-col>
             <el-col :span="19">
               <el-input v-model="userInfo.phoneNumber" maxlength="11" placeholder="请输入手机号" clearable/>
             </el-col>
           </el-row>
-          <el-row style="margin-top: 5px">
+          <el-row align="middle" style="margin-top: 5px">
             <el-col :span="5">验证码：</el-col>
             <el-col :span="12">
               <el-input v-model="userInfo.verificationCode" maxlength="6" placeholder="请输入验证码" />
@@ -82,10 +82,11 @@ const data = reactive({
     password: '',
     verificationCode: ''
   },
-  loading: false
+  loading: false,
+  verificationCodeLoading: false
 })
 
-const {userInfo, loading} = toRefs(data);
+const {userInfo, loading, verificationCodeLoading} = toRefs(data);
 const svg = `
         <path class="path" d="
           M 30 15
@@ -161,9 +162,12 @@ function getVerificationCode() {
     ElMessage.warning('手机号格式错误')
     return
   }
+  verificationCodeLoading.value = true;
   getVerificationCodeApi(userInfo.value.phoneNumber).then(data => {
     ElMessage.success("验证码已发送")
     startCountdown();
+  }).finally(() => {
+    verificationCodeLoading.value = false;
   })
 }
 
