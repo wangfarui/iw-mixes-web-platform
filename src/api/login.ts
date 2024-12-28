@@ -7,7 +7,7 @@ export const loginByPasswordApi = (user: UserLoginVO) => {
     return request.post('/auth-service/login/password', user);
 }
 
-// 账号密码登录
+// 验证码登录
 export const loginByVerificationCodeApi = (user: UserLoginVO) => {
     return request.post('/auth-service/login/verificationCode', user);
 }
@@ -27,7 +27,7 @@ export const getVerificationCodeApi = (phoneNumber: string) => {
     return request.get('/auth-service/register/getVerificationCode?phoneNumber=' + phoneNumber);
 }
 
-// 用户根据操作行为获取验证码
+// 用户根据操作行为获取验证码（例如验证码登录）
 export const getVerificationCodeByActionApi = (action: number) => {
     return request.get('/auth-service/user/verificationCode?action=' + action);
 }

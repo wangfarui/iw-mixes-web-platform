@@ -104,6 +104,11 @@ function loginByPassword() {
     ElMessage.warning('账号和密码不能为空')
     return
   }
+
+  // 清空验证码登录的数据
+  userInfo.value.phoneNumber = ''
+  userInfo.value.verificationCode = ''
+
   loading.value = true;
   loginByPasswordApi(userInfo.value).then(data => {
     loading.value = false;
@@ -123,6 +128,11 @@ function loginByVerificationCode() {
     ElMessage.warning('手机号格式错误')
     return
   }
+
+  // 清空密码登录的数据
+  userInfo.value.account = ''
+  userInfo.value.password = ''
+
   loading.value = true;
   loginByVerificationCodeApi(userInfo.value).then(data => {
     loading.value = false;
