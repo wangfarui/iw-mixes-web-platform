@@ -2,8 +2,9 @@ import {fileURLToPath, URL} from 'node:url'
 
 import {loadEnv} from 'vite'
 import vue from '@vitejs/plugin-vue'
+import svgLoader from 'vite-svg-loader'
 
-export default ({ command, mode }) => {
+export default ({ command, mode }: any) => {
   // 获取环境变量
   const envParams = loadEnv(mode, './');
   const VITE_BUILD_ENV = envParams.VITE_BUILD_ENV;
@@ -27,6 +28,7 @@ export default ({ command, mode }) => {
     },
     plugins: [
       vue(),
+      svgLoader() // 直接加载 SVG
     ],
     resolve: {
       alias: {
