@@ -37,71 +37,60 @@
         <el-aside width="250px">
           <el-menu router>
             <el-menu-item index="/">
-              <el-icon>
-                <House/>
-              </el-icon>
-              首页
+              <SvgIcon name="home" />首页
             </el-menu-item>
             <el-sub-menu index="1">
               <template #title>
-                <el-icon>
-                  <Dish/>
-                </el-icon>
+                <SvgIcon name="meal-manage" />
                 <span>餐饮管理</span>
               </template>
               <el-menu-item index="/meal">
-                <el-icon>
-                  <Food/>
-                </el-icon>
+                <SvgIcon name="meal-records" />
                 点餐记录
               </el-menu-item>
               <el-menu-item index="/dishes">
-                <el-icon>
-                  <KnifeFork/>
-                </el-icon>
+                <SvgIcon name="dishes-manage" />
                 菜品管理
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="2">
               <template #title>
-                <el-icon>
-                  <Wallet/>
-                </el-icon>
+                <SvgIcon name="bookkeeping-manage" />
                 <span>财务管理</span>
               </template>
               <el-menu-item index="/bookkeeping">
-                <el-icon>
-                  <ShoppingCart/>
-                </el-icon>
-                记账记录
+                <SvgIcon name="bookkeeping-records" />记账记录
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="3">
               <template #title>
-                <el-icon>
-                  <Wallet/>
-                </el-icon>
-                <span>积分管理</span>
+                <SvgIcon name="task-manage" />
+                <span>任务管理</span>
               </template>
-              <el-menu-item index="/points/task">
-                <el-icon>
-                  <Tickets/>
-                </el-icon>
-                积分任务
+              <el-menu-item index="/task/list">
+                <SvgIcon name="task-list" />任务列表
+              </el-menu-item>
+              <el-menu-item index="/task/records">
+                <SvgIcon name="task-records" />任务记录
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="4">
               <template #title>
-                <el-icon>
-                  <Setting/>
-                </el-icon>
+                <SvgIcon name="points-manage" />
+                <span>积分管理</span>
+              </template>
+              <el-menu-item index="/points/records">
+                <SvgIcon name="points-records" />积分记录
+              </el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="5">
+              <template #title>
+                <SvgIcon name="base-setting" />
                 <span>基础设置</span>
               </template>
               <el-menu-item index="/dict">
-                <el-icon>
-                  <Memo/>
-                </el-icon>
-                字典列表
+                <SvgIcon name="dict-manage" />
+                字典管理
               </el-menu-item>
             </el-sub-menu>
 
@@ -198,20 +187,12 @@ import router from "@/router";
 import {getCurrentInstance} from "vue";
 import {
   Edit,
-  SwitchButton,
-  KnifeFork,
-  Dish,
-  Food,
-  House,
-  Wallet,
-  ShoppingCart,
-  Setting,
-  Memo,
-  Tickets
+  SwitchButton
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
 import {editPasswordApi, getVerificationCodeByActionApi} from "@/api/login.ts";
 import type {UserPasswordEditDto} from "@/types/types";
+import SvgIcon from "@/components/SvgIcon.vue";
 
 const {proxy} = getCurrentInstance()!;
 

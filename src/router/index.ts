@@ -1,10 +1,5 @@
 import {createRouter, createWebHistory} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import Meal from '@/views/meal/Meal.vue'
-import Dishes from '@/views/dishes/Dishes.vue'
-import Bookkeeping from '@/views/bookkeeping/Bookkeeping.vue'
-import PointsTask from '@/views/points/PointsTask.vue'
-import DictManagement from '@/views/dict/DictManagement.vue'
 import Login from "@/views/Login.vue";
 
 const router = createRouter({
@@ -23,7 +18,7 @@ const router = createRouter({
                 {
                     path: '/meal',
                     name: '点餐列表',
-                    component: Meal
+                    component: () => import('@/views/meal/Meal.vue')
                 },
                 {
                     path: '/meal/add',
@@ -43,7 +38,7 @@ const router = createRouter({
                 {
                     path: '/dishes',
                     name: '菜品列表',
-                    component: Dishes
+                    component: () => import('@/views/dishes/Dishes.vue')
                 },
                 {
                     path: '/dishes/add',
@@ -63,17 +58,27 @@ const router = createRouter({
                 {
                     path: '/bookkeeping',
                     name: '记账记录',
-                    component: Bookkeeping
+                    component: () => import('@/views/bookkeeping/Bookkeeping.vue')
                 },
                 {
-                    path: '/points/task',
-                    name: '积分任务',
-                    component: PointsTask
+                    path: '/task/list',
+                    name: '任务列表',
+                    component: () => import('@/views/task/TaskList.vue')
+                },
+                {
+                    path: '/task/records',
+                    name: '任务记录',
+                    component: () => import('@/views/task/TaskRecords.vue')
+                },
+                {
+                    path: '/points/records',
+                    name: '积分记录',
+                    component: () => import('@/views/points/PointsRecords.vue')
                 },
                 {
                     path: '/dict',
                     name: '字典管理',
-                    component: DictManagement
+                    component: () => import('@/views/dict/DictManagement.vue')
                 },
                 {
                     path: '/dict/add',

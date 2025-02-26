@@ -1,5 +1,5 @@
 <template>
-  <el-icon>
+  <el-icon :size="size">
     <component
         :is="loadedIcon"
         v-if="loadedIcon"
@@ -14,6 +14,10 @@ import { shallowRef, watchEffect } from 'vue'
 
 const props = defineProps({
   name: String, // 传入的图标名称
+  size: {
+    type: [String, Number],
+    default: 16, // 可以设置默认大小
+  },
 })
 
 const loadedIcon = shallowRef(null)
