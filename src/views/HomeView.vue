@@ -92,6 +92,10 @@
                 <SvgIcon name="dict-manage" />
                 字典管理
               </el-menu-item>
+              <el-menu-item index="/account">
+                <SvgIcon name="account-manage" />
+                账号管理
+              </el-menu-item>
             </el-sub-menu>
 
           </el-menu>

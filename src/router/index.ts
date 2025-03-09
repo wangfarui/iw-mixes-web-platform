@@ -89,6 +89,11 @@ const router = createRouter({
                     path: '/dict/edit/:id',
                     name: '修改字典',
                     component: () => import('@/views/dict/DictEdit.vue')
+                },
+                {
+                    path: '/account',
+                    name: '账号管理',
+                    component: () => import('@/views/account/AccountManagement.vue')
                 }
             ]
         }

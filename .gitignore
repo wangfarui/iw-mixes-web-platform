@@ -32,3 +32,4 @@ coverage
 tmp
 
 pnpm-lock.yaml
+package-lock.json
