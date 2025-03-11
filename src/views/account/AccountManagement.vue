@@ -30,12 +30,14 @@
         <el-table-column prop="name" label="应用名称" width="180"/>
         <el-table-column prop="address" label="应用地址" width="180"/>
         <el-table-column prop="account" label="账号" width="180"/>
-        <el-table-column prop="password" label="密码" width="180"/>
         <el-table-column prop="remark" label="备注" width="180"/>
         <el-table-column prop="updateTime" label="更新时间" width="180"/>
         <el-table-column label="操作">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.$index, scope.row)">
+            <el-button size="small" @click="handleViewPassword(scope.$index, scope.row)">
+              查看密码
+            </el-button>
+            <el-button size="small" type="primary" @click="handleEdit(scope.$index, scope.row)">
               编辑
             </el-button>
             <el-button
@@ -63,6 +65,8 @@
         v-model="dialogData.visible"
         :title="dialogData.title"
         width="500"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
         align-center
     >
       <div>
@@ -92,6 +96,20 @@
         </div>
       </div>
     </el-dialog>
+    <el-dialog
+        v-model="viewPasswordDialog.visible"
+        title="查看密码"
+        width="500"
+        align-center
+    >
+      <div v-loading="viewPasswordDialog.loading">
+        <span>{{ viewPasswordDialog.pd }}</span>
+        <el-button type="primary" @click="copyText" style="margin-left: 10px;">
+          <SvgIcon name="copy-text-white" />
+          <span>复制</span>
+        </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -103,9 +121,11 @@ import {
   deleteApplicationAccount,
   queryApplicationAccountDetail,
   queryApplicationAccountPage,
-  updateApplicationAccount
+  updateApplicationAccount,
+  viewPasswordById
 } from "@/api/applicationAccount"
-import {FormInstance} from "element-plus";
+import SvgIcon from "@/components/SvgIcon.vue";
+import {ElMessage, FormInstance} from "element-plus";
 
 const loading = ref(false)
 const formRef = ref<FormInstance>()
@@ -134,6 +154,12 @@ const dialogData = reactive({
   title: '新增应用账号信息'
 })
 
+const viewPasswordDialog = reactive({
+  visible: false,
+  loading: false,
+  pd: ''
+})
+
 onMounted(() => {
   searchPage()
 })
@@ -159,6 +185,26 @@ function handleAdd() {
   dialogData.operate = 'ADD'
   dialogData.visible = true;
 }
+
+const handleViewPassword = (index: number, row: AccountListData) => {
+  viewPasswordDialog.visible = true
+  viewPasswordDialog.loading = true
+  viewPasswordById(row.id).then(res => {
+    viewPasswordDialog.pd = res.data
+  }).finally(() => {
+    viewPasswordDialog.loading = false
+  })
+}
+
+// 复制到剪贴板
+const copyText = async () => {
+  try {
+    await navigator.clipboard.writeText(viewPasswordDialog.pd);
+    ElMessage.success('复制成功！');
+  } catch (err) {
+    ElMessage.error('复制失败，请重试');
+  }
+};
 
 const handleEdit = (index: number, row: AccountListData) => {
   loading.value = true

@@ -27,3 +27,7 @@ export const queryApplicationAccountDetail = (id: number) => {
     return request.get('/auth-service/applicationAccount/detail?id=' + id)
 }
 
+// 查询应用账号密码
+export const viewPasswordById = (id: number) => {
+    return request.get('/auth-service/applicationAccount/viewPassword?id=' + id)
+}
