@@ -26,10 +26,29 @@
     </div>
 
     <div>
+      <div>
+        <el-tabs
+          v-model="activeName"
+          type="card"
+          @tab-click="handleClick"
+        >
+          <el-tab-pane :key="-1" label="所有" :name="-1" />
+          <el-tab-pane v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.AUTH_APPLICATION_ACCOUNT_TYPE)"
+                      :key="item.dictCode"
+                      :label="item.dictName"
+                      :name="item.dictCode">
+          </el-tab-pane>
+      </el-tabs>
+    </div>
       <el-table :data="page.list" style="width: 100%">
         <el-table-column prop="name" label="应用名称" width="180"/>
         <el-table-column prop="address" label="应用地址" width="180"/>
         <el-table-column prop="account" label="账号" width="180"/>
+        <el-table-column prop="type" label="应用分类" width="100">
+          <template #default="{ row }">
+            {{ dictStore.getDictNameByCode(dictStore.dictTypeEnum.AUTH_APPLICATION_ACCOUNT_TYPE, row.type) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="remark" label="备注" width="180"/>
         <el-table-column prop="updateTime" label="更新时间" width="180"/>
         <el-table-column label="操作">
@@ -68,14 +87,24 @@
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         align-center
+        @close="cancelDialog()"
     >
       <div>
         <el-form ref="formRef" :model="formData" label-width="auto" style="max-width: 500px">
+          <el-form-item label="应用分类" prop="type">
+            <el-select v-model="formData.type" placeholder="请选择应用分类" style="width: 400px">
+              <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.AUTH_APPLICATION_ACCOUNT_TYPE)"
+                        :key="item.dictCode"
+                        :label="item.dictName"
+                        :value="item.dictCode"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="应用名称" prop="name">
             <el-input v-model="formData.name"/>
           </el-form-item>
           <el-form-item label="应用地址" prop="address">
-            <el-input v-model="formData.address"/>
+            <el-input v-model="formData.address" type="textarea" autosize/>
           </el-form-item>
           <el-form-item label="账号" prop="account">
             <el-input v-model="formData.account"/>
@@ -84,12 +113,12 @@
             <el-input v-model="formData.password"/>
           </el-form-item>
           <el-form-item label="备注" prop="remark">
-            <el-input v-model="formData.remark"/>
+            <el-input v-model="formData.remark" type="textarea" autosize/>
           </el-form-item>
         </el-form>
 
         <div class="dialog-footer">
-          <el-button @click="cancelDialog(formRef)">取消</el-button>
+          <el-button @click="cancelDialog()">取消</el-button>
           <el-button type="primary" @click="handleDialogConfirm(formRef)">
             保存
           </el-button>
@@ -126,9 +155,15 @@ import {
 } from "@/api/applicationAccount"
 import SvgIcon from "@/components/SvgIcon.vue";
 import {ElMessage, FormInstance} from "element-plus";
+import {useDictStore} from "@/stores/dict";
+import type { TabsPaneContext } from 'element-plus'
+
+const dictStore = useDictStore();
 
 const loading = ref(false)
 const formRef = ref<FormInstance>()
+// Tab选中的名称
+const activeName = ref('-1')
 
 const page = reactive({
   dto: {
@@ -164,6 +199,12 @@ onMounted(() => {
   searchPage()
 })
 
+const handleClick = (tab: TabsPaneContext, event: Event) => {
+  const name = tab.props.name;
+  page.dto.type = name == "-1" ? undefined : name;
+  searchPage() 
+}
+
 function searchPage() {
   loading.value = true
   queryApplicationAccountPage(page.dto).then(data => {
@@ -176,6 +217,7 @@ function searchPage() {
 }
 
 function resetSearch() {
+  page.dto.type = undefined
   page.dto.name = undefined
   page.dto.address = undefined
   searchPage()
@@ -226,10 +268,9 @@ const handleDelete = (index: number, row: AccountListData) => {
   })
 }
 
-const cancelDialog = (formEl: FormInstance | undefined) => {
+const cancelDialog = () => {
   dialogData.visible = false;
-  if (!formEl) return
-  formEl.resetFields()
+  initFormData();
 }
 
 const handleDialogConfirm = (formEl: FormInstance | undefined) => {
@@ -249,8 +290,18 @@ const handleDialogConfirm = (formEl: FormInstance | undefined) => {
       dialogData.visible = false;
     })
   }
+  initFormData();
+}
 
-  formEl.resetFields()
+const initFormData = () => {
+  formData.value = {
+    id: undefined,
+    name: '',
+    address: '',
+    account: '',
+    password: '',
+    remark: ''
+  }
 }
 
 const handleSizeChange = (val: number) => {
