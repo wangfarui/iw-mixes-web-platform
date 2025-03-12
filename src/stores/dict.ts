@@ -31,6 +31,7 @@ export const useDictStore = defineStore('common', () => {
     // code 就是 DictType#code
     const dictTypeEnum = Object.freeze({
         BASE_DICT_TYPE: 'dictType',
+        AUTH_APPLICATION_ACCOUNT_TYPE: '2010', // 应用账号-应用类型 code
         EAT_MEAL_TIME: '3002', // 餐饮-用餐时间 code
         EAT_DISHES_TYPE: '3003', // 餐饮-菜品分类 code
         EAT_DISHES_STATUS: '3004', // 餐饮-菜品状态 code
