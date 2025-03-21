@@ -15,3 +15,25 @@ export type UserPasswordEditDto = {
     newPassword: string
     twoPassword: string
 }
+
+// 任务清单相关类型
+export interface TaskGroup {
+  id: string;
+  name: string;
+  icon?: string;
+  count?: number;
+  sort?: number;
+  isTop?: number;
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  completed: boolean;
+  notes?: string;
+  groupId: string;
+}
+
+export interface TaskGroupWithTasks extends TaskGroup {
+  tasks: Task[];
+}

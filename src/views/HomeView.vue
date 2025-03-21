@@ -72,7 +72,7 @@
               </template>
               <el-menu-item index="/task/list">
                 <el-icon><SvgIcon name="task-list" /></el-icon>
-                <span>任务列表</span>
+                <span>任务清单</span>
               </el-menu-item> 
               <el-menu-item index="/task/records">
                 <el-icon><SvgIcon name="task-records" /></el-icon>
@@ -116,7 +116,7 @@
         </el-main>
       </el-container>
 
-      <el-footer class="footer">
+      <!-- <el-footer class="footer">
         <div class="footer-content">
           <a href="https://beian.miit.gov.cn/"><span>鄂ICP备2024050235号-1</span></a>&nbsp;&nbsp;
           <a href="https://beian.mps.gov.cn/#/query/webSearch?code=42018502007471" rel="noreferrer" target="_blank">
@@ -125,7 +125,7 @@
             <span>鄂公网安备42018502007471</span>
           </a>
         </div>
-      </el-footer>
+      </el-footer> -->
     </el-container>
 
     <el-dialog
