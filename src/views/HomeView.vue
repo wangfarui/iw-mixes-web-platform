@@ -1,100 +1,106 @@
 <template>
   <div class="main-layout">
     <el-container>
-      <!-- 顶栏容器 -->
-      <el-header class="header">
-        <div class="left">
-          <span class="logo">IW管理平台</span>
-        </div>
-        <div class="right">
-          <el-dropdown trigger="hover">
-          <span class="user">
-            <el-avatar :src="user.avatar" :size="40"/>
-            &nbsp;&nbsp;<span class="username">{{ user.name }}</span>
-          </span>
-            <template #dropdown>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item @click="editPassword">
-                  <el-icon>
-                    <Edit/>
-                  </el-icon>
-                  修改密码
-                </el-dropdown-item>
-                <el-dropdown-item @click="logout">
-                  <el-icon>
-                    <SwitchButton/>
-                  </el-icon>
-                  退出登录
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </el-header>
-
       <el-container>
         <!-- 侧边容器 -->
-        <el-aside width="250px">
-          <el-menu router>
+        <el-aside :width="isCollapse ? '64px' : '180px'" class="aside-container">
+          <!-- 用户信息区域 -->
+          <div class="user-info">
+            <el-dropdown trigger="click" placement="right-start">
+              <div class="user-content" :class="{ 'collapsed': isCollapse }">
+                <el-avatar :src="user.avatar" :size="isCollapse ? 40 : 60"/>
+                <span v-if="!isCollapse" class="username">{{ user.name }}</span>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="editPassword">
+                    <el-icon><Edit/></el-icon>
+                    <span>修改密码</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="logout">
+                    <el-icon><SwitchButton/></el-icon>
+                    <span>退出登录</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <!-- 折叠按钮 -->
+          <div class="collapse-btn" @click="toggleCollapse">
+            <el-icon :size="20">
+              <Fold v-if="!isCollapse"/>
+              <Expand v-else/>
+            </el-icon>
+          </div>
+          <!-- 菜单 -->
+          <el-menu 
+            router 
+            :collapse="isCollapse"
+            :collapse-transition="true">
             <el-menu-item index="/">
-              <SvgIcon name="home" />首页
+              <el-icon><HomeFilled /></el-icon>
+              <template #title>首页</template>
             </el-menu-item>
             <el-sub-menu index="1">
               <template #title>
-                <SvgIcon name="meal-manage" />
+                <el-icon><SvgIcon name="meal-manage" /></el-icon>
                 <span>餐饮管理</span>
               </template>
               <el-menu-item index="/meal">
-                <SvgIcon name="meal-records" />
-                点餐记录
+                <el-icon><SvgIcon name="meal-records" /></el-icon>
+                <span>点餐记录</span>
               </el-menu-item>
               <el-menu-item index="/dishes">
-                <SvgIcon name="dishes-manage" />
-                菜品管理
+                <el-icon><SvgIcon name="dishes-manage" /></el-icon>
+                <span>菜品管理</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="2">
               <template #title>
-                <SvgIcon name="bookkeeping-manage" />
+                <el-icon><SvgIcon name="bookkeeping-manage" /></el-icon>
                 <span>财务管理</span>
               </template>
               <el-menu-item index="/bookkeeping">
-                <SvgIcon name="bookkeeping-records" />记账记录
+                <el-icon><SvgIcon name="bookkeeping-records" /></el-icon>
+                <span>记账记录</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="3">
               <template #title>
-                <SvgIcon name="task-manage" />
+                <el-icon><SvgIcon name="task-manage" /></el-icon>
                 <span>任务管理</span>
               </template>
               <el-menu-item index="/task/list">
-                <SvgIcon name="task-list" />任务列表
-              </el-menu-item>
+                <el-icon><SvgIcon name="task-list" /></el-icon>
+                <span>任务清单</span>
+              </el-menu-item> 
               <el-menu-item index="/task/records">
-                <SvgIcon name="task-records" />任务记录
+                <el-icon><SvgIcon name="task-records" /></el-icon>
+                <span>任务记录</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="4">
               <template #title>
-                <SvgIcon name="points-manage" />
+                <el-icon><SvgIcon name="points-manage" /></el-icon>
                 <span>积分管理</span>
               </template>
               <el-menu-item index="/points/records">
-                <SvgIcon name="points-records" />积分记录
+                <el-icon><SvgIcon name="points-records" /></el-icon>
+                <span>积分记录</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="5">
               <template #title>
-                <SvgIcon name="base-setting" />
+                <el-icon><SvgIcon name="base-setting" /></el-icon>
                 <span>基础设置</span>
               </template>
               <el-menu-item index="/dict">
-                <SvgIcon name="dict-manage" />
-                字典管理
+                <el-icon><SvgIcon name="dict-manage" /></el-icon>
+                <span>字典管理</span>
               </el-menu-item>
               <el-menu-item index="/account">
-                <SvgIcon name="account-manage" />
-                账号管理
+                <el-icon><SvgIcon name="account-manage" /></el-icon>
+                <span>账号管理</span>
               </el-menu-item>
             </el-sub-menu>
 
@@ -110,7 +116,7 @@
         </el-main>
       </el-container>
 
-      <el-footer class="footer">
+      <!-- <el-footer class="footer">
         <div class="footer-content">
           <a href="https://beian.miit.gov.cn/"><span>鄂ICP备2024050235号-1</span></a>&nbsp;&nbsp;
           <a href="https://beian.mps.gov.cn/#/query/webSearch?code=42018502007471" rel="noreferrer" target="_blank">
@@ -119,7 +125,7 @@
             <span>鄂公网安备42018502007471</span>
           </a>
         </div>
-      </el-footer>
+      </el-footer> -->
     </el-container>
 
     <el-dialog
@@ -191,10 +197,13 @@ import router from "@/router";
 import {getCurrentInstance} from "vue";
 import {
   Edit,
-  SwitchButton
+  SwitchButton,
+  Expand,
+  Fold,
+  HomeFilled
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
-import {editPasswordApi, getVerificationCodeByActionApi} from "@/api/login.ts";
+import {editPasswordApi, getVerificationCodeByActionApi} from "@/api/login";
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
 
@@ -219,6 +228,12 @@ const numberValidateForm: UserPasswordEditDto = reactive({
 })
 
 const formRef = ref<FormInstance>()
+
+const isCollapse = ref(false)
+
+const toggleCollapse = () => {
+  isCollapse.value = !isCollapse.value
+}
 
 onMounted(() => {
   user.name = window.sessionStorage.getItem("name");
@@ -398,5 +413,93 @@ function startCountdown() {
 
 .footer-content > a {
   color: #000000;
+}
+
+.aside-container {
+  transition: width 0.3s;
+  background-color: #fff;
+  border-right: 1px solid #e6e6e6;
+}
+
+.collapse-btn {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.collapse-btn:hover {
+  background-color: #f5f7fa;
+}
+
+.user-info {
+  padding: 16px 0;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  justify-content: center;
+}
+
+.user-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.user-content.collapsed {
+  padding: 0;
+}
+
+.user-content .username {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* 下拉菜单样式优化 */
+:deep(.el-dropdown-menu) {
+  padding: 5px 0;
+  min-width: 120px;
+}
+
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:deep(.el-dropdown-menu__item .el-icon) {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+:deep(.el-menu) {
+  border-right: none;
+}
+
+:deep(.el-menu--collapse) {
+  width: 64px;
+}
+
+:deep(.el-menu-item), :deep(.el-sub-menu__title) {
+  height: 50px;
+  line-height: 50px;
+}
+
+/* 移除不需要的样式 */
+.header,
+.left,
+.right,
+.logo {
+  display: none;
 }
 </style>
