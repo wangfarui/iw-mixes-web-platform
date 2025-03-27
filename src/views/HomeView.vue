@@ -43,63 +43,63 @@
             </el-menu-item>
             <el-sub-menu index="1">
               <template #title>
-                <el-icon><SvgIcon name="meal-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="meal-manage" /></el-icon>
                 <span>餐饮管理</span>
               </template>
               <el-menu-item index="/meal">
-                <el-icon><SvgIcon name="meal-records" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="meal-records" /></el-icon>
                 <span>点餐记录</span>
               </el-menu-item>
               <el-menu-item index="/dishes">
-                <el-icon><SvgIcon name="dishes-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="dishes-manage" /></el-icon>
                 <span>菜品管理</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="2">
               <template #title>
-                <el-icon><SvgIcon name="bookkeeping-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="bookkeeping-manage" /></el-icon>
                 <span>财务管理</span>
               </template>
               <el-menu-item index="/bookkeeping">
-                <el-icon><SvgIcon name="bookkeeping-records" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="bookkeeping-records" /></el-icon>
                 <span>记账记录</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="3">
               <template #title>
-                <el-icon><SvgIcon name="task-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="task-manage" /></el-icon>
                 <span>任务管理</span>
               </template>
               <el-menu-item index="/task/list">
-                <el-icon><SvgIcon name="task-list" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="task-list" /></el-icon>
                 <span>任务清单</span>
               </el-menu-item> 
               <el-menu-item index="/task/records">
-                <el-icon><SvgIcon name="task-records" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="task-records" /></el-icon>
                 <span>任务记录</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="4">
               <template #title>
-                <el-icon><SvgIcon name="points-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="points-manage" /></el-icon>
                 <span>积分管理</span>
               </template>
               <el-menu-item index="/points/records">
-                <el-icon><SvgIcon name="points-records" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="points-records" /></el-icon>
                 <span>积分记录</span>
               </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="5">
               <template #title>
-                <el-icon><SvgIcon name="base-setting" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="base-setting" /></el-icon>
                 <span>基础设置</span>
               </template>
               <el-menu-item index="/dict">
-                <el-icon><SvgIcon name="dict-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home" name="dict-manage" /></el-icon>
                 <span>字典管理</span>
               </el-menu-item>
               <el-menu-item index="/account">
-                <el-icon><SvgIcon name="account-manage" /></el-icon>
+                <el-icon><SvgIcon dir="home"  name="account-manage" /></el-icon>
                 <span>账号管理</span>
               </el-menu-item>
             </el-sub-menu>

@@ -13,6 +13,7 @@
 import { shallowRef, watchEffect } from 'vue'
 
 const props = defineProps({
+  dir: String, // 传入的图标目录
   name: String, // 传入的图标名称
   size: {
     type: [String, Number],
@@ -27,8 +28,13 @@ watchEffect(async () => {
 
   try {
     // 动态导入 SVG
-    const iconModule = await import(`@/assets/icons/${props.name}.svg`)
-    loadedIcon.value = iconModule.default
+    if (props.dir && props.dir !== '') {
+      const iconModule = await import(`@/assets/icons/${props.dir}/${props.name}.svg`)
+      loadedIcon.value = iconModule.default
+    } else {
+      const iconModule = await import(`@/assets/icons/${props.name}.svg`)
+      loadedIcon.value = iconModule.default
+    }
   } catch (error) {
     console.error(`SVG 图标加载失败: ${props.name}`, error)
   }
