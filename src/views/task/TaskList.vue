@@ -129,8 +129,8 @@
               {{ task.taskName }}
             </span>
             <span v-if="task.deadlineDate" class="deadline-date" :class="{
-              'deadline-urgent': isUrgentDeadline(task.deadlineDate),
-              'deadline-warning': isWarningDeadline(task.deadlineDate)
+              'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus),
+              'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus)
             }">
               {{ formatDeadlineDisplay(task.deadlineDate) }}
             </span>
@@ -197,6 +197,13 @@
                   <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
                     <el-icon><Top /></el-icon>
                     <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item 
+                    v-if="currentGroup?.id === 'trash'"
+                    class="normal-item" 
+                    @click="restoreTask(task)">
+                    <el-icon><Refresh /></el-icon>
+                    <span>恢复</span>
                   </el-dropdown-item>
                   <el-dropdown-item class="normal-item" @click="deleteTask(task)">
                     <el-icon><Delete /></el-icon>
@@ -288,8 +295,8 @@
                   {{ task.taskName }}
                 </span>
                 <span v-if="task.deadlineDate" class="deadline-date" :class="{
-                  'deadline-urgent': isUrgentDeadline(task.deadlineDate),
-                  'deadline-warning': isWarningDeadline(task.deadlineDate)
+                  'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus),
+                  'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus)
                 }">
                   {{ formatDeadlineDisplay(task.deadlineDate) }}
                 </span>
@@ -356,6 +363,13 @@
                       <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
                         <el-icon><Top /></el-icon>
                         <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
+                      </el-dropdown-item>
+                      <el-dropdown-item 
+                        v-if="currentGroup?.id === 'trash'"
+                        class="normal-item" 
+                        @click="restoreTask(task)">
+                        <el-icon><Refresh /></el-icon>
+                        <span>恢复</span>
                       </el-dropdown-item>
                       <el-dropdown-item class="normal-item" @click="deleteTask(task)">
                         <el-icon><Delete /></el-icon>
@@ -431,6 +445,7 @@
         :model="addGroupForm"
         :rules="addGroupRules"
         label-width="80px"
+        @submit.prevent="submitAddGroup"
       >
         <el-form-item :label="addGroupForm.parentId ? '分组名称' : '清单名称'" prop="groupName">
           <el-input 
@@ -439,6 +454,7 @@
             maxlength="20"
             show-word-limit
             ref="groupNameInput"
+            @keyup.enter.prevent="submitAddGroup"
           />
         </el-form-item>
       </el-form>
@@ -550,6 +566,13 @@
         <el-icon><Top /></el-icon>
         <span>{{ contextMenuTask?.isTop ? '取消置顶' : '置顶' }}</span>
       </div>
+      <div 
+        v-if="currentGroup?.id === 'trash'"
+        class="context-menu-item" 
+        @click="contextMenuTask && restoreTask(contextMenuTask)">
+        <el-icon><Refresh /></el-icon>
+        <span>恢复</span>
+      </div>
       <div class="context-menu-item" @click="contextMenuTask && deleteTask(contextMenuTask)">
         <el-icon><Delete /></el-icon>
         <span>删除任务</span>
@@ -621,7 +644,8 @@ import {
   Flag,
   Top,
   Position,
-  ArrowLeft
+  ArrowLeft,
+  Refresh
 } from '@element-plus/icons-vue'
 import type { TaskGroup } from '@/types/types'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -745,6 +769,8 @@ const switchGroup = async (group: TaskGroup) => {
   currentGroup.value = group
   activeCollapse.value = []
   subGroups.value = []
+  selectedTask.value = null  // 清空选中的任务
+  activeTask.value = null   // 清空高亮的任务
   
   // 如果是已完成分组，加载已完成任务列表
   if (group.id === 'completed') {
@@ -813,11 +839,11 @@ const switchGroup = async (group: TaskGroup) => {
 
       switch (group.id) {
         case 'today':
-          startDeadlineDate = todayStr
+          // startDeadlineDate = todayStr
           endDeadlineDate = todayStr
           break
         case 'week':
-          startDeadlineDate = todayStr
+          // startDeadlineDate = todayStr
           const nextWeek = new Date(today)
           nextWeek.setDate(nextWeek.getDate() + 7)
           endDeadlineDate = formatDate(nextWeek)
@@ -926,11 +952,13 @@ const addTask = async () => {
           taskNum: res.data.length
         }]
       }
-    } else {
-      // 如果是自定义分组，更新第一个分组的任务数量
+    } else if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+      // 如果是自定义清单，刷新任务分组列表和任务列表
+      await loadSubGroups(currentGroup.value.id)
+      // 刷新任务分组下的任务列表
       const group = subGroups.value.find(g => g.id === taskGroupId.toString())
       if (group) {
-        group.taskNum = (group.taskNum || 0) + 1
+        await loadGroupTasks(group.id)
       }
     }
     
@@ -1129,6 +1157,12 @@ const submitAddGroup = async () => {
         ElMessage.success(addGroupForm.parentId ? '添加分组成功' : '添加清单成功')
         addGroupDialogVisible.value = false
         resetAddGroupForm()
+        
+        // 如果是添加分组，刷新当前清单的分组列表
+        if (currentGroup.value) {
+          await loadSubGroups(currentGroup.value.id)
+        }
+        
         // 重新加载自定义分组
         await loadCustomGroups()
       } catch (error) {
@@ -1227,8 +1261,13 @@ const saveNewTask = async (groupId: string) => {
       taskGroupId: parseInt(groupId)
     })
     
-    // 重新加载任务列表
-    await loadGroupTasks(groupId)
+    // 如果是自定义清单，刷新任务分组列表和任务列表
+    if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+      await loadSubGroups(currentGroup.value.id)
+      // 刷新当前分组的任务列表
+      await loadGroupTasks(groupId)
+    }
+    
     ElMessage.success('添加任务成功')
   } catch (error) {
     console.error('添加任务失败:', error)
@@ -1310,6 +1349,15 @@ const deleteGroup = async (group: TaskGroup) => {
 
     await deleteTaskGroup(parseInt(group.id))
     ElMessage.success('删除成功')
+
+    // 重新加载自定义分组列表
+    await loadCustomGroups()
+
+    
+    // 如果分组是自定义清单，则刷新任务列表
+    if (group.parentId && group.parentId === '0') {
+      await loadSubGroups(group.parentId)
+    }
     
     // 从列表中移除该分组
     const index = customGroups.value.findIndex(g => g.id === group.id)
@@ -1443,6 +1491,54 @@ const toggleTaskTop = async (task: TaskBasicsVo) => {
   }
 }
 
+// 恢复任务
+const restoreTask = async (task: TaskBasicsVo) => {
+  try {
+    await request.put('/bookkeeping-service/task/basics/updateStatus', {
+      id: task.id,
+      taskStatus: 0
+    })
+    
+    // 从列表中移除该任务并更新任务数量
+    const group = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
+    if (group) {
+      const index = group.tasks.findIndex(t => t.id === task.id)
+      if (index > -1) {
+        group.tasks.splice(index, 1)
+        group.taskNum = (group.taskNum || 1) - 1
+      }
+    }
+    
+    // 更新固定分组和清单列表的任务数量
+    await updateTaskCounts()
+    
+    // 如果是垃圾箱清单，刷新任务列表
+    if (currentGroup.value?.id === 'trash') {
+      const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+      if (Array.isArray(res.data)) {
+        subGroups.value = [{
+          id: 'trash',
+          name: '垃圾箱',
+          tasks: res.data.map(t => ({
+            ...t,
+            completed: false
+          })),
+          loading: false,
+          showNewTaskInput: false,
+          newTaskName: '',
+          taskNum: res.data.length
+        }]
+      }
+    }
+    
+    ElMessage.success('恢复任务成功')
+    closeContextMenu() // 关闭右键菜单
+  } catch (error) {
+    console.error('恢复任务失败:', error)
+    ElMessage.error('恢复任务失败')
+  }
+}
+
 // 删除任务
 const deleteTask = async (task: TaskBasicsVo) => {
   try {
@@ -1485,6 +1581,62 @@ const deleteTask = async (task: TaskBasicsVo) => {
     
     // 更新固定分组和清单列表的任务数量
     await updateTaskCounts()
+    
+    // 如果是垃圾箱清单或固定清单，刷新任务列表
+    if (currentGroup.value && ['trash', 'today', 'week', 'inbox'].includes(currentGroup.value.id)) {
+      let startDeadlineDate: string | undefined
+      let endDeadlineDate: string | undefined
+      const today = new Date()
+      const todayStr = formatDate(today)
+
+      switch (currentGroup.value.id) {
+        case 'trash':
+          const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+          if (Array.isArray(res.data)) {
+            subGroups.value = [{
+              id: 'trash',
+              name: '垃圾箱',
+              tasks: res.data.map(t => ({
+                ...t,
+                completed: false
+              })),
+              loading: false,
+              showNewTaskInput: false,
+              newTaskName: '',
+              taskNum: res.data.length
+            }]
+          }
+          break
+        case 'today':
+          startDeadlineDate = todayStr
+          endDeadlineDate = todayStr
+          break
+        case 'week':
+          startDeadlineDate = todayStr
+          const nextWeek = new Date(today)
+          nextWeek.setDate(nextWeek.getDate() + 7)
+          endDeadlineDate = formatDate(nextWeek)
+          break
+        case 'inbox':
+          // 收集箱不需要时间范围
+          break
+      }
+
+      if (currentGroup.value.id !== 'trash') {
+        const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+        if (Array.isArray(res.data)) {
+          subGroups.value = [{
+            id: currentGroup.value.id,
+            name: currentGroup.value.name,
+            tasks: res.data,
+            loading: false,
+            showNewTaskInput: false,
+            newTaskName: '',
+            taskNum: res.data.length
+          }]
+        }
+      }
+    }
     
     ElMessage.success('删除成功')
     closeContextMenu() // 关闭右键菜单
@@ -1925,23 +2077,23 @@ const updateTaskCounts = async () => {
 }
 
 // 判断是否为紧急截止日期（今天或更早）
-const isUrgentDeadline = (date: string): boolean => {
+const isUrgentDeadline = (date: string, taskStatus: number): boolean => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const deadline = new Date(date)
   deadline.setHours(0, 0, 0, 0)
-  return deadline <= today
+  return deadline <= today && taskStatus == 0
 }
 
 // 判断是否为警告截止日期（明天到一周内）
-const isWarningDeadline = (date: string): boolean => {
+const isWarningDeadline = (date: string, taskStatus: number): boolean => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const deadline = new Date(date)
   deadline.setHours(0, 0, 0, 0)
   const diffTime = deadline.getTime() - today.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  return diffDays > 0 && diffDays <= 7
+  return diffDays > 0 && diffDays <= 7 && taskStatus == 0
 }
 </script>
 <style scoped>
