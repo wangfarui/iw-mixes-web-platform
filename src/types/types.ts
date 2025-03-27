@@ -24,6 +24,7 @@ export interface TaskGroup {
   count?: number;
   sort?: number;
   isTop?: number;
+  parentId?: string;
 }
 
 export interface Task {

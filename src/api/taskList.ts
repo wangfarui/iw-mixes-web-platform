@@ -59,6 +59,7 @@ export interface TaskBasicsVo {
   priority?: number;
   isTop?: number;
   completed?: boolean;
+  taskStatus?: number;
 }
 
 // 获取任务列表
