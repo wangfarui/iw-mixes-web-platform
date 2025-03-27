@@ -53,24 +53,50 @@ export const getTaskGroupStatistics = (): Promise<GeneralResponse<StatisticsLate
 export interface TaskBasicsVo {
   id: number;
   taskName: string;
-  completed: boolean;
-  notes?: string;
+  taskRemark?: string;
+  taskGroupId: number;
+  deadlineDate?: string;
+  priority?: number;
+  isTop?: number;
+  completed?: boolean;
 }
 
 // 获取任务列表
-export const getTaskList = (taskGroupId: string) => {
+export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string) => {
   return request<GeneralResponse<TaskBasicsVo[]>>({
     url: '/bookkeeping-service/task/basics/list',
     method: 'post',
-    data: { taskGroupId }
+    data: { 
+      taskGroupId,
+      startDeadlineDate,
+      endDeadlineDate
+    }
   })
 }
 
 // 创建任务
-export const addTask = (data: { taskName: string; taskGroupId: number }) => {
+export const addTask = (data: { taskName: string; taskGroupId: number; deadlineDate?: string | null }) => {
   return request<GeneralResponse<void>>({
     url: '/bookkeeping-service/task/basics/add',
     method: 'post',
     data
+  })
+}
+
+// 更新任务
+export const updateTask = (params: TaskBasicsVo) => {
+  return request.put('/bookkeeping-service/task/basics/update', params)
+}
+
+// 重命名分组
+export const renameTaskGroup = (params: { id: number, groupName: string }) => {
+  return request.put('/bookkeeping-service/task/group/update', params)
+}
+
+// 删除分组
+export const deleteTaskGroup = (id: number) => {
+  return request<GeneralResponse<void>>({
+    url: `/bookkeeping-service/task/group/delete?id=${id}`,
+    method: 'delete'
   })
 } 
