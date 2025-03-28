@@ -26,7 +26,7 @@ export interface StatisticsLatestTaskNumVo {
 
 // 添加任务清单分组
 export const addTaskGroup = (data: { groupName: string; parentId?: string }) => {
-  return request<GeneralResponse<void>>({
+  return request<GeneralResponse<number>>({
     url: '/bookkeeping-service/task/group/add',
     method: 'post',
     data
@@ -60,6 +60,7 @@ export interface TaskBasicsVo {
   isTop?: number;
   completed?: boolean;
   taskStatus?: number;
+  sort?: number;
 }
 
 // 获取任务列表
@@ -99,5 +100,20 @@ export const deleteTaskGroup = (id: number) => {
   return request<GeneralResponse<void>>({
     url: `/bookkeeping-service/task/group/delete?id=${id}`,
     method: 'delete'
+  })
+}
+
+// 移动清单列表项
+export interface TaskGroupMoveListVo {
+  id: number;
+  groupName: string;
+  subGroupList: TaskGroupMoveListVo[];
+}
+
+// 获取移动清单列表
+export const getTaskGroupMoveList = () => {
+  return request<GeneralResponse<TaskGroupMoveListVo[]>>({
+    url: '/bookkeeping-service/task/group/moveList',
+    method: 'get'
   })
 } 

@@ -91,6 +91,11 @@
                 <el-dropdown-item @click="toggleHideCompleted">
                   <el-icon><View /></el-icon>{{ isHideCompleted ? '显示已完成' : '隐藏已完成' }}
                 </el-dropdown-item>
+                <el-dropdown-item 
+                  v-if="currentGroup?.id === 'trash'"
+                  @click="clearTrash">
+                  <el-icon><Delete /></el-icon>清空垃圾箱
+                </el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -110,175 +115,17 @@
       <div class="tasks-list">
         <!-- 固定清单（今天、最近7天、收集箱）和已完成清单、垃圾箱的任务列表 -->
         <template v-if="['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')">
-          <div class="task-item" 
-            v-for="task in subGroups[0]?.tasks || []" 
-            :key="task.id"
-            :data-task-id="task.id"
-            @click="selectTask(task)"
-            @contextmenu.prevent="showTaskContextMenu($event, task)"
-            :class="{ 'active': activeTask?.id === task.id }">
-            <el-checkbox 
-              v-model="task.completed"
-              @change="toggleTaskStatus(task)"
-              @click.stop
-            />
-            <span class="task-name" :class="{ 
-              completed: task.completed && currentGroup?.id === 'completed',
-              'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
-            }">
-              {{ task.taskName }}
-            </span>
-            <span v-if="task.deadlineDate" class="deadline-date" :class="{
-              'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus),
-              'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus)
-            }">
-              {{ formatDeadlineDisplay(task.deadlineDate) }}
-            </span>
-            <el-dropdown trigger="click" @click.stop>
-              <el-icon class="more-icon" @click.stop="activeTask = task"><MoreFilled /></el-icon>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item class="submenu-item">
-                    <div class="context-menu-item">
-                      <el-icon><Calendar /></el-icon>
-                      <span>截止日期</span>
-                      <div class="quick-actions">
-                        <el-icon 
-                          class="quick-action-icon" 
-                          @click.stop="setTaskDeadline(task, 'today')"
-                          title="今天"
-                        ><SvgIcon dir="task-list" name="today" /></el-icon>
-                        <el-icon 
-                          class="quick-action-icon" 
-                          @click.stop="setTaskDeadline(task, 'tomorrow')"
-                          title="明天"
-                        ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
-                        <el-icon 
-                          class="quick-action-icon" 
-                          @click.stop="setTaskDeadline(task, 'nextWeek')"
-                          title="下周"
-                        ><SvgIcon dir="task-list" name="last-week" /></el-icon>
-                        <el-icon 
-                          class="quick-action-icon" 
-                          @click.stop="showDatePicker($event, task)"
-                          title="自定义"
-                        ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
-                      </div>
-                    </div>
-                  </el-dropdown-item>
-                  <el-dropdown-item class="submenu-item">
-                    <div class="context-menu-item">
-                      <el-icon><Flag /></el-icon>
-                      <span>优先级</span>
-                      <div class="quick-actions">
-                        <el-icon 
-                          class="quick-action-icon priority-high" 
-                          @click.stop="setTaskPriority(task, 30)"
-                          title="高"
-                        ><Flag /></el-icon>
-                        <el-icon 
-                          class="quick-action-icon priority-medium" 
-                          @click.stop="setTaskPriority(task, 20)"
-                          title="中"
-                        ><Flag /></el-icon>
-                        <el-icon 
-                          class="quick-action-icon priority-low" 
-                          @click.stop="setTaskPriority(task, 10)"
-                          title="低"
-                        ><Flag /></el-icon>
-                        <el-icon 
-                          class="quick-action-icon priority-none" 
-                          @click.stop="setTaskPriority(task, 0)"
-                          title="无"
-                        ><Flag /></el-icon>
-                      </div>
-                    </div>
-                  </el-dropdown-item>
-                  <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
-                    <el-icon><Top /></el-icon>
-                    <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item 
-                    v-if="currentGroup?.id === 'trash'"
-                    class="normal-item" 
-                    @click="restoreTask(task)">
-                    <el-icon><Refresh /></el-icon>
-                    <span>恢复</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item class="normal-item" @click="deleteTask(task)">
-                    <el-icon><Delete /></el-icon>
-                    <span>删除任务</span>
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-          <div v-if="!loadingSubGroups && (!subGroups[0]?.tasks || subGroups[0].tasks.length === 0)" class="no-tasks">
-            {{ currentGroup?.id === 'completed' ? '暂无已完成任务' : 
-               currentGroup?.id === 'trash' ? '暂无已删除任务' : '暂无任务' }}
-          </div>
-        </template>
-
-        <!-- 其他清单的任务列表 -->
-        <template v-else>
-          <el-collapse v-model="activeCollapse" @change="handleCollapseChange">
-            <el-collapse-item 
-              v-for="group in subGroups" 
-              :key="group.id" 
-              :title="group.name"
-              :name="group.id">
-              <template #title>
-                <div style="display: flex; align-items: center; width: 100%;">
-                  <span style="flex: 1; text-align: left; padding-left: 8px;">
-                    <span style="font-weight: bold;">{{ group.name }}</span>
-                    <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ group.taskNum || 0 }}</span>
-                  </span>
-                  <el-icon 
-                    class="add-task-icon" 
-                    @click.stop="showNewTaskInput(group.id)"
-                    style="margin-right: 8px;"
-                  >
-                    <Plus />
-                  </el-icon>
-                  <el-dropdown trigger="click" @click.stop>
-                    <el-icon 
-                      class="more-icon"
-                      style="margin-right: 16px;"
-                      @click.stop
-                    >
-                      <MoreFilled />
-                    </el-icon>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item @click="renameGroup(group)">
-                          <el-icon><Edit /></el-icon>重命名
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="deleteGroup(group)">
-                          <el-icon><Delete /></el-icon>删除
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-              </template>
-              <template #extra>
-                <el-icon v-if="group.loading" class="is-loading"><Loading /></el-icon>
-              </template>
-              <!-- 新任务输入框 -->
-              <div v-if="group.showNewTaskInput" class="task-item new-task-input">
-                <el-checkbox disabled />
-                <el-input
-                  v-model="group.newTaskName"
-                  placeholder="请输入任务名称"
-                  @keyup.enter="saveNewTask(group.id)"
-                  @blur="saveNewTask(group.id)"
-                  ref="newTaskInput"
-                  v-focus
-                />
-              </div>
+          <draggable
+            v-if="subGroups[0]"
+            v-model="subGroups[0].tasks"
+            :disabled="currentGroup?.id === 'completed' || currentGroup?.id === 'trash'"
+            @end="(evt) => handleDragEnd(evt, subGroups[0].id)"
+            item-key="id"
+            handle=".task-item"
+            ghost-class="ghost"
+          >
+            <template #item="{ element: task }">
               <div class="task-item" 
-                v-for="task in group.tasks" 
-                :key="task.id"
                 :data-task-id="task.id"
                 @click="selectTask(task)"
                 @contextmenu.prevent="showTaskContextMenu($event, task)"
@@ -295,8 +142,8 @@
                   {{ task.taskName }}
                 </span>
                 <span v-if="task.deadlineDate" class="deadline-date" :class="{
-                  'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus),
-                  'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus)
+                  'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
+                  'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus || 0)
                 }">
                   {{ formatDeadlineDisplay(task.deadlineDate) }}
                 </span>
@@ -360,6 +207,47 @@
                           </div>
                         </div>
                       </el-dropdown-item>
+                      <el-dropdown-item class="submenu-item move-to-wrapper" 
+                        @mouseenter="showMoveToMenu = true" 
+                        @mouseleave="handleMoveToMenuLeave"
+                      >
+                        <div class="context-menu-item">
+                          <el-icon><FolderOpened /></el-icon>
+                          <span>移动到</span>
+                          <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+                          <!-- 移动到菜单 -->
+                          <div v-show="showMoveToMenu" class="move-to-menu">
+                            <div class="search-box">
+                              <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
+                            </div>
+                            <!-- 收集箱选项 -->
+                            <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
+                              <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
+                              <span>收集箱</span>
+                            </div>
+                            <!-- 自定义清单列表 -->
+                            <template v-for="list in filteredMoveList" :key="list.id">
+                              <div class="menu-item">
+                                <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
+                                <span>{{ list.groupName }}</span>
+                                <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+                                <!-- 分组子菜单 -->
+                                <div class="move-to-submenu">
+                                  <div 
+                                    v-for="subGroup in list.subGroupList" 
+                                    :key="subGroup.id" 
+                                    class="menu-item"
+                                    @click="moveTask(contextMenuTask!, subGroup.id)"
+                                  >
+                                    <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
+                                    <span>{{ subGroup.groupName }}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </el-dropdown-item>
                       <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
                         <el-icon><Top /></el-icon>
                         <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
@@ -379,6 +267,384 @@
                   </template>
                 </el-dropdown>
               </div>
+            </template>
+          </draggable>
+          <div v-if="!loadingSubGroups && (!subGroups[0]?.tasks || subGroups[0].tasks.length === 0)" class="no-tasks">
+            {{ currentGroup?.id === 'completed' ? '暂无已完成任务' : 
+               currentGroup?.id === 'trash' ? '暂无已删除任务' : '暂无任务' }}
+          </div>
+          <!-- 添加查看更多按钮 -->
+          <div v-if="currentGroup?.id === 'completed'" class="view-more">
+            <template v-if="hasMore">
+              <el-button type="primary" link @click="loadMoreCompletedTasks">
+                查看更多
+              </el-button>
+            </template>
+            <template v-else-if="subGroups[0]?.tasks?.length > 0">
+              <span class="no-more">到底了~</span>
+            </template>
+          </div>
+        </template>
+
+        <!-- 其他清单的任务列表 -->
+        <template v-else>
+          <template v-if="subGroups.length === 1 && subGroups[0].name === '未分组'">
+            <draggable
+              v-model="subGroups[0].tasks"
+              @end="(evt) => handleDragEnd(evt, subGroups[0].id)"
+              item-key="id"
+              handle=".task-item"
+              ghost-class="ghost"
+            >
+              <template #item="{ element: task }">
+                <div class="task-item" 
+                  :data-task-id="task.id"
+                  @click="selectTask(task)"
+                  @contextmenu.prevent="showTaskContextMenu($event, task)"
+                  :class="{ 'active': activeTask?.id === task.id }">
+                  <el-checkbox 
+                    v-model="task.completed"
+                    @change="toggleTaskStatus(task)"
+                    @click.stop
+                  />
+                  <span class="task-name" :class="{ 
+                    completed: task.completed && currentGroup?.id === 'completed',
+                    'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                  }">
+                    {{ task.taskName }}
+                  </span>
+                  <span v-if="task.deadlineDate" class="deadline-date" :class="{
+                    'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
+                    'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus || 0)
+                  }">
+                    {{ formatDeadlineDisplay(task.deadlineDate) }}
+                  </span>
+                  <el-dropdown trigger="click" @click.stop>
+                    <el-icon class="more-icon" @click.stop="activeTask = task"><MoreFilled /></el-icon>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item class="submenu-item">
+                          <div class="context-menu-item">
+                            <el-icon><Calendar /></el-icon>
+                            <span>截止日期</span>
+                            <div class="quick-actions">
+                              <el-icon 
+                                class="quick-action-icon" 
+                                @click.stop="setTaskDeadline(task, 'today')"
+                                title="今天"
+                              ><SvgIcon dir="task-list" name="today" /></el-icon>
+                              <el-icon 
+                                class="quick-action-icon" 
+                                @click.stop="setTaskDeadline(task, 'tomorrow')"
+                                title="明天"
+                              ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
+                              <el-icon 
+                                class="quick-action-icon" 
+                                @click.stop="setTaskDeadline(task, 'nextWeek')"
+                                title="下周"
+                              ><SvgIcon dir="task-list" name="last-week" /></el-icon>
+                              <el-icon 
+                                class="quick-action-icon" 
+                                @click.stop="showDatePicker($event, task)"
+                                title="自定义"
+                              ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
+                            </div>
+                          </div>
+                        </el-dropdown-item>
+                        <el-dropdown-item class="submenu-item">
+                          <div class="context-menu-item">
+                            <el-icon><Flag /></el-icon>
+                            <span>优先级</span>
+                            <div class="quick-actions">
+                              <el-icon 
+                                class="quick-action-icon priority-high" 
+                                @click.stop="setTaskPriority(task, 30)"
+                                title="高"
+                              ><Flag /></el-icon>
+                              <el-icon 
+                                class="quick-action-icon priority-medium" 
+                                @click.stop="setTaskPriority(task, 20)"
+                                title="中"
+                              ><Flag /></el-icon>
+                              <el-icon 
+                                class="quick-action-icon priority-low" 
+                                @click.stop="setTaskPriority(task, 10)"
+                                title="低"
+                              ><Flag /></el-icon>
+                              <el-icon 
+                                class="quick-action-icon priority-none" 
+                                @click.stop="setTaskPriority(task, 0)"
+                                title="无"
+                              ><Flag /></el-icon>
+                            </div>
+                          </div>
+                        </el-dropdown-item>
+                        <el-dropdown-item class="submenu-item move-to-wrapper" 
+                          @mouseenter="showMoveToMenu = true" 
+                          @mouseleave="handleMoveToMenuLeave"
+                        >
+                          <div class="context-menu-item">
+                            <el-icon><FolderOpened /></el-icon>
+                            <span>移动到</span>
+                            <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+                            <!-- 移动到菜单 -->
+                            <div v-show="showMoveToMenu" class="move-to-menu">
+                              <div class="search-box">
+                                <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
+                              </div>
+                              <!-- 收集箱选项 -->
+                              <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
+                                <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
+                                <span>收集箱</span>
+                              </div>
+                              <!-- 自定义清单列表 -->
+                              <template v-for="list in filteredMoveList" :key="list.id">
+                                <div class="menu-item">
+                                  <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
+                                  <span>{{ list.groupName }}</span>
+                                  <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+                                  <!-- 分组子菜单 -->
+                                  <div class="move-to-submenu">
+                                    <div 
+                                      v-for="subGroup in list.subGroupList" 
+                                      :key="subGroup.id" 
+                                      class="menu-item"
+                                      @click="moveTask(contextMenuTask!, subGroup.id)"
+                                    >
+                                      <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
+                                      <span>{{ subGroup.groupName }}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </el-dropdown-item>
+                        <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
+                          <el-icon><Top /></el-icon>
+                          <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
+                        </el-dropdown-item>
+                        <el-dropdown-item class="normal-item" @click="deleteTask(task)">
+                          <el-icon><Delete /></el-icon>
+                          <span>删除任务</span>
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </template>
+            </draggable>
+            <div v-if="!loadingSubGroups && subGroups[0].tasks.length === 0" class="no-tasks">
+              暂无任务
+            </div>
+          </template>
+          <el-collapse v-else v-model="activeCollapse" @change="handleCollapseChange">
+            <el-collapse-item 
+              v-for="group in subGroups" 
+              :key="group.id" 
+              :title="group.name"
+              :name="group.id">
+              <template #title>
+                <div style="display: flex; align-items: center; width: 100%;">
+                  <span style="flex: 1; text-align: left; padding-left: 8px;">
+                    <span style="font-weight: bold;">{{ group.name }}</span>
+                    <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ group.taskNum || 0 }}</span>
+                  </span>
+                  <el-icon 
+                    class="add-task-icon" 
+                    @click.stop="showNewTaskInput(group.id)"
+                    style="margin-right: 8px;"
+                  >
+                    <Plus />
+                  </el-icon>
+                  <el-dropdown trigger="click" @click.stop>
+                    <el-icon 
+                      class="more-icon"
+                      style="margin-right: 16px;"
+                      @click.stop
+                    >
+                      <MoreFilled />
+                    </el-icon>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="renameGroup(group)">
+                          <el-icon><Edit /></el-icon>重命名
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="deleteGroup(group)">
+                          <el-icon><Delete /></el-icon>删除
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </template>
+              <template #extra>
+                <el-icon v-if="group.loading" class="is-loading"><Loading /></el-icon>
+              </template>
+              <!-- 新任务输入框 -->
+              <div v-if="group.showNewTaskInput" class="task-item new-task-input">
+                <el-checkbox disabled />
+                <el-input
+                  v-model="group.newTaskName"
+                  placeholder="请输入任务名称"
+                  @keyup.enter="saveNewTask(group.id)"
+                  @blur="saveNewTask(group.id)"
+                  ref="newTaskInput"
+                  v-focus
+                />
+              </div>
+              <draggable
+                v-model="group.tasks"
+                @end="(evt) => handleDragEnd(evt, group.id)"
+                item-key="id"
+                handle=".task-item"
+                ghost-class="ghost"
+              >
+                <template #item="{ element: task }">
+                  <div class="task-item" 
+                    :data-task-id="task.id"
+                    @click="selectTask(task)"
+                    @contextmenu.prevent="showTaskContextMenu($event, task)"
+                    :class="{ 'active': activeTask?.id === task.id }">
+                    <el-checkbox 
+                      v-model="task.completed"
+                      @change="toggleTaskStatus(task)"
+                      @click.stop
+                    />
+                    <span class="task-name" :class="{ 
+                      completed: task.completed && currentGroup?.id === 'completed',
+                      'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                    }">
+                      {{ task.taskName }}
+                    </span>
+                    <span v-if="task.deadlineDate" class="deadline-date" :class="{
+                      'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
+                      'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus || 0)
+                    }">
+                      {{ formatDeadlineDisplay(task.deadlineDate) }}
+                    </span>
+                    <el-dropdown trigger="click" @click.stop>
+                      <el-icon class="more-icon" @click.stop="activeTask = task"><MoreFilled /></el-icon>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item class="submenu-item">
+                            <div class="context-menu-item">
+                              <el-icon><Calendar /></el-icon>
+                              <span>截止日期</span>
+                              <div class="quick-actions">
+                                <el-icon 
+                                  class="quick-action-icon" 
+                                  @click.stop="setTaskDeadline(task, 'today')"
+                                  title="今天"
+                                ><SvgIcon dir="task-list" name="today" /></el-icon>
+                                <el-icon 
+                                  class="quick-action-icon" 
+                                  @click.stop="setTaskDeadline(task, 'tomorrow')"
+                                  title="明天"
+                                ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
+                                <el-icon 
+                                  class="quick-action-icon" 
+                                  @click.stop="setTaskDeadline(task, 'nextWeek')"
+                                  title="下周"
+                                ><SvgIcon dir="task-list" name="last-week" /></el-icon>
+                                <el-icon 
+                                  class="quick-action-icon" 
+                                  @click.stop="showDatePicker($event, task)"
+                                  title="自定义"
+                                ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
+                              </div>
+                            </div>
+                          </el-dropdown-item>
+                          <el-dropdown-item class="submenu-item">
+                            <div class="context-menu-item">
+                              <el-icon><Flag /></el-icon>
+                              <span>优先级</span>
+                              <div class="quick-actions">
+                                <el-icon 
+                                  class="quick-action-icon priority-high" 
+                                  @click.stop="setTaskPriority(task, 30)"
+                                  title="高"
+                                ><Flag /></el-icon>
+                                <el-icon 
+                                  class="quick-action-icon priority-medium" 
+                                  @click.stop="setTaskPriority(task, 20)"
+                                  title="中"
+                                ><Flag /></el-icon>
+                                <el-icon 
+                                  class="quick-action-icon priority-low" 
+                                  @click.stop="setTaskPriority(task, 10)"
+                                  title="低"
+                                ><Flag /></el-icon>
+                                <el-icon 
+                                  class="quick-action-icon priority-none" 
+                                  @click.stop="setTaskPriority(task, 0)"
+                                  title="无"
+                                ><Flag /></el-icon>
+                              </div>
+                            </div>
+                          </el-dropdown-item>
+                          <el-dropdown-item class="submenu-item move-to-wrapper" 
+                            @mouseenter="showMoveToMenu = true" 
+                            @mouseleave="handleMoveToMenuLeave"
+                          >
+                            <div class="context-menu-item">
+                              <el-icon><FolderOpened /></el-icon>
+                              <span>移动到</span>
+                              <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+                              <!-- 移动到菜单 -->
+                              <div v-show="showMoveToMenu" class="move-to-menu">
+                                <div class="search-box">
+                                  <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
+                                </div>
+                                <!-- 收集箱选项 -->
+                                <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
+                                  <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
+                                  <span>收集箱</span>
+                                </div>
+                                <!-- 自定义清单列表 -->
+                                <template v-for="list in filteredMoveList" :key="list.id">
+                                  <div class="menu-item">
+                                    <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
+                                    <span>{{ list.groupName }}</span>
+                                    <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+                                    <!-- 分组子菜单 -->
+                                    <div class="move-to-submenu">
+                                      <div 
+                                        v-for="subGroup in list.subGroupList" 
+                                        :key="subGroup.id" 
+                                        class="menu-item"
+                                        @click="moveTask(contextMenuTask!, subGroup.id)"
+                                      >
+                                        <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
+                                        <span>{{ subGroup.groupName }}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </template>
+                              </div>
+                            </div>
+                          </el-dropdown-item>
+                          <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
+                            <el-icon><Top /></el-icon>
+                            <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
+                          </el-dropdown-item>
+                          <el-dropdown-item 
+                            v-if="currentGroup?.id === 'trash'"
+                            class="normal-item" 
+                            @click="restoreTask(task)">
+                            <el-icon><Refresh /></el-icon>
+                            <span>恢复</span>
+                          </el-dropdown-item>
+                          <el-dropdown-item class="normal-item" @click="deleteTask(task)">
+                            <el-icon><Delete /></el-icon>
+                            <span>删除任务</span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+              </draggable>
               <div v-if="!group.loading && !group.showNewTaskInput && group.tasks.length === 0" class="no-tasks">
                 暂无任务
               </div>
@@ -561,6 +827,46 @@
           ><Flag /></el-icon>
         </div>
       </div>
+      <!-- 移动到选项 -->
+      <div class="context-menu-item move-to-wrapper" 
+        @mouseenter="showMoveToMenu = true" 
+        @mouseleave="handleMoveToMenuLeave"
+      >
+        <el-icon><FolderOpened /></el-icon>
+        <span>移动到</span>
+        <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+        <!-- 移动到菜单 -->
+        <div v-show="showMoveToMenu" class="move-to-menu">
+          <div class="search-box">
+            <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
+          </div>
+          <!-- 收集箱选项 -->
+          <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
+            <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
+            <span>收集箱</span>
+          </div>
+          <!-- 自定义清单列表 -->
+          <template v-for="list in filteredMoveList" :key="list.id">
+            <div class="menu-item">
+              <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
+              <span>{{ list.groupName }}</span>
+              <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+              <!-- 分组子菜单 -->
+              <div class="move-to-submenu">
+                <div 
+                  v-for="subGroup in list.subGroupList" 
+                  :key="subGroup.id" 
+                  class="menu-item"
+                  @click="moveTask(contextMenuTask!, subGroup.id)"
+                >
+                  <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
+                  <span>{{ subGroup.groupName }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
       <div class="context-menu-divider"></div>
       <div class="context-menu-item" @click="contextMenuTask && toggleTaskTop(contextMenuTask)">
         <el-icon><Top /></el-icon>
@@ -660,11 +966,14 @@ import {
   updateTask,
   renameTaskGroup,
   deleteTaskGroup,
+  getTaskGroupMoveList,
   type TaskGroupListVo, 
   type StatisticsLatestTaskNumVo, 
-  type TaskBasicsVo 
+  type TaskBasicsVo,
+  type TaskGroupMoveListVo 
 } from '@/api/taskList'
 import SvgIcon from '@/components/SvgIcon.vue'
+import draggable from 'vuedraggable'
 
 // 面板宽度控制
 const leftWidth = ref(250)
@@ -776,7 +1085,9 @@ const switchGroup = async (group: TaskGroup) => {
   if (group.id === 'completed') {
     try {
       loadingSubGroups.value = true
-      const res = await request.get('/bookkeeping-service/task/basics/doneList')
+      currentPage.value = 1 // 重置页码
+      hasMore.value = true // 重置加载更多状态
+      const res = await request.get(`/bookkeeping-service/task/basics/doneList?currentPage=${currentPage.value}`)
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'completed',
@@ -790,6 +1101,8 @@ const switchGroup = async (group: TaskGroup) => {
           newTaskName: '',
           taskNum: res.data.length
         }]
+        // 如果返回的数据少于10条，说明没有更多数据了
+        hasMore.value = res.data.length >= 10
       }
     } catch (error) {
       console.error('加载已完成任务失败:', error)
@@ -906,8 +1219,22 @@ const addTask = async () => {
           taskGroupId = 0
           break
         default:
-          // 如果是自定义分组，使用第一个分组的ID
-          taskGroupId = subGroups.value[0]?.id ? parseInt(subGroups.value[0].id) : 0
+          // 如果是自定义清单，检查是否有分组
+          if (subGroups.value.length === 0) {
+            // 如果没有分组，先创建默认分组
+            const res = await addTaskGroup({
+              groupName: '未分组',
+              parentId: currentGroup.value.id
+            })
+            if (res.data) {
+              taskGroupId = res.data
+              // 刷新分组列表
+              await loadSubGroups(currentGroup.value.id)
+            }
+          } else {
+            // 如果有分组，使用第一个分组的ID
+            taskGroupId = subGroups.value[0]?.id ? parseInt(subGroups.value[0].id) : 0
+          }
       }
     }
 
@@ -953,12 +1280,11 @@ const addTask = async () => {
         }]
       }
     } else if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
-      // 如果是自定义清单，刷新任务分组列表和任务列表
-      await loadSubGroups(currentGroup.value.id)
-      // 刷新任务分组下的任务列表
-      const group = subGroups.value.find(g => g.id === taskGroupId.toString())
-      if (group) {
-        await loadGroupTasks(group.id)
+      // 如果是自定义清单，只刷新第一个分组的任务列表
+      if (subGroups.value.length > 0) {
+        await loadGroupTasks(subGroups.value[0].id)
+        // 更新第一个分组的任务数量
+        subGroups.value[0].taskNum = (subGroups.value[0].taskNum || 0) + 1
       }
     }
     
@@ -1163,8 +1489,9 @@ const submitAddGroup = async () => {
           await loadSubGroups(currentGroup.value.id)
         }
         
-        // 重新加载自定义分组
+        // 重新加载自定义分组和移动清单列表
         await loadCustomGroups()
+        await loadMoveList()
       } catch (error) {
         console.error(addGroupForm.parentId ? '添加分组失败:' : '添加清单失败:', error)
         ElMessage.error('添加失败')
@@ -1188,6 +1515,11 @@ const loadSubGroups = async (parentId: string) => {
         newTaskName: '',
         taskNum: item.taskNum
       }))
+
+      // 如果只有一个分组且分组名为"未分组"，自动加载其任务列表
+      if (subGroups.value.length === 1 && subGroups.value[0].name === '未分组') {
+        await loadGroupTasks(subGroups.value[0].id)
+      }
     }
   } catch (error) {
     console.error('加载子分组失败:', error)
@@ -1261,12 +1593,8 @@ const saveNewTask = async (groupId: string) => {
       taskGroupId: parseInt(groupId)
     })
     
-    // 如果是自定义清单，刷新任务分组列表和任务列表
-    if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
-      await loadSubGroups(currentGroup.value.id)
-      // 刷新当前分组的任务列表
-      await loadGroupTasks(groupId)
-    }
+    // 只刷新当前分组的任务列表
+    await loadGroupTasks(groupId)
     
     ElMessage.success('添加任务成功')
   } catch (error) {
@@ -1324,8 +1652,9 @@ const submitRename = async () => {
           group.name = renameForm.groupName
         }
 
-        // 重新加载自定义分组列表
+        // 重新加载自定义分组列表和移动清单列表
         await loadCustomGroups()
+        await loadMoveList()
       } catch (error) {
         console.error('重命名分组失败:', error)
         ElMessage.error('重命名失败')
@@ -1350,10 +1679,10 @@ const deleteGroup = async (group: TaskGroup) => {
     await deleteTaskGroup(parseInt(group.id))
     ElMessage.success('删除成功')
 
-    // 重新加载自定义分组列表
+    // 重新加载自定义分组列表和移动清单列表
     await loadCustomGroups()
+    await loadMoveList()
 
-    
     // 如果分组是自定义清单，则刷新任务列表
     if (group.parentId && group.parentId === '0') {
       await loadSubGroups(group.parentId)
@@ -1722,6 +2051,9 @@ onMounted(async () => {
     
     // 加载自定义分组
     await loadCustomGroups()
+    
+    // 加载移动清单列表
+    await loadMoveList()
 
     // 默认选中今天分组
     switchGroup(fixedGroups.value[0])
@@ -2094,6 +2426,201 @@ const isWarningDeadline = (date: string, taskStatus: number): boolean => {
   const diffTime = deadline.getTime() - today.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return diffDays > 0 && diffDays <= 7 && taskStatus == 0
+}
+
+// 清空垃圾箱
+const clearTrash = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要清空垃圾箱吗？此操作将永久删除所有已删除的任务，且无法恢复。',
+      '清空确认',
+      {
+        confirmButtonText: '清空',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await request.delete('/bookkeeping-service/task/basics/clearDeletedList')
+    
+    // 重新加载垃圾箱的任务列表
+    const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+    if (Array.isArray(res.data)) {
+      subGroups.value = [{
+        id: 'trash',
+        name: '垃圾箱',
+        tasks: res.data.map(t => ({
+          ...t,
+          completed: false
+        })),
+        loading: false,
+        showNewTaskInput: false,
+        newTaskName: '',
+        taskNum: res.data.length
+      }]
+    }
+    
+    // 更新固定分组和清单列表的任务数量
+    await updateTaskCounts()
+    
+    ElMessage.success('清空垃圾箱成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('清空垃圾箱失败:', error)
+      ElMessage.error('清空垃圾箱失败')
+    }
+  }
+}
+
+// 加载更多已完成任务
+const loadMoreCompletedTasks = async () => {
+  try {
+    loadingSubGroups.value = true
+    currentPage.value++ // 页码自增
+    const res = await request.get(`/bookkeeping-service/task/basics/doneList?currentPage=${currentPage.value}`)
+    if (Array.isArray(res.data)) {
+      // 将新数据追加到现有列表中
+      if (subGroups.value[0]) {
+        subGroups.value[0].tasks = [
+          ...subGroups.value[0].tasks,
+          ...res.data.map(task => ({
+            ...task,
+            completed: true
+          }))
+        ]
+        // 如果返回的数据少于10条，说明没有更多数据了
+        hasMore.value = res.data.length >= 10
+      }
+    }
+  } catch (error) {
+    console.error('加载更多已完成任务失败:', error)
+    ElMessage.error('加载更多已完成任务失败')
+  } finally {
+    loadingSubGroups.value = false
+  }
+}
+
+// 添加分页相关的响应式变量
+const currentPage = ref(1)
+const hasMore = ref(true)
+
+// 添加拖拽排序相关的函数
+const handleDragEnd = async (evt: any, groupId: string) => {
+  const { oldIndex, newIndex } = evt
+  if (oldIndex === newIndex) return
+
+  const group = subGroups.value.find(g => g.id === groupId)
+  if (!group) return
+
+  const task = group.tasks[newIndex]
+  const oldTask = group.tasks[oldIndex]
+
+  try {
+    let newSort = 0
+    if (newIndex > oldIndex) {
+      // 向下移动，使用上方任务的sort值减1，允许为负数
+      const prevTask = group.tasks[newIndex - 1]
+      newSort = (prevTask.sort || 0) - 1
+    } else {
+      // 向上移动
+      const nextTask = group.tasks[newIndex + 1]
+      newSort = nextTask.sort ? nextTask.sort + 1 : 1
+    }
+
+    // 调用更新任务接口
+    await updateTask({
+      id: task.id,
+      taskName: task.taskName,
+      taskRemark: task.taskRemark,
+      taskGroupId: task.taskGroupId,
+      deadlineDate: task.deadlineDate,
+      priority: task.priority || 0,
+      isTop: task.isTop || 0,
+      sort: newSort
+    })
+
+    // 更新本地任务数据
+    task.sort = newSort
+  } catch (error) {
+    console.error('更新任务排序失败:', error)
+    ElMessage.error('更新任务排序失败')
+  }
+}
+
+// 移动清单列表缓存
+const moveListCache = ref<TaskGroupMoveListVo[]>([])
+
+// 加载移动清单列表
+const loadMoveList = async () => {
+  try {
+    const res = await getTaskGroupMoveList()
+    if (Array.isArray(res.data)) {
+      moveListCache.value = res.data
+    }
+  } catch (error) {
+    console.error('加载移动清单列表失败:', error)
+  }
+}
+
+// 移动任务
+const moveTask = async (task: TaskBasicsVo, targetGroupId: number) => {
+  try {
+    // 调用更新任务接口
+    await updateTask({
+      id: task.id,
+      taskName: task.taskName,
+      taskRemark: task.taskRemark,
+      taskGroupId: targetGroupId,
+      deadlineDate: task.deadlineDate,
+      priority: task.priority || 0,
+      isTop: task.isTop || 0
+    })
+
+    // 重新加载固定清单列表和自定义清单列表
+    await updateTaskCounts()
+    await loadCustomGroups()
+
+    // 如果当前在自定义清单下，重新加载任务分组列表
+    if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+      await loadSubGroups(currentGroup.value.id)
+    }
+
+    // 获取移动前和移动后的分组所在的清单
+    const sourceGroup = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
+    const targetGroup = subGroups.value.find(g => g.id === targetGroupId.toString())
+
+    // 如果移动前的分组存在，重新加载其任务列表
+    if (sourceGroup) {
+      await loadGroupTasks(sourceGroup.id)
+    }
+
+    // 如果移动后的分组存在，且与移动前的分组在同一个清单下，重新加载其任务列表
+    if (targetGroup && sourceGroup && targetGroup.parentId === sourceGroup.parentId) {
+      await loadGroupTasks(targetGroup.id)
+    }
+
+    ElMessage.success('移动任务成功')
+    closeContextMenu()
+    showMoveToMenu.value = false
+  } catch (error) {
+    console.error('移动任务失败:', error)
+    ElMessage.error('移动任务失败')
+  }
+}
+
+const showMoveToMenu = ref(false)
+const moveToSearchText = ref('')
+const filteredMoveList = computed(() => {
+  return moveListCache.value.filter(list => list.groupName.toLowerCase().includes(moveToSearchText.value.toLowerCase()))
+})
+
+// 处理移动到菜单的鼠标离开事件
+const handleMoveToMenuLeave = (e: MouseEvent) => {
+  // 检查鼠标是否移动到子菜单
+  const target = e.relatedTarget as HTMLElement
+  if (!target?.closest('.move-to-menu') && !target?.closest('.move-to-submenu')) {
+    showMoveToMenu.value = false
+  }
 }
 </script>
 <style scoped>
@@ -2589,16 +3116,15 @@ const isWarningDeadline = (date: string, taskStatus: number): boolean => {
 }
 
 .context-menu-item {
-  padding: 8px 16px;
   display: flex;
   align-items: center;
+  padding: 8px 16px;
   cursor: pointer;
-  color: #666;
-  transition: background-color 0.3s;
+  position: relative;
 }
 
 .context-menu-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--el-color-primary-light-9);
 }
 
 .context-menu-item .el-icon {
@@ -2764,5 +3290,124 @@ const isWarningDeadline = (date: string, taskStatus: number): boolean => {
 .deadline-warning {
   color: #faad14;
   background-color: #fffbe6;
+}
+
+.view-more {
+  padding: 16px;
+  text-align: center;
+}
+
+.no-more {
+  color: #999;
+  font-size: 14px;
+}
+
+.ghost {
+  opacity: 0.5;
+  background: #c8ebfb;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  cursor: pointer;
+  position: relative;
+}
+
+.menu-item:hover {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.menu-item .quick-actions {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 200px;
+}
+
+.menu-item:hover .quick-actions {
+  display: block;
+}
+
+.quick-action-icon {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 移除之前的 .quick-actions 相关样式 */
+
+/* 移动到菜单样式 */
+.move-to-menu {
+  position: absolute;
+  left: calc(100% - 4px);
+  top: -4px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 4px;
+  box-shadow: var(--el-box-shadow-light);
+  min-width: 200px;
+  padding: 4px 0;
+}
+
+.move-to-menu .search-box {
+  padding: 0 12px 8px;
+}
+
+.move-to-menu .search-box .el-input__inner {
+  height: 32px;
+}
+
+.move-to-menu .menu-item {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 36px;
+  cursor: pointer;
+  position: relative;
+}
+
+.move-to-menu .menu-item:hover {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.move-to-menu .menu-item .el-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.move-to-menu .menu-item .arrow-icon {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.move-to-submenu {
+  position: absolute;
+  left: calc(100% - 4px);
+  top: -4px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 4px;
+  box-shadow: var(--el-box-shadow-light);
+  min-width: 160px;
+  padding: 4px 0;
+  display: none;
+}
+
+.move-to-menu .menu-item:hover .move-to-submenu {
+  display: block;
+}
+
+.move-to-wrapper {
+  position: relative;
 }
 </style>
