@@ -70,7 +70,7 @@
 
 <script setup>
 import {reactive, toRefs, ref} from "vue";
-import {loginByPasswordApi, getDictTypeList, getAllDictList, loginByVerificationCodeApi, getVerificationCodeApi} from "@/api/login.ts";
+import {loginByPasswordApi, refreshDictCache, loginByVerificationCodeApi, getVerificationCodeApi} from "@/api/login.ts";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
@@ -157,15 +157,8 @@ function loginSuccessAfter(data) {
   //2. 跳转
   router.push({path: '/'})
 
-  // 3. 加载字典类型
-  getDictTypeList().then(data => {
-    dictStore.setDictTypeArray(data.data)
-  })
-
-  // 4. 加载所有数据字典
-  getAllDictList().then(data => {
-    dictStore.setDictDataArrayMap(data.data)
-  })
+  // 3. 加载字典缓存
+  refreshDictCache();
 }
 
 // 获取验证码

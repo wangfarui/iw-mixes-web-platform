@@ -13,6 +13,10 @@
               </div>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item @click="refreshCache">
+                    <el-icon><Refresh /></el-icon>
+                    <span>刷新缓存</span>
+                  </el-dropdown-item>
                   <el-dropdown-item @click="editPassword">
                     <el-icon><Edit/></el-icon>
                     <span>修改密码</span>
@@ -108,7 +112,7 @@
         </el-aside>
 
         <!-- 主容器 -->
-        <el-main>
+        <el-main style="padding:0">
           <div v-if="proxy!.$router.currentRoute.value.path=='/'"
                style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">欢迎来到IW管理平台！
           </div>
@@ -196,6 +200,7 @@ import {RouterView} from 'vue-router'
 import router from "@/router";
 import {getCurrentInstance} from "vue";
 import {
+  Refresh,
   Edit,
   SwitchButton,
   Expand,
@@ -203,7 +208,7 @@ import {
   HomeFilled
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
-import {editPasswordApi, getVerificationCodeByActionApi} from "@/api/login";
+import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
 
@@ -241,6 +246,11 @@ onMounted(() => {
 
 function editPassword() {
   editPasswordDialogVisible.value = true;
+}
+
+function refreshCache() {
+  refreshDictCache();
+  ElMessage.success("刷新缓存成功")
 }
 
 const validateVerificationCode = (rule: any, value: any, callback: any) => {

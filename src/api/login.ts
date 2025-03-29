@@ -1,4 +1,7 @@
 import request from "@/api/request";
+import {
+	useDictStore
+} from "@/stores/dict.ts";
 import type {UserLoginVO, UserPasswordEditDto} from "@/types/types";
 
 
@@ -35,6 +38,21 @@ export const getVerificationCodeByActionApi = (action: number) => {
 // 修改密码
 export const editPasswordApi = (passwordEditDto: UserPasswordEditDto) => {
     return request.post('/auth-service/user/editPassword', passwordEditDto);
+}
+
+// 刷新字典缓存
+export const refreshDictCache = () => {
+	const dictStore = useDictStore()
+	
+	// 加载字典类型
+	getDictTypeList().then(res => {
+		dictStore.setDictTypeArray(res.data)
+	})
+
+	// 加载所有数据字典
+	getAllDictList().then(res => {
+		dictStore.setDictDataArrayMap(res.data)
+	})
 }
 
 export function logout() {

@@ -1292,7 +1292,7 @@ const addTask = async () => {
     
     // 更新固定分组和清单列表的任务数量
     await updateTaskCounts()
-    
+
     ElMessage.success('添加任务成功')
   } catch (error) {
     console.error('添加任务失败:', error)
@@ -1381,7 +1381,7 @@ const updateTaskDetail = async (field: 'taskName' | 'taskRemark') => {
       id: selectedTask.value.id,
       taskName: selectedTask.value.taskName,
       taskRemark: selectedTask.value.taskRemark,
-      taskGroupId: parseInt(group.id)
+      taskGroupId: parseInt(group.id == 'inbox' ? 0 : group.id)
     })
 
     // 更新列表中的任务名称
@@ -1502,6 +1502,11 @@ const submitAddGroup = async () => {
 
 // 加载子分组
 const loadSubGroups = async (parentId: string) => {
+  // 如果不是自定义清单，直接返回
+  if (['today', 'week', 'inbox', 'completed', 'trash'].includes(parentId)) {
+    return
+  }
+
   try {
     loadingSubGroups.value = true
     const res = await getTaskGroupList(parentId)
@@ -2637,7 +2642,6 @@ const handleMoveToMenuLeave = (e: MouseEvent) => {
   left: 0;
   top: 0;
   bottom: 0;
-  background-color: #f7f7f7;
   border-right: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
