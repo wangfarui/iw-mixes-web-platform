@@ -59,6 +59,12 @@
         <el-col :span="4" @click="forgetPassword()" style="cursor: pointer; text-align: end">找回密码</el-col>
       </el-row>
     </el-card>
+    <div style="position: fixed; bottom: 20px; width: 100%; text-align: center; font-size: 12px; color: #909399;">
+      <a href="https://beian.miit.gov.cn/" style="color: #909399;"><span>鄂ICP备2024050235号-1</span></a>&nbsp;&nbsp;
+      <a href="https://beian.mps.gov.cn/#/query/webSearch?code=42018502007471" rel="noreferrer" target="_blank" style="color: #909399;">
+        <span>鄂公网安备42018502007471</span>
+      </a>
+    </div>
   </div>
 </template>
 
