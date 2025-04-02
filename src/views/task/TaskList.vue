@@ -67,7 +67,7 @@
 
     <!-- 中间任务列表 -->
     <div class="tasks-content" :style="{ 
-      left: leftWidth + 'px',
+      left: (leftWidth + 10) + 'px',
       width: middleWidth + 'px'
     }">
       <!-- 头部 -->
@@ -666,13 +666,13 @@
     <!-- 右侧拖动条 -->
     <div class="resize-bar right-resize" 
       @mousedown="startResize($event, 'right')"
-      :style="{ left: (leftWidth + middleWidth) + 'px' }">
+      :style="{ left: (leftWidth + middleWidth + 10) + 'px' }">
     </div>
 
     <!-- 右侧任务详情 -->
     <div class="task-detail" :style="{ 
-      left: (leftWidth + middleWidth) + 'px',
-      width: rightWidth + 'px'
+      left: (leftWidth + middleWidth + 20) + 'px',
+      width: (rightWidth - 20) + 'px'
     }">
       <div v-if="selectedTask" class="detail-content">
         <!-- 任务名称 -->
@@ -978,7 +978,7 @@ import draggable from 'vuedraggable'
 // 面板宽度控制
 const leftWidth = ref(250)
 const middleWidth = ref(400)
-const rightWidth = ref(300)
+const rightWidth = ref(650)
 const isLeftCollapsed = ref(false)
 
 // 分组数据
@@ -1040,7 +1040,7 @@ const startResize = (e: MouseEvent, type: 'left' | 'right') => {
 
   const handleMouseMove = (e: MouseEvent) => {
     const deltaX = e.clientX - startX
-    
+
     if (type === 'left') {
       const newLeftWidth = startLeftWidth + deltaX
       if (newLeftWidth >= 200 && newLeftWidth <= 400) {
