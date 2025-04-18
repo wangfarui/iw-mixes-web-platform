@@ -140,6 +140,9 @@
                   'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
                 }">
                   {{ task.taskName }}
+                  <span v-if="task.taskGroupName && !['inbox'].includes(currentGroup?.id || '')" class="task-group-name">
+                    ({{ task.taskGroupName }})
+                  </span>
                 </span>
                 <span v-if="task.deadlineDate" class="deadline-date" :class="{
                   'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
@@ -252,6 +255,10 @@
                         <el-icon><Top /></el-icon>
                         <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
                       </el-dropdown-item>
+                      <el-dropdown-item  v-if="currentGroup?.id !== 'trash'" class="normal-item" @click="openPointsDialog(task)">
+                            <el-icon><Coin /></el-icon>
+                            <span>积分</span>
+                          </el-dropdown-item>
                       <el-dropdown-item 
                         v-if="currentGroup?.id === 'trash'"
                         class="normal-item" 
@@ -424,6 +431,10 @@
                           <el-icon><Top /></el-icon>
                           <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
                         </el-dropdown-item>
+                        <el-dropdown-item class="normal-item" @click="openPointsDialog(task)">
+                            <el-icon><Coin /></el-icon>
+                            <span>积分</span>
+                          </el-dropdown-item>
                         <el-dropdown-item class="normal-item" @click="deleteTask(task)">
                           <el-icon><Delete /></el-icon>
                           <span>删除任务</span>
@@ -628,6 +639,10 @@
                             <el-icon><Top /></el-icon>
                             <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
                           </el-dropdown-item>
+                          <el-dropdown-item  v-if="currentGroup?.id !== 'trash'" class="normal-item" @click="openPointsDialog(task)">
+                            <el-icon><Coin /></el-icon>
+                            <span>积分</span>
+                          </el-dropdown-item>
                           <el-dropdown-item 
                             v-if="currentGroup?.id === 'trash'"
                             class="normal-item" 
@@ -681,6 +696,17 @@
           class="task-name-input"
           @blur="updateTaskDetail('taskName')"
         />
+        <!-- 添加积分显示 -->
+        <div class="task-points" v-if="selectedTask.rewardPoints || selectedTask.punishPoints">
+          <span v-if="selectedTask.rewardPoints" class="reward-points">
+            <el-icon><Coin /></el-icon>
+            奖励积分：{{ selectedTask.rewardPoints }}
+          </span>
+          <span v-if="selectedTask.punishPoints" class="punish-points">
+            <el-icon><Coin /></el-icon>
+            惩罚积分：{{ selectedTask.punishPoints }}
+          </span>
+        </div>
         <!-- 任务详情 -->
         <el-input
           type="textarea"
@@ -872,6 +898,10 @@
         <el-icon><Top /></el-icon>
         <span>{{ contextMenuTask?.isTop ? '取消置顶' : '置顶' }}</span>
       </div>
+      <div class="context-menu-item"  v-if="currentGroup?.id !== 'trash'" @click="contextMenuTask && openPointsDialog(contextMenuTask)">
+        <el-icon><Coin /></el-icon>
+        <span>积分</span>
+      </div>
       <div 
         v-if="currentGroup?.id === 'trash'"
         class="context-menu-item" 
@@ -926,6 +956,36 @@
         <el-button size="small" @click="selectNextWeek">一周后</el-button>
       </div>
     </div>
+
+    <!-- 积分弹框 -->
+    <el-dialog
+      v-model="pointsDialogVisible"
+      title="设置积分"
+      width="400px"
+      :close-on-click-modal="false">
+      <el-form :model="pointsForm" :rules="pointsRules" label-width="80px">
+        <el-form-item label="奖励积分" prop="rewardPoints">
+          <el-input-number 
+            v-model="pointsForm.rewardPoints"
+            :min="0"
+            :precision="0"
+            placeholder="请输入奖励积分"/>
+        </el-form-item>
+        <el-form-item label="处罚积分" prop="punishPoints">
+          <el-input-number 
+            v-model="pointsForm.punishPoints"
+            :min="0"
+            :precision="0"
+            placeholder="请输入处罚积分"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="pointsDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="savePoints">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -951,7 +1011,9 @@ import {
   Top,
   Position,
   ArrowLeft,
-  Refresh
+  Refresh,
+  Coin,
+  Bottom
 } from '@element-plus/icons-vue'
 import type { TaskGroup } from '@/types/types'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -1364,9 +1426,23 @@ const toggleTaskStatus = async (task: TaskBasicsVo) => {
 }
 
 // 选择任务
-const selectTask = (task: TaskBasicsVo) => {
+const selectTask = async (task: TaskBasicsVo) => {
   selectedTask.value = task
-  activeTask.value = null
+  isTaskDetailVisible.value = true
+  
+  // 获取任务详情
+  try {
+    const res = await request.get(`/bookkeeping-service/task/basics/detail?id=${task.id}`)
+    if (res.data) {
+      selectedTask.value = {
+        ...selectedTask.value,
+        rewardPoints: res.data.rewardPoints,
+        punishPoints: res.data.punishPoints
+      }
+    }
+  } catch (error) {
+    console.error('获取任务详情失败:', error)
+  }
 }
 
 // 更新任务详情
@@ -1381,7 +1457,7 @@ const updateTaskDetail = async (field: 'taskName' | 'taskRemark') => {
       id: selectedTask.value.id,
       taskName: selectedTask.value.taskName,
       taskRemark: selectedTask.value.taskRemark,
-      taskGroupId: parseInt(group.id == 'inbox' ? 0 : group.id)
+      taskGroupId: selectedTask.value.taskGroupId
     })
 
     // 更新列表中的任务名称
@@ -2627,6 +2703,108 @@ const handleMoveToMenuLeave = (e: MouseEvent) => {
     showMoveToMenu.value = false
   }
 }
+
+// 积分弹框相关
+const pointsDialogVisible = ref(false)
+const pointsForm = ref({
+  rewardPoints: '',
+  punishPoints: ''
+})
+const currentTaskForPoints = ref<TaskBasicsVo | null>(null)
+
+// 打开积分弹框
+const openPointsDialog = async (task: TaskBasicsVo) => {
+  currentTaskForPoints.value = task
+  // 先查询任务积分
+  const res = await request.get(`/bookkeeping-service/taskRelation/getByTaskId?taskId=${task.id}`)
+  if (res.data) {
+    pointsForm.value = {
+      rewardPoints: res.data.rewardPoints?.toString() || '',
+      punishPoints: res.data.punishPoints?.toString() || ''
+    }
+  } else {
+    pointsForm.value = {
+      rewardPoints: '',
+      punishPoints: ''
+    }
+  }
+
+  pointsDialogVisible.value = true
+}
+
+// 保存积分
+const savePoints = async () => {
+  if (!currentTaskForPoints.value) return
+  
+  try {
+    const res = await request.post('/bookkeeping-service/taskRelation/save', {
+      taskId: currentTaskForPoints.value.id,
+      rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
+      punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
+    })
+    
+    if (res.code === 200) {
+      ElMessage.success('保存成功')
+      pointsDialogVisible.value = false
+      // 更新当前任务数据
+      if (selectedTask.value?.id === currentTaskForPoints.value.id) {
+        selectedTask.value = {
+          ...selectedTask.value,
+          rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
+          punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
+        }
+      }
+    } else {
+      ElMessage.error(res.data.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存积分失败:', error)
+    ElMessage.error('保存失败')
+  }
+}
+
+// 验证积分输入
+const validatePoints = (rule: any, value: string, callback: any) => {
+  if (value && (isNaN(Number(value)) || Number(value) < 0)) {
+    callback(new Error('请输入大于等于0的数值'))
+  } else {
+    callback()
+  }
+}
+
+const pointsRules = {
+  rewardPoints: [{ validator: validatePoints, trigger: 'blur' }],
+  punishPoints: [{ validator: validatePoints, trigger: 'blur' }]
+}
+
+// 移动任务到顶部
+const moveTaskToTop = (task: TaskBasicsVo) => {
+  const group = subGroups.value.find(g => g.tasks.some(t => t.id === task.id))
+  if (group) {
+    const taskIndex = group.tasks.findIndex(t => t.id === task.id)
+    if (taskIndex > -1) {
+      group.tasks.splice(taskIndex, 1)
+      group.tasks.unshift(task)
+      group.taskNum = (group.taskNum || 0) + 1
+    }
+  }
+}
+
+// 移动任务到底部
+const moveTaskToBottom = (task: TaskBasicsVo) => {
+  const group = subGroups.value.find(g => g.tasks.some(t => t.id === task.id))
+  if (group) {
+    const taskIndex = group.tasks.findIndex(t => t.id === task.id)
+    if (taskIndex > -1) {
+      group.tasks.splice(taskIndex, 1)
+      group.tasks.push(task)
+      group.taskNum = (group.taskNum || 0) + 1
+    }
+  }
+}
+
+// 在 setup 函数开始处添加
+const isTaskDetailVisible = ref(false)
 </script>
 <style scoped>
 .task-list-container {
@@ -3413,5 +3591,32 @@ const handleMoveToMenuLeave = (e: MouseEvent) => {
 
 .move-to-wrapper {
   position: relative;
+}
+
+.task-group-name {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+/* 添加积分显示的样式 */
+.task-points {
+  display: flex;
+  gap: 20px;
+  margin: 10px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.reward-points {
+  color: #67C23A;
+}
+
+.punish-points {
+  color: #F56C6C;
+}
+
+.task-points .el-icon {
+  margin-right: 4px;
 }
 </style>

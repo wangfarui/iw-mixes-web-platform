@@ -113,8 +113,8 @@
 
         <!-- 主容器 -->
         <el-main style="padding:0">
-          <div v-if="proxy!.$router.currentRoute.value.path=='/'"
-               style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">欢迎来到IW管理平台！
+          <div v-if="proxy!.$router.currentRoute.value.path=='/'"style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">
+               欢迎来到IW管理平台！
           </div>
           <RouterView/>
         </el-main>
