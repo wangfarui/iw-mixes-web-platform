@@ -2716,7 +2716,7 @@ const currentTaskForPoints = ref<TaskBasicsVo | null>(null)
 const openPointsDialog = async (task: TaskBasicsVo) => {
   currentTaskForPoints.value = task
   // 先查询任务积分
-  const res = await request.get(`/bookkeeping-service/taskRelation/getByTaskId?taskId=${task.id}`)
+  const res = await request.get(`/bookkeeping-service/task/relation/getByTaskId?taskId=${task.id}`)
   if (res.data) {
     pointsForm.value = {
       rewardPoints: res.data.rewardPoints?.toString() || '',
@@ -2737,7 +2737,7 @@ const savePoints = async () => {
   if (!currentTaskForPoints.value) return
   
   try {
-    const res = await request.post('/bookkeeping-service/taskRelation/save', {
+    const res = await request.post('/bookkeeping-service/task/relation/save', {
       taskId: currentTaskForPoints.value.id,
       rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
       punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
