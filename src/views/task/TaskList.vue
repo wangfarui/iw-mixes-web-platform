@@ -1436,6 +1436,7 @@ const selectTask = async (task: TaskBasicsVo) => {
     if (res.data) {
       selectedTask.value = {
         ...selectedTask.value,
+        taskRemark: res.data.taskRemark,
         rewardPoints: res.data.rewardPoints,
         punishPoints: res.data.punishPoints
       }
