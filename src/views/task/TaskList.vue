@@ -716,6 +716,72 @@
           :autosize="{ minRows: 4 }"
           @blur="updateTaskDetail('taskRemark')"
         />
+        
+        <!-- 添加图片上传区域 -->
+        <div class="task-images">
+          <div class="images-header">
+            <h3>任务图片</h3>
+            <el-upload
+              class="image-uploader"
+              action="/auth-service/file/upload"
+              name="file"
+              :show-file-list="false"
+              :before-upload="(file) => {
+                handleImageUpload(file)
+                return false
+              }"
+            >
+              <el-button type="primary" :loading="isUploading">
+                <el-icon><Upload /></el-icon>
+                上传图片
+              </el-button>
+            </el-upload>
+          </div>
+          
+          <div 
+            class="images-container"
+            @paste="handlePaste"
+            @drop="handleDrop"
+            @dragover="handleDragOver"
+          >
+            <div v-if="!selectedTask.fileList?.length" class="empty-tip">
+              <el-icon><Picture /></el-icon>
+              <p>支持拖拽图片、粘贴图片或点击上传</p>
+              <el-upload
+                class="image-uploader"
+                action="/auth-service/file/upload"
+                name="file"
+                :show-file-list="false"
+                :before-upload="(file) => {
+                  handleImageUpload(file)
+                  return false
+                }"
+              >
+              </el-upload>
+            </div>
+            
+            <div v-else class="image-list">
+              <div v-for="(file, index) in selectedTask.fileList" :key="index" class="image-item">
+                <el-image 
+                  :src="file.fileUrl" 
+                  :preview-src-list="selectedTask.fileList.map(f => f.fileUrl)"
+                  :initial-index="index"
+                  fit="cover"
+                />
+                <div class="image-actions">
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    circle
+                    @click="handleDeleteFile(file)"
+                  >
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div v-else class="no-task-selected">
         请选择一个任务查看详情
@@ -1013,7 +1079,9 @@ import {
   ArrowLeft,
   Refresh,
   Coin,
-  Bottom
+  Bottom,
+  Upload,
+  Picture
 } from '@element-plus/icons-vue'
 import type { TaskGroup } from '@/types/types'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -1431,18 +1499,17 @@ const selectTask = async (task: TaskBasicsVo) => {
   isTaskDetailVisible.value = true
   
   // 获取任务详情
-  try {
-    const res = await request.get(`/bookkeeping-service/task/basics/detail?id=${task.id}`)
-    if (res.data) {
-      selectedTask.value = {
-        ...selectedTask.value,
-        taskRemark: res.data.taskRemark,
-        rewardPoints: res.data.rewardPoints,
-        punishPoints: res.data.punishPoints
-      }
-    }
-  } catch (error) {
-    console.error('获取任务详情失败:', error)
+  await handleTaskDetail(task.id)
+}
+
+const handleTaskDetail = async (taskId: number) => {
+  const res = await request.get(`/bookkeeping-service/task/basics/detail?id=${taskId}`)
+  selectedTask.value = {
+    ...selectedTask.value,
+    taskRemark: res.data.taskRemark,
+    rewardPoints: res.data.rewardPoints,
+    punishPoints: res.data.punishPoints,
+    fileList: res.data.fileList
   }
 }
 
@@ -2806,6 +2873,85 @@ const moveTaskToBottom = (task: TaskBasicsVo) => {
 
 // 在 setup 函数开始处添加
 const isTaskDetailVisible = ref(false)
+
+// 在 setup 函数中添加图片上传相关的响应式变量
+const taskImages = ref<string[]>([])
+const isUploading = ref(false)
+
+// 添加图片上传相关的方法
+const handleImageUpload = async (file: File) => {
+  try {
+    isUploading.value = true
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const uploadRes = await request.post('/auth-service/file/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    if (uploadRes.data) {
+      const fileData = {
+        fileName: uploadRes.data.fileName,
+        fileUrl: uploadRes.data.fileUrl,
+        taskId: selectedTask.value?.id
+      }
+      
+      await request.post('/bookkeeping-service/task/basics/addFile', fileData)
+      
+      // 重新获取任务详情以更新文件列表
+      await handleTaskDetail(selectedTask.value?.id)
+     
+      ElMessage.success('图片上传成功')
+    }
+  } finally {
+    isUploading.value = false
+  }
+}
+
+const handlePaste = async (event: ClipboardEvent) => {
+  const items = event.clipboardData?.items
+  if (!items) return
+  
+  for (const item of items) {
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file) {
+        await handleImageUpload(file)
+      }
+    }
+  }
+}
+
+const handleDrop = async (event: DragEvent) => {
+  event.preventDefault()
+  const files = event.dataTransfer?.files
+  if (!files) return
+  
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      await handleImageUpload(file)
+    }
+  }
+}
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault()
+}
+
+// 添加删除文件的方法
+const handleDeleteFile = async (file: any) => {
+  await request.post('/bookkeeping-service/task/basics/deleteFile', {
+    taskId: selectedTask.value?.id,
+    fileUrl: file.fileUrl
+  })
+  
+  // 重新获取任务详情以更新文件列表
+  await handleTaskDetail(selectedTask.value?.id)
+  
+  ElMessage.success('删除成功')
+}
 </script>
 <style scoped>
 .task-list-container {
@@ -3619,5 +3765,243 @@ const isTaskDetailVisible = ref(false)
 
 .task-points .el-icon {
   margin-right: 4px;
+}
+
+.task-images {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+.images-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.images-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.images-container {
+  min-height: 200px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.images-container:hover {
+  border-color: #409eff;
+}
+
+.empty-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #909399;
+}
+
+.empty-tip .el-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.image-item .el-image {
+  width: 100%;
+  height: 100%;
+}
+
+.image-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
+}
+
+.task-content {
+  margin-top: 20px;
+}
+
+.content-item {
+  margin-bottom: 20px;
+}
+
+.item-label {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.images-container {
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 16px;
+  transition: all 0.3s;
+  background: #fafafa;
+}
+
+.images-container:hover {
+  border-color: #409eff;
+}
+
+.empty-tip {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.empty-tip .el-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.empty-tip p {
+  margin: 8px 0 16px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.image-item .el-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
+}
+
+.add-image {
+  aspect-ratio: 1;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.add-image:hover {
+  border-color: #409eff;
+}
+
+.upload-trigger {
+  font-size: 24px;
+  color: #909399;
+}
+
+.item-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.upload-button {
+  display: inline-block;
+}
+
+.images-container {
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 12px;
+  transition: all 0.3s;
+  background: #fafafa;
+  min-height: 100px;
+}
+
+.empty-tip {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.empty-tip .el-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.empty-tip p {
+  margin: 8px 0 16px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.image-item .el-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
 }
 </style>
