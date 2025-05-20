@@ -109,7 +109,10 @@
           <el-form-item label="账号" prop="account">
             <el-input v-model="formData.account"/>
           </el-form-item>
-          <el-form-item label="密码" prop="password">
+          <el-form-item label="修改密码" prop="updatePassword" v-if="dialogData.operate === 'UPDATE'">
+            <el-switch v-model="formData.updatePassword"/>
+          </el-form-item>
+          <el-form-item label="密码" prop="password" v-if="dialogData.operate === 'ADD' || formData.updatePassword">
             <el-input v-model="formData.password"/>
           </el-form-item>
           <el-form-item label="备注" prop="remark">
@@ -180,7 +183,8 @@ const formData = ref({
   address: '',
   account: '',
   password: '',
-  remark: ''
+  remark: '',
+  updatePassword: false
 } as AccountUpdateDto)
 
 const dialogData = reactive({
@@ -284,7 +288,11 @@ const handleDialogConfirm = (formEl: FormInstance | undefined) => {
     })
   } else if (dialogData.operate == "UPDATE") {
     // 修改字典
-    updateApplicationAccount(formData.value).then(res => {
+    const updateData = { ...formData.value }
+    if (!updateData.updatePassword) {
+      delete updateData.password
+    }
+    updateApplicationAccount(updateData).then(res => {
       searchPage()
     }).finally(() => {
       dialogData.visible = false;
@@ -300,7 +308,8 @@ const initFormData = () => {
     address: '',
     account: '',
     password: '',
-    remark: ''
+    remark: '',
+    updatePassword: false
   }
 }
 

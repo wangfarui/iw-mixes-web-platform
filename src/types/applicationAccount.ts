@@ -1,4 +1,3 @@
-
 export type AccountListData =  {
     id: number,
     type: string,
@@ -24,7 +23,8 @@ export type AccountAddDto = {
     address?: string,
     account?: string,
     password?: string,
-    remark?: string
+    remark?: string,
+    updatePassword?: boolean
 }
 
 export type AccountUpdateDto = AccountAddDto & {
