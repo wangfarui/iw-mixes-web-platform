@@ -66,7 +66,7 @@ export interface TaskBasicsVo {
 // 获取任务列表
 export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string) => {
   return request<GeneralResponse<TaskBasicsVo[]>>({
-    url: '/bookkeeping-service/task/basics/list',
+    url: '/bookkeeping-service/points/task/basics/list',
     method: 'post',
     data: { 
       taskGroupId,
@@ -79,7 +79,7 @@ export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, end
 // 创建任务
 export const addTask = (data: { taskName: string; taskGroupId: number; deadlineDate?: string | null }) => {
   return request<GeneralResponse<void>>({
-    url: '/bookkeeping-service/task/basics/add',
+    url: '/bookkeeping-service/points/task/basics/add',
     method: 'post',
     data
   })
@@ -87,7 +87,7 @@ export const addTask = (data: { taskName: string; taskGroupId: number; deadlineD
 
 // 更新任务
 export const updateTask = (params: TaskBasicsVo) => {
-  return request.put('/bookkeeping-service/task/basics/update', params)
+  return request.put('/bookkeeping-service/points/task/basics/update', params)
 }
 
 // 重命名分组

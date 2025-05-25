@@ -1217,7 +1217,7 @@ const switchGroup = async (group: TaskGroup) => {
       loadingSubGroups.value = true
       currentPage.value = 1 // 重置页码
       hasMore.value = true // 重置加载更多状态
-      const res = await request.get(`/bookkeeping-service/task/basics/doneList?currentPage=${currentPage.value}`)
+      const res = await request.get(`/bookkeeping-service/points/task/basics/doneList?currentPage=${currentPage.value}`)
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'completed',
@@ -1247,7 +1247,7 @@ const switchGroup = async (group: TaskGroup) => {
   if (group.id === 'trash') {
     try {
       loadingSubGroups.value = true
-      const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+      const res = await request.get('/bookkeeping-service/points/task/basics/deletedList')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'trash',
@@ -1433,7 +1433,7 @@ const addTask = async () => {
 // 切换任务状态
 const toggleTaskStatus = async (task: TaskBasicsVo) => {
   try {
-    await request.put('/bookkeeping-service/task/basics/updateStatus', {
+    await request.put('/bookkeeping-service/points/task/basics/updateStatus', {
       id: task.id,
       taskStatus: task.completed ? 1 : 0
     })
@@ -1469,7 +1469,7 @@ const toggleTaskStatus = async (task: TaskBasicsVo) => {
     
     // 如果是已完成清单中的任务，取消完成状态后需要重新加载已完成任务列表
     if (currentGroup.value?.id === 'completed') {
-      const res = await request.get('/bookkeeping-service/task/basics/doneList')
+      const res = await request.get('/bookkeeping-service/points/task/basics/doneList')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'completed',
@@ -1503,7 +1503,7 @@ const selectTask = async (task: TaskBasicsVo) => {
 }
 
 const handleTaskDetail = async (taskId: number) => {
-  const res = await request.get(`/bookkeeping-service/task/basics/detail?id=${taskId}`)
+  const res = await request.get(`/bookkeeping-service/points/task/basics/detail?id=${taskId}`)
   selectedTask.value = {
     ...selectedTask.value,
     taskRemark: res.data.taskRemark,
@@ -1972,7 +1972,7 @@ const toggleTaskTop = async (task: TaskBasicsVo) => {
 // 恢复任务
 const restoreTask = async (task: TaskBasicsVo) => {
   try {
-    await request.put('/bookkeeping-service/task/basics/updateStatus', {
+    await request.put('/bookkeeping-service/points/task/basics/updateStatus', {
       id: task.id,
       taskStatus: 0
     })
@@ -1992,7 +1992,7 @@ const restoreTask = async (task: TaskBasicsVo) => {
     
     // 如果是垃圾箱清单，刷新任务列表
     if (currentGroup.value?.id === 'trash') {
-      const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+      const res = await request.get('/bookkeeping-service/points/task/basics/deletedList')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'trash',
@@ -2038,10 +2038,10 @@ const deleteTask = async (task: TaskBasicsVo) => {
     // 根据当前清单类型调用不同的删除接口
     if (currentGroup.value?.id === 'trash') {
       // 垃圾箱清单下使用永久删除接口
-      await request.delete('/bookkeeping-service/task/basics/delete?id=' + task.id)
+      await request.delete('/bookkeeping-service/points/task/basics/delete?id=' + task.id)
     } else {
       // 其他清单下使用更新状态接口
-      await request.put('/bookkeeping-service/task/basics/updateStatus', {
+      await request.put('/bookkeeping-service/points/task/basics/updateStatus', {
         id: task.id,
         taskStatus: 3
       })
@@ -2069,7 +2069,7 @@ const deleteTask = async (task: TaskBasicsVo) => {
 
       switch (currentGroup.value.id) {
         case 'trash':
-          const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+          const res = await request.get('/bookkeeping-service/points/task/basics/deletedList')
           if (Array.isArray(res.data)) {
             subGroups.value = [{
               id: 'trash',
@@ -2310,7 +2310,7 @@ const handleDateSelect = async (date: Date) => {
           // 收集箱不需要时间范围
           break
         case 'completed':
-          const res = await request.get('/bookkeeping-service/task/basics/doneList')
+          const res = await request.get('/bookkeeping-service/points/task/basics/doneList')
           if (Array.isArray(res.data)) {
             subGroups.value = [{
               id: 'completed',
@@ -2327,7 +2327,7 @@ const handleDateSelect = async (date: Date) => {
           }
           return
         case 'trash':
-          const trashRes = await request.get('/bookkeeping-service/task/basics/deletedList')
+          const trashRes = await request.get('/bookkeeping-service/points/task/basics/deletedList')
           if (Array.isArray(trashRes.data)) {
             subGroups.value = [{
               id: 'trash',
@@ -2590,10 +2590,10 @@ const clearTrash = async () => {
       }
     )
 
-    await request.delete('/bookkeeping-service/task/basics/clearDeletedList')
+    await request.delete('/bookkeeping-service/points/task/basics/clearDeletedList')
     
     // 重新加载垃圾箱的任务列表
-    const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+    const res = await request.get('/bookkeeping-service/points/task/basics/deletedList')
     if (Array.isArray(res.data)) {
       subGroups.value = [{
         id: 'trash',
@@ -2626,7 +2626,7 @@ const loadMoreCompletedTasks = async () => {
   try {
     loadingSubGroups.value = true
     currentPage.value++ // 页码自增
-    const res = await request.get(`/bookkeeping-service/task/basics/doneList?currentPage=${currentPage.value}`)
+    const res = await request.get(`/bookkeeping-service/points/task/basics/doneList?currentPage=${currentPage.value}`)
     if (Array.isArray(res.data)) {
       // 将新数据追加到现有列表中
       if (subGroups.value[0]) {
@@ -2898,7 +2898,7 @@ const handleImageUpload = async (file: File) => {
         taskId: selectedTask.value?.id
       }
       
-      await request.post('/bookkeeping-service/task/basics/addFile', fileData)
+      await request.post('/bookkeeping-service/points/task/basics/addFile', fileData)
       
       // 重新获取任务详情以更新文件列表
       await handleTaskDetail(selectedTask.value?.id)
@@ -2942,7 +2942,7 @@ const handleDragOver = (event: DragEvent) => {
 
 // 添加删除文件的方法
 const handleDeleteFile = async (file: any) => {
-  await request.post('/bookkeeping-service/task/basics/deleteFile', {
+  await request.post('/bookkeeping-service/points/task/basics/deleteFile', {
     taskId: selectedTask.value?.id,
     fileUrl: file.fileUrl
   })
