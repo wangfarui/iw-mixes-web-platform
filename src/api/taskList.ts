@@ -27,7 +27,7 @@ export interface StatisticsLatestTaskNumVo {
 // 添加任务清单分组
 export const addTaskGroup = (data: { groupName: string; parentId?: string }) => {
   return request<GeneralResponse<number>>({
-    url: '/bookkeeping-service/task/group/add',
+    url: '/bookkeeping-service/points/task/group/add',
     method: 'post',
     data
   })
@@ -36,7 +36,7 @@ export const addTaskGroup = (data: { groupName: string; parentId?: string }) => 
 // 获取任务清单分组列表
 export const getTaskGroupList = (parentId?: string) => {
   return request<GeneralResponse<TaskGroupListVo[]>>({
-    url: '/bookkeeping-service/task/group/list' + (parentId ? `?parentId=${parentId}` : ''),
+    url: '/bookkeeping-service/points/task/group/list' + (parentId ? `?parentId=${parentId}` : ''),
     method: 'get'
   })
 }
@@ -44,7 +44,7 @@ export const getTaskGroupList = (parentId?: string) => {
 // 获取分组数量统计
 export const getTaskGroupStatistics = (): Promise<GeneralResponse<StatisticsLatestTaskNumVo>> => {
   return request<GeneralResponse<StatisticsLatestTaskNumVo>>({
-    url: '/bookkeeping-service/task/group/statisticsLatestTaskNum',
+    url: '/bookkeeping-service/points/task/group/statisticsLatestTaskNum',
     method: 'get'
   })
 }
@@ -92,13 +92,13 @@ export const updateTask = (params: TaskBasicsVo) => {
 
 // 重命名分组
 export const renameTaskGroup = (params: { id: number, groupName: string }) => {
-  return request.put('/bookkeeping-service/task/group/update', params)
+  return request.put('/bookkeeping-service/points/task/group/update', params)
 }
 
 // 删除分组
 export const deleteTaskGroup = (id: number) => {
   return request<GeneralResponse<void>>({
-    url: `/bookkeeping-service/task/group/delete?id=${id}`,
+    url: `/bookkeeping-service/points/task/group/delete?id=${id}`,
     method: 'delete'
   })
 }
@@ -113,7 +113,7 @@ export interface TaskGroupMoveListVo {
 // 获取移动清单列表
 export const getTaskGroupMoveList = () => {
   return request<GeneralResponse<TaskGroupMoveListVo[]>>({
-    url: '/bookkeeping-service/task/group/moveList',
+    url: '/bookkeeping-service/points/task/group/moveList',
     method: 'get'
   })
 } 
