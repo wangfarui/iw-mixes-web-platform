@@ -25,9 +25,14 @@ export const getAllDictList = () => {
     return request.get('/auth-service/dict/getAllDictList');
 }
 
-// 注册获取验证码
-export const getVerificationCodeApi = (phoneNumber: string) => {
-    return request.get('/auth-service/register/getVerificationCode?phoneNumber=' + phoneNumber);
+// 注册获取手机验证码
+export const getPhoneVerificationCodeApi = (phoneNumber: string) => {
+    return request.get('/auth-service/register/getPhoneVerificationCode?phoneNumber=' + phoneNumber);
+}
+
+// 注册获取邮箱验证码
+export const getEmailVerificationCodeApi = (email: string) => {
+    return request.get('/auth-service/register/getEmailVerificationCode?email=' + email);
 }
 
 // 用户根据操作行为获取验证码（例如验证码登录）

@@ -70,7 +70,7 @@
 
 <script setup>
 import {reactive, toRefs, ref} from "vue";
-import {loginByPasswordApi, refreshDictCache, loginByVerificationCodeApi, getVerificationCodeApi} from "@/api/login.ts";
+import {loginByPasswordApi, refreshDictCache, loginByVerificationCodeApi, getPhoneVerificationCodeApi, getEmailVerificationCodeApi} from "@/api/login.ts";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
@@ -139,6 +139,8 @@ function loginByVerificationCode() {
   userInfo.value.account = ''
   userInfo.value.password = ''
 
+  userInfo.value.loginWay = 1
+
   loading.value = true;
   loginByVerificationCodeApi(userInfo.value).then(data => {
     loading.value = false;
@@ -172,7 +174,7 @@ function getVerificationCode() {
     return
   }
   verificationCodeLoading.value = true;
-  getVerificationCodeApi(userInfo.value.phoneNumber).then(data => {
+  getPhoneVerificationCodeApi(userInfo.value.phoneNumber).then(data => {
     ElMessage.success("验证码已发送")
     startCountdown();
   }).finally(() => {
