@@ -22,6 +22,7 @@ export interface StatisticsLatestTaskNumVo {
   todayNum: number;
   weekNum: number;
   noGroupNum: number;
+  withDeadlineNum: number;
 }
 
 // 添加任务清单分组
@@ -64,14 +65,16 @@ export interface TaskBasicsVo {
 }
 
 // 获取任务列表
-export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string) => {
+export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string, isDeadline?: boolean) => {
   return request<GeneralResponse<TaskBasicsVo[]>>({
     url: '/points-service/points/task/basics/list',
     method: 'post',
     data: { 
       taskGroupId,
       startDeadlineDate,
-      endDeadlineDate
+      endDeadlineDate,
+      statisticsDeadline: isDeadline,
+      sortDeadline: taskGroupId === '0' || taskGroupId === ''
     }
   })
 }

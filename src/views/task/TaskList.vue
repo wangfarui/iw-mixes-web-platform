@@ -84,7 +84,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item 
-                  v-if="!['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')"
+                  v-if="!['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')"
                   @click="addGroup">
                   <el-icon><Plus /></el-icon>添加分组
                 </el-dropdown-item>
@@ -113,8 +113,8 @@
 
       <!-- 任务列表 -->
       <div class="tasks-list">
-        <!-- 固定清单（今天、最近7天、收集箱）和已完成清单、垃圾箱的任务列表 -->
-        <template v-if="['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')">
+        <!-- 固定清单（今天、最近7天、收集箱、截止任务）和已完成清单、垃圾箱的任务列表 -->
+        <template v-if="['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')">
           <draggable
             v-if="subGroups[0]"
             v-model="subGroups[0].tasks"
@@ -137,10 +137,10 @@
                 />
                 <span class="task-name" :class="{ 
                   completed: task.completed && currentGroup?.id === 'completed',
-                  'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                  'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
                 }">
                   {{ task.taskName }}
-                  <span v-if="task.taskGroupName && !['inbox'].includes(currentGroup?.id || '')" class="task-group-name">
+                  <span v-if="task.taskGroupName && !['inbox', 'deadline'].includes(currentGroup?.id || '')" class="task-group-name">
                     ({{ task.taskGroupName }})
                   </span>
                 </span>
@@ -316,7 +316,7 @@
                   />
                   <span class="task-name" :class="{ 
                     completed: task.completed && currentGroup?.id === 'completed',
-                    'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                    'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
                   }">
                     {{ task.taskName }}
                   </span>
@@ -524,7 +524,7 @@
                     />
                     <span class="task-name" :class="{ 
                       completed: task.completed && currentGroup?.id === 'completed',
-                      'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                      'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
                     }">
                       {{ task.taskName }}
                     </span>
@@ -1115,6 +1115,7 @@ const isLeftCollapsed = ref(false)
 const fixedGroups = ref<TaskGroup[]>([
   { id: 'today', name: '今天', icon: 'today', count: 0 },
   { id: 'week', name: '最近7天', icon: 'last-7day', count: 0 },
+  { id: 'deadline', name: '截止任务', icon: 'deadline', count: 0 },
   { id: 'inbox', name: '收集箱', icon: 'box', count: 0 }
 ])
 
@@ -1272,7 +1273,7 @@ const switchGroup = async (group: TaskGroup) => {
   }
 
   // 如果是固定清单（今天、最近7天、收集箱），加载对应的任务列表
-  if (['today', 'week', 'inbox'].includes(group.id)) {
+  if (['today', 'week', 'inbox', 'deadline'].includes(group.id)) {
     try {
       loadingSubGroups.value = true
       let startDeadlineDate: string | undefined
@@ -1294,9 +1295,12 @@ const switchGroup = async (group: TaskGroup) => {
         case 'inbox':
           // 收集箱不需要时间范围
           break
+        case 'deadline':
+          // 截止任务不需要时间范围
+          break
       }
 
-      const res = await getTaskList(group.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+      const res = await getTaskList(group.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, group.id === 'deadline')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: group.id,
@@ -1348,6 +1352,12 @@ const addTask = async () => {
           deadlineDate = null
           taskGroupId = 0
           break
+        case 'deadline':
+          const nextMonth = new Date()
+          nextMonth.setDate(nextMonth.getDate() + 30)
+          deadlineDate = formatDate(nextMonth)
+          taskGroupId = 0
+          break
         default:
           // 如果是自定义清单，检查是否有分组
           if (subGroups.value.length === 0) {
@@ -1375,7 +1385,7 @@ const addTask = async () => {
     })
 
     // 更新当前分组的任务列表
-    if (currentGroup.value && ['today', 'week', 'inbox'].includes(currentGroup.value.id)) {
+    if (currentGroup.value && ['today', 'week', 'inbox', 'deadline'].includes(currentGroup.value.id)) {
       let startDeadlineDate: string | undefined
       let endDeadlineDate: string | undefined
       const today = new Date()
@@ -1395,9 +1405,12 @@ const addTask = async () => {
         case 'inbox':
           // 收集箱不需要时间范围
           break
+        case 'deadline':
+          // 截止任务不需要时间范围
+          break
       }
 
-      const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+      const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value.id === 'deadline')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: currentGroup.value.id,
@@ -1409,7 +1422,7 @@ const addTask = async () => {
           taskNum: res.data.length
         }]
       }
-    } else if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+    } else if (currentGroup.value && !['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value.id)) {
       // 如果是自定义清单，只刷新第一个分组的任务列表
       if (subGroups.value.length > 0) {
         await loadGroupTasks(subGroups.value[0].id)
@@ -1647,7 +1660,7 @@ const submitAddGroup = async () => {
 // 加载子分组
 const loadSubGroups = async (parentId: string) => {
   // 如果不是自定义清单，直接返回
-  if (['today', 'week', 'inbox', 'completed', 'trash'].includes(parentId)) {
+  if (['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(parentId)) {
     return
   }
 
@@ -2061,7 +2074,7 @@ const deleteTask = async (task: TaskBasicsVo) => {
     await updateTaskCounts()
     
     // 如果是垃圾箱清单或固定清单，刷新任务列表
-    if (currentGroup.value && ['trash', 'today', 'week', 'inbox'].includes(currentGroup.value.id)) {
+    if (currentGroup.value && ['trash', 'today', 'week', 'inbox', 'deadline'].includes(currentGroup.value.id)) {
       let startDeadlineDate: string | undefined
       let endDeadlineDate: string | undefined
       const today = new Date()
@@ -2101,7 +2114,7 @@ const deleteTask = async (task: TaskBasicsVo) => {
       }
 
       if (currentGroup.value.id !== 'trash') {
-        const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+        const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value.id === 'deadline')
         if (Array.isArray(res.data)) {
           subGroups.value = [{
             id: currentGroup.value.id,
@@ -2195,7 +2208,8 @@ onMounted(async () => {
       ...group,
       count: group.id === 'today' ? res.data.todayNum :
              group.id === 'week' ? res.data.weekNum :
-             group.id === 'inbox' ? res.data.noGroupNum : 0
+             group.id === 'inbox' ? res.data.noGroupNum :
+             group.id === 'deadline' ? res.data.withDeadlineNum : 0
     }))
     
     // 加载自定义分组
@@ -2288,7 +2302,7 @@ const handleDateSelect = async (date: Date) => {
     })
 
     // 更新本地任务数据
-    if (['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value?.id || '')) {
+    if (['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value?.id || '')) {
       // 对于固定清单和特殊清单，重新加载整个任务列表
       let startDeadlineDate: string | undefined
       let endDeadlineDate: string | undefined
@@ -2345,7 +2359,7 @@ const handleDateSelect = async (date: Date) => {
           return
       }
 
-      const res = await getTaskList(currentGroup.value?.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+      const res = await getTaskList(currentGroup.value?.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value?.id === 'deadline')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: currentGroup.value?.id || '',
@@ -2547,7 +2561,8 @@ const updateTaskCounts = async () => {
       ...group,
       count: group.id === 'today' ? res.data.todayNum :
              group.id === 'week' ? res.data.weekNum :
-             group.id === 'inbox' ? res.data.noGroupNum : 0
+             group.id === 'inbox' ? res.data.noGroupNum :
+             group.id === 'deadline' ? res.data.withDeadlineNum : 0
     }))
     
     // 更新自定义分组列表
@@ -2730,7 +2745,7 @@ const moveTask = async (task: TaskBasicsVo, targetGroupId: number) => {
     await loadCustomGroups()
 
     // 如果当前在自定义清单下，重新加载任务分组列表
-    if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+    if (currentGroup.value && !['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value.id)) {
       await loadSubGroups(currentGroup.value.id)
     }
 

@@ -23,6 +23,10 @@ export default ({ command, mode }: any) => {
         '/bookkeeping-service': {
           target: 'http://localhost:18000',
           changeOrigin: true
+        },
+        '/points-service': {
+          target: 'http://localhost:18000',
+          changeOrigin: true
         }
       }
     },
