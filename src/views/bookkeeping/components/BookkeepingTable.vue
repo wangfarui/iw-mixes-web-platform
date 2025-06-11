@@ -1,8 +1,15 @@
 <template>
   <div v-loading="loading">
-    <div>
-<!--      <el-button type="primary" @click="handleBookkeepingAdd">新增</el-button>-->
+    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
       <el-button type="primary" @click="searchPage">刷新</el-button>
+      <el-upload
+        class="upload-demo"
+        :http-request="handleImport"
+        :show-file-list="false"
+        accept=".xlsx,.xls,.csv"
+      >
+        <el-button type="primary">导入</el-button>
+      </el-upload>
     </div>
     <div>
       <el-table :data="page.list" style="width: 100%" @row-dblclick="handleClick">
@@ -56,8 +63,11 @@ import router from '@/router'
 import type {BookkeepingListData, BookkeepingPageDto} from "@/types/bookkeeping"
 import {queryBookkeepingPage, queryBookkeepingDetail, deleteBookkeeping} from "@/api/bookkeeping"
 import {useDictStore} from "@/stores/dict";
+import { ElMessage } from 'element-plus'
+import request from "@/api/request"
 
 const dictStore = useDictStore();
+const baseUrl = import.meta.env.VITE_API_BASE_URL
 
 const loading = ref(false)
 
@@ -115,5 +125,25 @@ const handleSizeChange = (val: number) => {
 const handleCurrentChange = (val: number) => {
   page.dto.currentPage = val
   searchPage()
+}
+
+const handleImport = async (options: any) => {
+  const formData = new FormData()
+  formData.append('file', options.file)
+  
+  try {
+    await request({
+      url: '/bookkeeping-service/bookkeeping/records/import',
+      method: 'post',
+      data: formData,
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    ElMessage.success('导入成功')
+    searchPage()
+  } catch (error) {
+    ElMessage.error('导入失败')
+  }
 }
 </script>
