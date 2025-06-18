@@ -8,6 +8,8 @@ import SvgIcon from '@/components/SvgIcon.vue'
 
 import App from './App.vue'
 import router from './router'
+import versionPollingService from '@/services/versionPollingService'
+import { refreshDictCache } from '@/api/login'
 // @ts-ignore
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
@@ -29,6 +31,11 @@ router.beforeEach((to, from, next) => {
     }
     if (window.sessionStorage.getItem("iwtoken")) {
         //说明用户已经登录
+        // 检查并启动版本号轮询
+        if (!versionPollingService.isPollingActive()) {
+            versionPollingService.startVersionPolling();
+            refreshDictCache();
+        }
         next();
     } else {
         //说明用户未登录，去登录

@@ -45,6 +45,11 @@ export const editPasswordApi = (passwordEditDto: UserPasswordEditDto) => {
     return request.post('/auth-service/user/editPassword', passwordEditDto);
 }
 
+// 获取字典版本号
+export const getDictVersion = () => {
+    return request.get('/auth-service/dict/version');
+}
+
 // 刷新字典缓存
 export const refreshDictCache = () => {
 	const dictStore = useDictStore()
