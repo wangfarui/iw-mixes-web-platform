@@ -113,8 +113,8 @@
 
         <!-- 主容器 -->
         <el-main style="padding:0">
-          <div v-if="proxy!.$router.currentRoute.value.path=='/'"
-               style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">欢迎来到IW管理平台！
+          <div v-if="proxy!.$router.currentRoute.value.path=='/'"style="font-size: 20px;font-family: 华文行楷;color: black;text-align: center">
+               欢迎来到IW管理平台！
           </div>
           <RouterView/>
         </el-main>
@@ -195,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, reactive, onMounted} from 'vue'
+import {ref, reactive, onMounted, computed} from 'vue'
 import {RouterView} from 'vue-router'
 import router from "@/router";
 import {getCurrentInstance} from "vue";
@@ -211,6 +211,7 @@ import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type Form
 import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
+import versionPollingService from '@/services/versionPollingService'
 
 const {proxy} = getCurrentInstance()!;
 
@@ -337,6 +338,7 @@ const cancelForm = (formEl: FormInstance | undefined) => {
 
 function logout() {
   window.sessionStorage.removeItem("iwtoken");
+  versionPollingService.stopVersionPolling();
   router.push({path: '/login'})
 }
 

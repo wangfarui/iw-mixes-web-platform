@@ -22,12 +22,13 @@ export interface StatisticsLatestTaskNumVo {
   todayNum: number;
   weekNum: number;
   noGroupNum: number;
+  withDeadlineNum: number;
 }
 
 // 添加任务清单分组
 export const addTaskGroup = (data: { groupName: string; parentId?: string }) => {
   return request<GeneralResponse<number>>({
-    url: '/bookkeeping-service/task/group/add',
+    url: '/points-service/points/task/group/add',
     method: 'post',
     data
   })
@@ -36,7 +37,7 @@ export const addTaskGroup = (data: { groupName: string; parentId?: string }) => 
 // 获取任务清单分组列表
 export const getTaskGroupList = (parentId?: string) => {
   return request<GeneralResponse<TaskGroupListVo[]>>({
-    url: '/bookkeeping-service/task/group/list' + (parentId ? `?parentId=${parentId}` : ''),
+    url: '/points-service/points/task/group/list' + (parentId ? `?parentId=${parentId}` : ''),
     method: 'get'
   })
 }
@@ -44,7 +45,7 @@ export const getTaskGroupList = (parentId?: string) => {
 // 获取分组数量统计
 export const getTaskGroupStatistics = (): Promise<GeneralResponse<StatisticsLatestTaskNumVo>> => {
   return request<GeneralResponse<StatisticsLatestTaskNumVo>>({
-    url: '/bookkeeping-service/task/group/statisticsLatestTaskNum',
+    url: '/points-service/points/task/group/statisticsLatestTaskNum',
     method: 'get'
   })
 }
@@ -64,14 +65,16 @@ export interface TaskBasicsVo {
 }
 
 // 获取任务列表
-export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string) => {
+export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string, isDeadline?: boolean) => {
   return request<GeneralResponse<TaskBasicsVo[]>>({
-    url: '/bookkeeping-service/task/basics/list',
+    url: '/points-service/points/task/basics/list',
     method: 'post',
     data: { 
       taskGroupId,
       startDeadlineDate,
-      endDeadlineDate
+      endDeadlineDate,
+      statisticsDeadline: isDeadline,
+      sortDeadline: taskGroupId === '0' || taskGroupId === ''
     }
   })
 }
@@ -79,7 +82,7 @@ export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, end
 // 创建任务
 export const addTask = (data: { taskName: string; taskGroupId: number; deadlineDate?: string | null }) => {
   return request<GeneralResponse<void>>({
-    url: '/bookkeeping-service/task/basics/add',
+    url: '/points-service/points/task/basics/add',
     method: 'post',
     data
   })
@@ -87,18 +90,18 @@ export const addTask = (data: { taskName: string; taskGroupId: number; deadlineD
 
 // 更新任务
 export const updateTask = (params: TaskBasicsVo) => {
-  return request.put('/bookkeeping-service/task/basics/update', params)
+  return request.put('/points-service/points/task/basics/update', params)
 }
 
 // 重命名分组
 export const renameTaskGroup = (params: { id: number, groupName: string }) => {
-  return request.put('/bookkeeping-service/task/group/update', params)
+  return request.put('/points-service/points/task/group/update', params)
 }
 
 // 删除分组
 export const deleteTaskGroup = (id: number) => {
   return request<GeneralResponse<void>>({
-    url: `/bookkeeping-service/task/group/delete?id=${id}`,
+    url: `/points-service/points/task/group/delete?id=${id}`,
     method: 'delete'
   })
 }
@@ -113,7 +116,7 @@ export interface TaskGroupMoveListVo {
 // 获取移动清单列表
 export const getTaskGroupMoveList = () => {
   return request<GeneralResponse<TaskGroupMoveListVo[]>>({
-    url: '/bookkeeping-service/task/group/moveList',
+    url: '/points-service/points/task/group/moveList',
     method: 'get'
   })
 } 

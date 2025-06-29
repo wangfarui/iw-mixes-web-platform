@@ -84,7 +84,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item 
-                  v-if="!['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')"
+                  v-if="!['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')"
                   @click="addGroup">
                   <el-icon><Plus /></el-icon>添加分组
                 </el-dropdown-item>
@@ -113,8 +113,8 @@
 
       <!-- 任务列表 -->
       <div class="tasks-list">
-        <!-- 固定清单（今天、最近7天、收集箱）和已完成清单、垃圾箱的任务列表 -->
-        <template v-if="['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')">
+        <!-- 固定清单（今天、最近7天、收集箱、截止任务）和已完成清单、垃圾箱的任务列表 -->
+        <template v-if="['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')">
           <draggable
             v-if="subGroups[0]"
             v-model="subGroups[0].tasks"
@@ -137,9 +137,12 @@
                 />
                 <span class="task-name" :class="{ 
                   completed: task.completed && currentGroup?.id === 'completed',
-                  'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                  'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
                 }">
                   {{ task.taskName }}
+                  <span v-if="task.taskGroupName && !['inbox', 'deadline'].includes(currentGroup?.id || '')" class="task-group-name">
+                    ({{ task.taskGroupName }})
+                  </span>
                 </span>
                 <span v-if="task.deadlineDate" class="deadline-date" :class="{
                   'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
@@ -252,6 +255,10 @@
                         <el-icon><Top /></el-icon>
                         <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
                       </el-dropdown-item>
+                      <el-dropdown-item  v-if="currentGroup?.id !== 'trash'" class="normal-item" @click="openPointsDialog(task)">
+                            <el-icon><Coin /></el-icon>
+                            <span>积分</span>
+                          </el-dropdown-item>
                       <el-dropdown-item 
                         v-if="currentGroup?.id === 'trash'"
                         class="normal-item" 
@@ -309,7 +316,7 @@
                   />
                   <span class="task-name" :class="{ 
                     completed: task.completed && currentGroup?.id === 'completed',
-                    'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                    'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
                   }">
                     {{ task.taskName }}
                   </span>
@@ -424,6 +431,10 @@
                           <el-icon><Top /></el-icon>
                           <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
                         </el-dropdown-item>
+                        <el-dropdown-item class="normal-item" @click="openPointsDialog(task)">
+                            <el-icon><Coin /></el-icon>
+                            <span>积分</span>
+                          </el-dropdown-item>
                         <el-dropdown-item class="normal-item" @click="deleteTask(task)">
                           <el-icon><Delete /></el-icon>
                           <span>删除任务</span>
@@ -513,7 +524,7 @@
                     />
                     <span class="task-name" :class="{ 
                       completed: task.completed && currentGroup?.id === 'completed',
-                      'fixed-list': ['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup?.id || '')
+                      'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
                     }">
                       {{ task.taskName }}
                     </span>
@@ -628,6 +639,10 @@
                             <el-icon><Top /></el-icon>
                             <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
                           </el-dropdown-item>
+                          <el-dropdown-item  v-if="currentGroup?.id !== 'trash'" class="normal-item" @click="openPointsDialog(task)">
+                            <el-icon><Coin /></el-icon>
+                            <span>积分</span>
+                          </el-dropdown-item>
                           <el-dropdown-item 
                             v-if="currentGroup?.id === 'trash'"
                             class="normal-item" 
@@ -681,6 +696,17 @@
           class="task-name-input"
           @blur="updateTaskDetail('taskName')"
         />
+        <!-- 添加积分显示 -->
+        <div class="task-points" v-if="selectedTask.rewardPoints || selectedTask.punishPoints">
+          <span v-if="selectedTask.rewardPoints" class="reward-points">
+            <el-icon><Coin /></el-icon>
+            奖励积分：{{ selectedTask.rewardPoints }}
+          </span>
+          <span v-if="selectedTask.punishPoints" class="punish-points">
+            <el-icon><Coin /></el-icon>
+            惩罚积分：{{ selectedTask.punishPoints }}
+          </span>
+        </div>
         <!-- 任务详情 -->
         <el-input
           type="textarea"
@@ -690,6 +716,72 @@
           :autosize="{ minRows: 4 }"
           @blur="updateTaskDetail('taskRemark')"
         />
+        
+        <!-- 添加图片上传区域 -->
+        <div class="task-images">
+          <div class="images-header">
+            <h3>任务图片</h3>
+            <el-upload
+              class="image-uploader"
+              action="/auth-service/file/upload"
+              name="file"
+              :show-file-list="false"
+              :before-upload="(file) => {
+                handleImageUpload(file)
+                return false
+              }"
+            >
+              <el-button type="primary" :loading="isUploading">
+                <el-icon><Upload /></el-icon>
+                上传图片
+              </el-button>
+            </el-upload>
+          </div>
+          
+          <div 
+            class="images-container"
+            @paste="handlePaste"
+            @drop="handleDrop"
+            @dragover="handleDragOver"
+          >
+            <div v-if="!selectedTask.fileList?.length" class="empty-tip">
+              <el-icon><Picture /></el-icon>
+              <p>支持拖拽图片、粘贴图片或点击上传</p>
+              <el-upload
+                class="image-uploader"
+                action="/auth-service/file/upload"
+                name="file"
+                :show-file-list="false"
+                :before-upload="(file) => {
+                  handleImageUpload(file)
+                  return false
+                }"
+              >
+              </el-upload>
+            </div>
+            
+            <div v-else class="image-list">
+              <div v-for="(file, index) in selectedTask.fileList" :key="index" class="image-item">
+                <el-image 
+                  :src="file.fileUrl" 
+                  :preview-src-list="selectedTask.fileList.map(f => f.fileUrl)"
+                  :initial-index="index"
+                  fit="cover"
+                />
+                <div class="image-actions">
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    circle
+                    @click="handleDeleteFile(file)"
+                  >
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div v-else class="no-task-selected">
         请选择一个任务查看详情
@@ -872,6 +964,10 @@
         <el-icon><Top /></el-icon>
         <span>{{ contextMenuTask?.isTop ? '取消置顶' : '置顶' }}</span>
       </div>
+      <div class="context-menu-item"  v-if="currentGroup?.id !== 'trash'" @click="contextMenuTask && openPointsDialog(contextMenuTask)">
+        <el-icon><Coin /></el-icon>
+        <span>积分</span>
+      </div>
       <div 
         v-if="currentGroup?.id === 'trash'"
         class="context-menu-item" 
@@ -926,6 +1022,36 @@
         <el-button size="small" @click="selectNextWeek">一周后</el-button>
       </div>
     </div>
+
+    <!-- 积分弹框 -->
+    <el-dialog
+      v-model="pointsDialogVisible"
+      title="设置积分"
+      width="400px"
+      :close-on-click-modal="false">
+      <el-form :model="pointsForm" :rules="pointsRules" label-width="80px">
+        <el-form-item label="奖励积分" prop="rewardPoints">
+          <el-input-number 
+            v-model="pointsForm.rewardPoints"
+            :min="0"
+            :precision="0"
+            placeholder="请输入奖励积分"/>
+        </el-form-item>
+        <el-form-item label="处罚积分" prop="punishPoints">
+          <el-input-number 
+            v-model="pointsForm.punishPoints"
+            :min="0"
+            :precision="0"
+            placeholder="请输入处罚积分"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="pointsDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="savePoints">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -951,7 +1077,11 @@ import {
   Top,
   Position,
   ArrowLeft,
-  Refresh
+  Refresh,
+  Coin,
+  Bottom,
+  Upload,
+  Picture
 } from '@element-plus/icons-vue'
 import type { TaskGroup } from '@/types/types'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -985,6 +1115,7 @@ const isLeftCollapsed = ref(false)
 const fixedGroups = ref<TaskGroup[]>([
   { id: 'today', name: '今天', icon: 'today', count: 0 },
   { id: 'week', name: '最近7天', icon: 'last-7day', count: 0 },
+  { id: 'deadline', name: '截止任务', icon: 'deadline', count: 0 },
   { id: 'inbox', name: '收集箱', icon: 'box', count: 0 }
 ])
 
@@ -1087,7 +1218,7 @@ const switchGroup = async (group: TaskGroup) => {
       loadingSubGroups.value = true
       currentPage.value = 1 // 重置页码
       hasMore.value = true // 重置加载更多状态
-      const res = await request.get(`/bookkeeping-service/task/basics/doneList?currentPage=${currentPage.value}`)
+      const res = await request.get(`/points-service/points/task/basics/doneList?currentPage=${currentPage.value}`)
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'completed',
@@ -1117,7 +1248,7 @@ const switchGroup = async (group: TaskGroup) => {
   if (group.id === 'trash') {
     try {
       loadingSubGroups.value = true
-      const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+      const res = await request.get('/points-service/points/task/basics/deletedList')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'trash',
@@ -1142,7 +1273,7 @@ const switchGroup = async (group: TaskGroup) => {
   }
 
   // 如果是固定清单（今天、最近7天、收集箱），加载对应的任务列表
-  if (['today', 'week', 'inbox'].includes(group.id)) {
+  if (['today', 'week', 'inbox', 'deadline'].includes(group.id)) {
     try {
       loadingSubGroups.value = true
       let startDeadlineDate: string | undefined
@@ -1164,9 +1295,12 @@ const switchGroup = async (group: TaskGroup) => {
         case 'inbox':
           // 收集箱不需要时间范围
           break
+        case 'deadline':
+          // 截止任务不需要时间范围
+          break
       }
 
-      const res = await getTaskList(group.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+      const res = await getTaskList(group.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, group.id === 'deadline')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: group.id,
@@ -1218,6 +1352,12 @@ const addTask = async () => {
           deadlineDate = null
           taskGroupId = 0
           break
+        case 'deadline':
+          const nextMonth = new Date()
+          nextMonth.setDate(nextMonth.getDate() + 30)
+          deadlineDate = formatDate(nextMonth)
+          taskGroupId = 0
+          break
         default:
           // 如果是自定义清单，检查是否有分组
           if (subGroups.value.length === 0) {
@@ -1245,7 +1385,7 @@ const addTask = async () => {
     })
 
     // 更新当前分组的任务列表
-    if (currentGroup.value && ['today', 'week', 'inbox'].includes(currentGroup.value.id)) {
+    if (currentGroup.value && ['today', 'week', 'inbox', 'deadline'].includes(currentGroup.value.id)) {
       let startDeadlineDate: string | undefined
       let endDeadlineDate: string | undefined
       const today = new Date()
@@ -1265,9 +1405,12 @@ const addTask = async () => {
         case 'inbox':
           // 收集箱不需要时间范围
           break
+        case 'deadline':
+          // 截止任务不需要时间范围
+          break
       }
 
-      const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+      const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value.id === 'deadline')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: currentGroup.value.id,
@@ -1279,7 +1422,7 @@ const addTask = async () => {
           taskNum: res.data.length
         }]
       }
-    } else if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+    } else if (currentGroup.value && !['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value.id)) {
       // 如果是自定义清单，只刷新第一个分组的任务列表
       if (subGroups.value.length > 0) {
         await loadGroupTasks(subGroups.value[0].id)
@@ -1303,7 +1446,7 @@ const addTask = async () => {
 // 切换任务状态
 const toggleTaskStatus = async (task: TaskBasicsVo) => {
   try {
-    await request.put('/bookkeeping-service/task/basics/updateStatus', {
+    await request.put('/points-service/points/task/basics/updateStatus', {
       id: task.id,
       taskStatus: task.completed ? 1 : 0
     })
@@ -1339,7 +1482,7 @@ const toggleTaskStatus = async (task: TaskBasicsVo) => {
     
     // 如果是已完成清单中的任务，取消完成状态后需要重新加载已完成任务列表
     if (currentGroup.value?.id === 'completed') {
-      const res = await request.get('/bookkeeping-service/task/basics/doneList')
+      const res = await request.get('/points-service/points/task/basics/doneList')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'completed',
@@ -1364,9 +1507,23 @@ const toggleTaskStatus = async (task: TaskBasicsVo) => {
 }
 
 // 选择任务
-const selectTask = (task: TaskBasicsVo) => {
+const selectTask = async (task: TaskBasicsVo) => {
   selectedTask.value = task
-  activeTask.value = null
+  isTaskDetailVisible.value = true
+  
+  // 获取任务详情
+  await handleTaskDetail(task.id)
+}
+
+const handleTaskDetail = async (taskId: number) => {
+  const res = await request.get(`/points-service/points/task/basics/detail?id=${taskId}`)
+  selectedTask.value = {
+    ...selectedTask.value,
+    taskRemark: res.data.taskRemark,
+    rewardPoints: res.data.rewardPoints,
+    punishPoints: res.data.punishPoints,
+    fileList: res.data.fileList
+  }
 }
 
 // 更新任务详情
@@ -1381,7 +1538,7 @@ const updateTaskDetail = async (field: 'taskName' | 'taskRemark') => {
       id: selectedTask.value.id,
       taskName: selectedTask.value.taskName,
       taskRemark: selectedTask.value.taskRemark,
-      taskGroupId: parseInt(group.id == 'inbox' ? 0 : group.id)
+      taskGroupId: selectedTask.value.taskGroupId
     })
 
     // 更新列表中的任务名称
@@ -1503,7 +1660,7 @@ const submitAddGroup = async () => {
 // 加载子分组
 const loadSubGroups = async (parentId: string) => {
   // 如果不是自定义清单，直接返回
-  if (['today', 'week', 'inbox', 'completed', 'trash'].includes(parentId)) {
+  if (['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(parentId)) {
     return
   }
 
@@ -1828,7 +1985,7 @@ const toggleTaskTop = async (task: TaskBasicsVo) => {
 // 恢复任务
 const restoreTask = async (task: TaskBasicsVo) => {
   try {
-    await request.put('/bookkeeping-service/task/basics/updateStatus', {
+    await request.put('/points-service/points/task/basics/updateStatus', {
       id: task.id,
       taskStatus: 0
     })
@@ -1848,7 +2005,7 @@ const restoreTask = async (task: TaskBasicsVo) => {
     
     // 如果是垃圾箱清单，刷新任务列表
     if (currentGroup.value?.id === 'trash') {
-      const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+      const res = await request.get('/points-service/points/task/basics/deletedList')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: 'trash',
@@ -1894,10 +2051,10 @@ const deleteTask = async (task: TaskBasicsVo) => {
     // 根据当前清单类型调用不同的删除接口
     if (currentGroup.value?.id === 'trash') {
       // 垃圾箱清单下使用永久删除接口
-      await request.delete('/bookkeeping-service/task/basics/delete?id=' + task.id)
+      await request.delete('/points-service/points/task/basics/delete?id=' + task.id)
     } else {
       // 其他清单下使用更新状态接口
-      await request.put('/bookkeeping-service/task/basics/updateStatus', {
+      await request.put('/points-service/points/task/basics/updateStatus', {
         id: task.id,
         taskStatus: 3
       })
@@ -1917,7 +2074,7 @@ const deleteTask = async (task: TaskBasicsVo) => {
     await updateTaskCounts()
     
     // 如果是垃圾箱清单或固定清单，刷新任务列表
-    if (currentGroup.value && ['trash', 'today', 'week', 'inbox'].includes(currentGroup.value.id)) {
+    if (currentGroup.value && ['trash', 'today', 'week', 'inbox', 'deadline'].includes(currentGroup.value.id)) {
       let startDeadlineDate: string | undefined
       let endDeadlineDate: string | undefined
       const today = new Date()
@@ -1925,7 +2082,7 @@ const deleteTask = async (task: TaskBasicsVo) => {
 
       switch (currentGroup.value.id) {
         case 'trash':
-          const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+          const res = await request.get('/points-service/points/task/basics/deletedList')
           if (Array.isArray(res.data)) {
             subGroups.value = [{
               id: 'trash',
@@ -1957,7 +2114,7 @@ const deleteTask = async (task: TaskBasicsVo) => {
       }
 
       if (currentGroup.value.id !== 'trash') {
-        const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+        const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value.id === 'deadline')
         if (Array.isArray(res.data)) {
           subGroups.value = [{
             id: currentGroup.value.id,
@@ -2051,7 +2208,8 @@ onMounted(async () => {
       ...group,
       count: group.id === 'today' ? res.data.todayNum :
              group.id === 'week' ? res.data.weekNum :
-             group.id === 'inbox' ? res.data.noGroupNum : 0
+             group.id === 'inbox' ? res.data.noGroupNum :
+             group.id === 'deadline' ? res.data.withDeadlineNum : 0
     }))
     
     // 加载自定义分组
@@ -2144,7 +2302,7 @@ const handleDateSelect = async (date: Date) => {
     })
 
     // 更新本地任务数据
-    if (['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value?.id || '')) {
+    if (['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value?.id || '')) {
       // 对于固定清单和特殊清单，重新加载整个任务列表
       let startDeadlineDate: string | undefined
       let endDeadlineDate: string | undefined
@@ -2166,7 +2324,7 @@ const handleDateSelect = async (date: Date) => {
           // 收集箱不需要时间范围
           break
         case 'completed':
-          const res = await request.get('/bookkeeping-service/task/basics/doneList')
+          const res = await request.get('/points-service/points/task/basics/doneList')
           if (Array.isArray(res.data)) {
             subGroups.value = [{
               id: 'completed',
@@ -2183,7 +2341,7 @@ const handleDateSelect = async (date: Date) => {
           }
           return
         case 'trash':
-          const trashRes = await request.get('/bookkeeping-service/task/basics/deletedList')
+          const trashRes = await request.get('/points-service/points/task/basics/deletedList')
           if (Array.isArray(trashRes.data)) {
             subGroups.value = [{
               id: 'trash',
@@ -2201,7 +2359,7 @@ const handleDateSelect = async (date: Date) => {
           return
       }
 
-      const res = await getTaskList(currentGroup.value?.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate)
+      const res = await getTaskList(currentGroup.value?.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value?.id === 'deadline')
       if (Array.isArray(res.data)) {
         subGroups.value = [{
           id: currentGroup.value?.id || '',
@@ -2403,7 +2561,8 @@ const updateTaskCounts = async () => {
       ...group,
       count: group.id === 'today' ? res.data.todayNum :
              group.id === 'week' ? res.data.weekNum :
-             group.id === 'inbox' ? res.data.noGroupNum : 0
+             group.id === 'inbox' ? res.data.noGroupNum :
+             group.id === 'deadline' ? res.data.withDeadlineNum : 0
     }))
     
     // 更新自定义分组列表
@@ -2446,10 +2605,10 @@ const clearTrash = async () => {
       }
     )
 
-    await request.delete('/bookkeeping-service/task/basics/clearDeletedList')
+    await request.delete('/points-service/points/task/basics/clearDeletedList')
     
     // 重新加载垃圾箱的任务列表
-    const res = await request.get('/bookkeeping-service/task/basics/deletedList')
+    const res = await request.get('/points-service/points/task/basics/deletedList')
     if (Array.isArray(res.data)) {
       subGroups.value = [{
         id: 'trash',
@@ -2482,7 +2641,7 @@ const loadMoreCompletedTasks = async () => {
   try {
     loadingSubGroups.value = true
     currentPage.value++ // 页码自增
-    const res = await request.get(`/bookkeeping-service/task/basics/doneList?currentPage=${currentPage.value}`)
+    const res = await request.get(`/points-service/points/task/basics/doneList?currentPage=${currentPage.value}`)
     if (Array.isArray(res.data)) {
       // 将新数据追加到现有列表中
       if (subGroups.value[0]) {
@@ -2586,7 +2745,7 @@ const moveTask = async (task: TaskBasicsVo, targetGroupId: number) => {
     await loadCustomGroups()
 
     // 如果当前在自定义清单下，重新加载任务分组列表
-    if (currentGroup.value && !['today', 'week', 'inbox', 'completed', 'trash'].includes(currentGroup.value.id)) {
+    if (currentGroup.value && !['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value.id)) {
       await loadSubGroups(currentGroup.value.id)
     }
 
@@ -2626,6 +2785,187 @@ const handleMoveToMenuLeave = (e: MouseEvent) => {
   if (!target?.closest('.move-to-menu') && !target?.closest('.move-to-submenu')) {
     showMoveToMenu.value = false
   }
+}
+
+// 积分弹框相关
+const pointsDialogVisible = ref(false)
+const pointsForm = ref({
+  rewardPoints: '',
+  punishPoints: ''
+})
+const currentTaskForPoints = ref<TaskBasicsVo | null>(null)
+
+// 打开积分弹框
+const openPointsDialog = async (task: TaskBasicsVo) => {
+  currentTaskForPoints.value = task
+  // 先查询任务积分
+  const res = await request.get(`/bookkeeping-service/points/task/relation/getByTaskId?taskId=${task.id}`)
+  if (res.data) {
+    pointsForm.value = {
+      rewardPoints: res.data.rewardPoints?.toString() || '',
+      punishPoints: res.data.punishPoints?.toString() || ''
+    }
+  } else {
+    pointsForm.value = {
+      rewardPoints: '',
+      punishPoints: ''
+    }
+  }
+
+  pointsDialogVisible.value = true
+}
+
+// 保存积分
+const savePoints = async () => {
+  if (!currentTaskForPoints.value) return
+  
+  try {
+    const res = await request.post('/bookkeeping-service/points/task/relation/save', {
+      taskId: currentTaskForPoints.value.id,
+      rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
+      punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
+    })
+    
+    if (res.code === 200) {
+      ElMessage.success('保存成功')
+      pointsDialogVisible.value = false
+      // 更新当前任务数据
+      if (selectedTask.value?.id === currentTaskForPoints.value.id) {
+        selectedTask.value = {
+          ...selectedTask.value,
+          rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
+          punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
+        }
+      }
+    } else {
+      ElMessage.error(res.data.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存积分失败:', error)
+    ElMessage.error('保存失败')
+  }
+}
+
+// 验证积分输入
+const validatePoints = (rule: any, value: string, callback: any) => {
+  if (value && (isNaN(Number(value)) || Number(value) < 0)) {
+    callback(new Error('请输入大于等于0的数值'))
+  } else {
+    callback()
+  }
+}
+
+const pointsRules = {
+  rewardPoints: [{ validator: validatePoints, trigger: 'blur' }],
+  punishPoints: [{ validator: validatePoints, trigger: 'blur' }]
+}
+
+// 移动任务到顶部
+const moveTaskToTop = (task: TaskBasicsVo) => {
+  const group = subGroups.value.find(g => g.tasks.some(t => t.id === task.id))
+  if (group) {
+    const taskIndex = group.tasks.findIndex(t => t.id === task.id)
+    if (taskIndex > -1) {
+      group.tasks.splice(taskIndex, 1)
+      group.tasks.unshift(task)
+      group.taskNum = (group.taskNum || 0) + 1
+    }
+  }
+}
+
+// 移动任务到底部
+const moveTaskToBottom = (task: TaskBasicsVo) => {
+  const group = subGroups.value.find(g => g.tasks.some(t => t.id === task.id))
+  if (group) {
+    const taskIndex = group.tasks.findIndex(t => t.id === task.id)
+    if (taskIndex > -1) {
+      group.tasks.splice(taskIndex, 1)
+      group.tasks.push(task)
+      group.taskNum = (group.taskNum || 0) + 1
+    }
+  }
+}
+
+// 在 setup 函数开始处添加
+const isTaskDetailVisible = ref(false)
+
+// 在 setup 函数中添加图片上传相关的响应式变量
+const taskImages = ref<string[]>([])
+const isUploading = ref(false)
+
+// 添加图片上传相关的方法
+const handleImageUpload = async (file: File) => {
+  try {
+    isUploading.value = true
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const uploadRes = await request.post('/auth-service/file/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    if (uploadRes.data) {
+      const fileData = {
+        fileName: uploadRes.data.fileName,
+        fileUrl: uploadRes.data.fileUrl,
+        taskId: selectedTask.value?.id
+      }
+      
+      await request.post('/points-service/points/task/basics/addFile', fileData)
+      
+      // 重新获取任务详情以更新文件列表
+      await handleTaskDetail(selectedTask.value?.id)
+     
+      ElMessage.success('图片上传成功')
+    }
+  } finally {
+    isUploading.value = false
+  }
+}
+
+const handlePaste = async (event: ClipboardEvent) => {
+  const items = event.clipboardData?.items
+  if (!items) return
+  
+  for (const item of items) {
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file) {
+        await handleImageUpload(file)
+      }
+    }
+  }
+}
+
+const handleDrop = async (event: DragEvent) => {
+  event.preventDefault()
+  const files = event.dataTransfer?.files
+  if (!files) return
+  
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      await handleImageUpload(file)
+    }
+  }
+}
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault()
+}
+
+// 添加删除文件的方法
+const handleDeleteFile = async (file: any) => {
+  await request.post('/points-service/points/task/basics/deleteFile', {
+    taskId: selectedTask.value?.id,
+    fileUrl: file.fileUrl
+  })
+  
+  // 重新获取任务详情以更新文件列表
+  await handleTaskDetail(selectedTask.value?.id)
+  
+  ElMessage.success('删除成功')
 }
 </script>
 <style scoped>
@@ -3413,5 +3753,270 @@ const handleMoveToMenuLeave = (e: MouseEvent) => {
 
 .move-to-wrapper {
   position: relative;
+}
+
+.task-group-name {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+/* 添加积分显示的样式 */
+.task-points {
+  display: flex;
+  gap: 20px;
+  margin: 10px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.reward-points {
+  color: #67C23A;
+}
+
+.punish-points {
+  color: #F56C6C;
+}
+
+.task-points .el-icon {
+  margin-right: 4px;
+}
+
+.task-images {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+.images-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.images-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.images-container {
+  min-height: 200px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.images-container:hover {
+  border-color: #409eff;
+}
+
+.empty-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #909399;
+}
+
+.empty-tip .el-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.image-item .el-image {
+  width: 100%;
+  height: 100%;
+}
+
+.image-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
+}
+
+.task-content {
+  margin-top: 20px;
+}
+
+.content-item {
+  margin-bottom: 20px;
+}
+
+.item-label {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.images-container {
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 16px;
+  transition: all 0.3s;
+  background: #fafafa;
+}
+
+.images-container:hover {
+  border-color: #409eff;
+}
+
+.empty-tip {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.empty-tip .el-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.empty-tip p {
+  margin: 8px 0 16px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.image-item .el-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
+}
+
+.add-image {
+  aspect-ratio: 1;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.add-image:hover {
+  border-color: #409eff;
+}
+
+.upload-trigger {
+  font-size: 24px;
+  color: #909399;
+}
+
+.item-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.upload-button {
+  display: inline-block;
+}
+
+.images-container {
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 12px;
+  transition: all 0.3s;
+  background: #fafafa;
+  min-height: 100px;
+}
+
+.empty-tip {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.empty-tip .el-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.empty-tip p {
+  margin: 8px 0 16px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.image-item .el-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
 }
 </style>

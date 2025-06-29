@@ -13,7 +13,7 @@
             <el-row align="middle">
               <el-col :span="4">账号：</el-col>
               <el-col :span="20">
-                <el-input v-model="userInfo.account" placeholder="请输入用户名或手机号" clearable/>
+                <el-input v-model="userInfo.account" placeholder="请输入用户名或手机号" clearable @keyup.enter="loginByPassword"/>
               </el-col>
             </el-row>
             <el-row align="middle" style="margin-top: 5px">
@@ -24,6 +24,7 @@
                     type="password"
                     placeholder="请输入用户密码"
                     show-password
+                    @keyup.enter="loginByPassword"
                 />
               </el-col>
             </el-row>
@@ -36,13 +37,13 @@
           <el-row align="middle">
             <el-col :span="5">手机号：</el-col>
             <el-col :span="19">
-              <el-input v-model="userInfo.phoneNumber" maxlength="11" placeholder="请输入手机号" clearable/>
+              <el-input v-model="userInfo.phoneNumber" maxlength="11" placeholder="请输入手机号" clearable @keyup.enter="loginByVerificationCode"/>
             </el-col>
           </el-row>
           <el-row align="middle" style="margin-top: 5px">
             <el-col :span="5">验证码：</el-col>
             <el-col :span="12">
-              <el-input v-model="userInfo.verificationCode" maxlength="6" placeholder="请输入验证码" />
+              <el-input v-model="userInfo.verificationCode" maxlength="6" placeholder="请输入验证码" @keyup.enter="loginByVerificationCode" />
             </el-col>
             <el-col :span="7" style="text-align: end">
               <el-button :disabled="isCountingDown" @click="getVerificationCode()">{{ isCountingDown ? `${count}s重试` : "获取验证码" }}</el-button>
@@ -70,11 +71,12 @@
 
 <script setup>
 import {reactive, toRefs, ref} from "vue";
-import {loginByPasswordApi, refreshDictCache, loginByVerificationCodeApi, getVerificationCodeApi} from "@/api/login.ts";
+import {loginByPasswordApi, refreshDictCache, loginByVerificationCodeApi, getPhoneVerificationCodeApi, getEmailVerificationCodeApi} from "@/api/login.ts";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
 import {useDictStore} from "@/stores/dict";
+import versionPollingService from '@/services/versionPollingService'
 
 const dictStore = useDictStore();
 
@@ -139,6 +141,8 @@ function loginByVerificationCode() {
   userInfo.value.account = ''
   userInfo.value.password = ''
 
+  userInfo.value.loginWay = 1
+
   loading.value = true;
   loginByVerificationCodeApi(userInfo.value).then(data => {
     loading.value = false;
@@ -159,6 +163,9 @@ function loginSuccessAfter(data) {
 
   // 3. 加载字典缓存
   refreshDictCache();
+
+  // 4. 启动全局版本号轮询机制
+  versionPollingService.startVersionPolling();
 }
 
 // 获取验证码
@@ -172,7 +179,7 @@ function getVerificationCode() {
     return
   }
   verificationCodeLoading.value = true;
-  getVerificationCodeApi(userInfo.value.phoneNumber).then(data => {
+  getPhoneVerificationCodeApi(userInfo.value.phoneNumber).then(data => {
     ElMessage.success("验证码已发送")
     startCountdown();
   }).finally(() => {
