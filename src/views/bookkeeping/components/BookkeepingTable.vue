@@ -11,6 +11,64 @@
         <el-button type="primary">导入</el-button>
       </el-upload>
     </div>
+
+    <div style="margin-bottom: 16px;">
+      <el-row :gutter="10">
+        <el-col :span="4">
+          <el-input
+            v-model="page.dto.recordSource"
+            placeholder="搜索记录来源"
+            clearable
+            @change="searchPage"
+          />
+        </el-col>
+
+        <el-col :span="4">
+          <el-select
+            v-model="page.dto.recordCategory"
+            placeholder="记录类型"
+            clearable
+            @change="searchPage"
+          >
+            <el-option
+              v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.BOOKKEEPING_RECORD_CATEGORY)"
+              :key="item.dictCode"
+              :label="item.dictName"
+              :value="item.dictCode"
+            />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select
+            v-model="page.dto.recordType"
+            placeholder="记录分类"
+            clearable
+            @change="searchPage"
+          >
+            <el-option
+              v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.BOOKKEEPING_RECORD_TYPE)"
+              :key="item.dictCode"
+              :label="item.dictName"
+              :value="item.dictCode"
+            />
+          </el-select>
+        </el-col>
+
+        <el-col :span="6">
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            @change="handleDateChange"
+            class="date-picker-width"
+          />
+        </el-col>
+      </el-row>
+    </div>
+
     <div>
       <el-table :data="page.list" style="width: 100%" @row-dblclick="handleClick">
         <el-table-column prop="recordTime" label="记录时间" width="180"/>
@@ -70,11 +128,17 @@ const dictStore = useDictStore();
 const baseUrl = import.meta.env.VITE_API_BASE_URL
 
 const loading = ref(false)
+const dateRange = ref<[Date, Date] | null>(null)
 
 const page = reactive({
   dto: {
     currentPage: 1,
-    pageSize: 10
+    pageSize: 10,
+    recordSource: undefined,
+    recordCategory: undefined,
+    recordType: undefined,
+    recordStartDate: undefined,
+    recordEndDate: undefined
   } as BookkeepingPageDto,
   total: 0,
   list: [] as Array<BookkeepingListData>
@@ -127,6 +191,18 @@ const handleCurrentChange = (val: number) => {
   searchPage()
 }
 
+const handleDateChange = (val: [Date, Date] | null) => {
+  if (val && val.length === 2) {
+    page.dto.recordStartDate = val[0].toISOString().split('T')[0]
+    page.dto.recordEndDate = val[1].toISOString().split('T')[0]
+  } else {
+    page.dto.recordStartDate = undefined
+    page.dto.recordEndDate = undefined
+  }
+  page.dto.currentPage = 1
+  searchPage()
+}
+
 const handleImport = async (options: any) => {
   const formData = new FormData()
   formData.append('file', options.file)
@@ -147,3 +223,15 @@ const handleImport = async (options: any) => {
   }
 }
 </script>
+
+<style scoped>
+.date-picker-width :deep(.el-input) {
+  width: 100%;
+}
+
+:deep(.el-input),
+:deep(.el-select) {
+  width: 100%;
+}
+</style>
+

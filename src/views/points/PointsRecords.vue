@@ -4,9 +4,9 @@
       <el-button type="primary" @click="searchPage">刷新</el-button>
     </div>
 
-    <div style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center;">
+    <div style="margin-bottom: 16px;">
       <el-row>
-        <el-col :span="8">
+        <el-col :span="3">
           <el-input
               v-model="page.dto.source"
               placeholder="搜索积分来源"
@@ -15,7 +15,7 @@
               @change="searchPage"
           />
         </el-col>
-        <el-col :span="8">
+        <el-col :span="3">
           <el-select
               v-model="page.dto.transactionType"
               placeholder="积分变动类型"
@@ -27,7 +27,7 @@
             <el-option label="扣减" :value="2"/>
           </el-select>
         </el-col>
-        <el-col :span="8">
+        <el-col :span="6">
           <el-date-picker
               v-model="dateRange"
               type="daterange"

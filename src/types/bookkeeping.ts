@@ -10,8 +10,11 @@ export type BookkeepingListData =  {
 export type BookkeepingPageDto = {
     currentPage: number,
     pageSize: number,
-    recordStartDate?: Date,
-    recordEndDate?: Date
+    recordStartDate?: string,
+    recordEndDate?: string,
+    recordSource?: string,
+    recordType?: number,
+    recordCategory?: number
 }
 
 export type BookkeepingAddDto = {
