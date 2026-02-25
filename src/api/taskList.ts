@@ -1,4 +1,5 @@
 import request from "@/api/request"
+import type { TaskRecordsPageDto, TaskRecordsPageVo, PageResponse } from "@/types/task"
 
 // 通用响应类型
 export interface GeneralResponse<T> {
@@ -119,4 +120,14 @@ export const getTaskGroupMoveList = () => {
     url: '/points-service/points/task/group/moveList',
     method: 'get'
   })
-} 
+}
+
+// 任务记录分页查询
+export const queryTaskRecordsPage = (data: TaskRecordsPageDto) => {
+  return request<GeneralResponse<PageResponse<TaskRecordsPageVo>>>({
+    url: '/points-service/points/task/basics/page',
+    method: 'post',
+    data
+  })
+}
+ 
