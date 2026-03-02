@@ -94,6 +94,11 @@ const router = createRouter({
                     path: '/account',
                     name: '账号管理',
                     component: () => import('@/views/account/AccountManagement.vue')
+                },
+                {
+                    path: '/website/navigation',
+                    name: '网站管理',
+                    component: () => import('@/views/website/WebsiteManagement.vue')
                 }
             ]
         }

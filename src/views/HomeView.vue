@@ -106,6 +106,10 @@
                 <el-icon><SvgIcon dir="home"  name="account-manage" /></el-icon>
                 <span>账号管理</span>
               </el-menu-item>
+              <el-menu-item index="/website/navigation">
+                <el-icon><SvgIcon dir="home" name="dict-manage" /></el-icon>
+                <span>网站管理</span>
+              </el-menu-item>
             </el-sub-menu>
 
           </el-menu>
