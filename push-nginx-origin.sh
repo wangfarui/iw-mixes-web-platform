@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 初始化变量
-SOURCE_DIR="/Users/wangfarui/workspaces/wfr/iw-mixes-web-platform" # 源服务器目录
+SOURCE_DIR="/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform" # 源服务器目录
 SOURCE_FILE="dist" # 拷贝的文件或目录
 TARGET_DIR="iw-mixes-web-platform" # 目标服务器目录
 

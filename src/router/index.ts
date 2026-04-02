@@ -71,6 +71,11 @@ const router = createRouter({
                     component: () => import('@/views/task/TaskRecords.vue')
                 },
                 {
+                    path: '/ai/session-task',
+                    name: 'AI会话任务',
+                    component: () => import('@/views/ai-session/AiSessionHub.vue')
+                },
+                {
                     path: '/points/records',
                     name: '积分记录',
                     component: () => import('@/views/points/PointsRecords.vue')

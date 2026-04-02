@@ -82,6 +82,10 @@
                 <el-icon><SvgIcon dir="home" name="task-records" /></el-icon>
                 <span>任务记录</span>
               </el-menu-item>
+              <el-menu-item index="/ai/session-task">
+                <el-icon><SvgIcon dir="home" name="task-manage" /></el-icon>
+                <span>AI会话任务</span>
+              </el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="4">
               <template #title>
