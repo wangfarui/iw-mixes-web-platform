@@ -120,13 +120,13 @@
                 <el-icon><Operation /></el-icon>
                 <span>工具箱</span>
               </template>
-              <el-menu-item index="/tools/text-diff">
-                <el-icon><DocumentCopy /></el-icon>
-                <span>文本比对</span>
-              </el-menu-item>
-              <el-menu-item index="/tools/number-generator">
-                <el-icon><Operation /></el-icon>
-                <span>编号生成器</span>
+              <el-menu-item
+                v-for="tool in toolCatalog"
+                :key="tool.routePath"
+                :index="tool.routePath"
+              >
+                <el-icon><component :is="tool.icon" /></el-icon>
+                <span>{{ tool.menuTitle }}</span>
               </el-menu-item>
             </el-sub-menu>
 
@@ -228,14 +228,14 @@ import {
   Expand,
   Fold,
   HomeFilled,
-  Operation,
-  DocumentCopy
+  Operation
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
 import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
 import versionPollingService from '@/services/versionPollingService'
+import { toolCatalog } from '@/router/toolCatalog'
 
 const {proxy} = getCurrentInstance()!;
 
