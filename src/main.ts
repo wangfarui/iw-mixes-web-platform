@@ -29,6 +29,10 @@ router.beforeEach((to, from, next) => {
         next();
         return;
     }
+    if (to.meta.public === true) {
+        next();
+        return;
+    }
     if (window.sessionStorage.getItem("iwtoken")) {
         //说明用户已经登录
         // 检查并启动版本号轮询

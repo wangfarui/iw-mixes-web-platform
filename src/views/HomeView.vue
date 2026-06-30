@@ -115,6 +115,16 @@
                 <span>网站管理</span>
               </el-menu-item>
             </el-sub-menu>
+            <el-sub-menu index="6">
+              <template #title>
+                <el-icon><Operation /></el-icon>
+                <span>工具箱</span>
+              </template>
+              <el-menu-item index="/tools/text-diff">
+                <el-icon><DocumentCopy /></el-icon>
+                <span>文本比对</span>
+              </el-menu-item>
+            </el-sub-menu>
 
           </el-menu>
         </el-aside>
@@ -213,7 +223,9 @@ import {
   SwitchButton,
   Expand,
   Fold,
-  HomeFilled
+  HomeFilled,
+  Operation,
+  DocumentCopy
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
 import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";
