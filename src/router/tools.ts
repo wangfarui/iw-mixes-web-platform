@@ -19,6 +19,16 @@ export const toolRoutes: RouteRecordRaw = {
                 tool: true,
                 title: '文本比对 / Diff 工具'
             }
+        },
+        {
+            path: 'number-generator',
+            name: '编号生成器',
+            component: () => import('@/views/number-generator/NumberGeneratorTool.vue'),
+            meta: {
+                public: true,
+                tool: true,
+                title: '编号生成器'
+            }
         }
     ]
 }

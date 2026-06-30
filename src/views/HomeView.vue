@@ -124,6 +124,10 @@
                 <el-icon><DocumentCopy /></el-icon>
                 <span>文本比对</span>
               </el-menu-item>
+              <el-menu-item index="/tools/number-generator">
+                <el-icon><Operation /></el-icon>
+                <span>编号生成器</span>
+              </el-menu-item>
             </el-sub-menu>
 
           </el-menu>
