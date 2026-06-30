@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-`iw-mixes-web-platform` 是 IW 系统的 Web 管理平台，面向桌面端管理和数据维护场景。当前覆盖餐食、菜品、记账记录、任务、积分、字典、账号、网站导航、AI 会话任务等模块，通过后端网关访问 `../iw-mixes`。
+`iw-mixes-web-platform` 是 IW 系统的 Web 管理平台，面向桌面端管理和数据维护场景。当前覆盖餐食、菜品、记账记录、任务、积分、字典、账号、网站导航、AI 会话任务等模块，通过后端兼容入口访问 `../iw-mixes-server`。
 
 Web 端开发重点是：清晰的路由、稳定的表格/表单/详情交互、类型一致、API 路径正确、和小程序端共享同一后端语义。
 
@@ -69,6 +69,8 @@ Vite proxy 在 `vite.config.ts`：
 - `/bookkeeping-service` -> `http://localhost:18000`
 - `/points-service` -> `http://localhost:18000`
 
+本地 `18000` 由 `iw-mixes-server` 的 `iw-core` dev profile 兼容旧入口前缀。生产环境由 Nginx 转发到 `iw-core` 或 `iw-external`；Web 端 API 路径仍保留 `/auth-service`、`/bookkeeping-service`、`/eat-service`、`/points-service`、`/external-service` 前缀。
+
 API 文件按业务域组织：
 
 - `src/api/login.ts`
@@ -92,7 +94,7 @@ API 文件按业务域组织：
 - `GET /api/local/claude-sessions`
 - `GET /api/local/codex-sessions`
 
-它们由 Vite middleware 读取本机 Claude/Codex 会话草稿，不是后端 `iw-mixes` API。修改 AI 会话页面时，要区分这类本地开发接口和真实网关接口。
+它们由 Vite middleware 读取本机 Claude/Codex 会话草稿，不是后端 `iw-mixes-server` API。修改 AI 会话页面时，要区分这类本地开发接口和真实后端兼容入口。
 
 ## 页面开发流程
 
@@ -137,4 +139,3 @@ npm run preview
 - 调整公共请求封装会影响所有页面，要优先做全局回归思考。
 - 页面新增字段时，同步检查 `src/types`、表格列、表单项、详情显示、API 入参出参。
 - 复杂 UI 改动完成后，优先用 `npm run type-check` 和 `npm run build` 验证。
-
