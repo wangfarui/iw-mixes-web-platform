@@ -726,10 +726,7 @@
               action="/auth-service/file/upload"
               name="file"
               :show-file-list="false"
-              :before-upload="(file) => {
-                handleImageUpload(file)
-                return false
-              }"
+              :before-upload="beforeImageUpload"
             >
               <el-button type="primary" :loading="isUploading">
                 <el-icon><Upload /></el-icon>
@@ -752,10 +749,7 @@
                 action="/auth-service/file/upload"
                 name="file"
                 :show-file-list="false"
-                :before-upload="(file) => {
-                  handleImageUpload(file)
-                  return false
-                }"
+                :before-upload="beforeImageUpload"
               >
               </el-upload>
             </div>
@@ -1084,7 +1078,7 @@ import {
   Picture
 } from '@element-plus/icons-vue'
 import type { TaskGroup } from '@/types/types'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance, FormRules, UploadRawFile } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
 import { 
@@ -1097,9 +1091,11 @@ import {
   renameTaskGroup,
   deleteTaskGroup,
   getTaskGroupMoveList,
+  type GeneralResponse,
   type TaskGroupListVo, 
   type StatisticsLatestTaskNumVo, 
   type TaskBasicsVo,
+  type TaskFileVo,
   type TaskGroupMoveListVo 
 } from '@/api/taskList'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -1154,6 +1150,7 @@ interface SubGroup {
   id: string;
   name: string;
   tasks: TaskBasicsVo[];
+  parentId?: string;
   loading?: boolean;
   showNewTaskInput?: boolean;
   newTaskName?: string;
@@ -1516,7 +1513,9 @@ const selectTask = async (task: TaskBasicsVo) => {
 }
 
 const handleTaskDetail = async (taskId: number) => {
-  const res = await request.get(`/points-service/points/task/basics/detail?id=${taskId}`)
+  const res = await request.get<unknown, GeneralResponse<TaskBasicsVo>>(`/points-service/points/task/basics/detail?id=${taskId}`)
+  if (!selectedTask.value) return
+
   selectedTask.value = {
     ...selectedTask.value,
     taskRemark: res.data.taskRemark,
@@ -2820,7 +2819,7 @@ const savePoints = async () => {
   if (!currentTaskForPoints.value) return
   
   try {
-    const res = await request.post('/bookkeeping-service/points/task/relation/save', {
+    const res = await request.post<unknown, GeneralResponse<{ msg?: string }>>('/bookkeeping-service/points/task/relation/save', {
       taskId: currentTaskForPoints.value.id,
       rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
       punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
@@ -2893,6 +2892,11 @@ const isTaskDetailVisible = ref(false)
 const taskImages = ref<string[]>([])
 const isUploading = ref(false)
 
+const beforeImageUpload = (file: UploadRawFile) => {
+  handleImageUpload(file)
+  return false
+}
+
 // 添加图片上传相关的方法
 const handleImageUpload = async (file: File) => {
   try {
@@ -2916,7 +2920,9 @@ const handleImageUpload = async (file: File) => {
       await request.post('/points-service/points/task/basics/addFile', fileData)
       
       // 重新获取任务详情以更新文件列表
-      await handleTaskDetail(selectedTask.value?.id)
+      if (selectedTask.value?.id) {
+        await handleTaskDetail(selectedTask.value.id)
+      }
      
       ElMessage.success('图片上传成功')
     }
@@ -2956,14 +2962,16 @@ const handleDragOver = (event: DragEvent) => {
 }
 
 // 添加删除文件的方法
-const handleDeleteFile = async (file: any) => {
+const handleDeleteFile = async (file: TaskFileVo) => {
   await request.post('/points-service/points/task/basics/deleteFile', {
     taskId: selectedTask.value?.id,
     fileUrl: file.fileUrl
   })
   
   // 重新获取任务详情以更新文件列表
-  await handleTaskDetail(selectedTask.value?.id)
+  if (selectedTask.value?.id) {
+    await handleTaskDetail(selectedTask.value.id)
+  }
   
   ElMessage.success('删除成功')
 }

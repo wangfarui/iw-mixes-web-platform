@@ -12,6 +12,10 @@ export interface TaskRecordsPageDto {
   pageSize: number
   taskStatus?: TaskStatusEnum
   taskName?: string
+  startDeadlineDate?: string
+  endDeadlineDate?: string
+  startDoneTime?: string
+  endDoneTime?: string
 }
 
 // 任务记录分页查询VO
@@ -21,8 +25,10 @@ export interface TaskRecordsPageVo {
   taskName: string
   taskRemark?: string
   taskStatus: number
+  createTime?: string
   deadlineDate?: string
   deadlineTime?: string
+  doneTime?: string
 }
 
 // 分页响应

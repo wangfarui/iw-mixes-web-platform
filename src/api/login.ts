@@ -1,7 +1,7 @@
 import request from "@/api/request";
 import {
 	useDictStore
-} from "@/stores/dict.ts";
+} from "@/stores/dict";
 import type {UserLoginVO, UserPasswordEditDto} from "@/types/types";
 
 

@@ -1,4 +1,5 @@
 import request from "@/api/request"
+import type { AxiosRequestConfig } from "axios"
 import type { TaskRecordsPageDto, TaskRecordsPageVo, PageResponse } from "@/types/task"
 
 // 通用响应类型
@@ -6,6 +7,10 @@ export interface GeneralResponse<T> {
   code: number;
   message: string;
   data: T;
+}
+
+const requestApi = <T>(config: AxiosRequestConfig): Promise<GeneralResponse<T>> => {
+  return request<GeneralResponse<T>, GeneralResponse<T>>(config)
 }
 
 // 任务分组返回类型
@@ -28,7 +33,7 @@ export interface StatisticsLatestTaskNumVo {
 
 // 添加任务清单分组
 export const addTaskGroup = (data: { groupName: string; parentId?: string }) => {
-  return request<GeneralResponse<number>>({
+  return requestApi<number>({
     url: '/points-service/points/task/group/add',
     method: 'post',
     data
@@ -37,7 +42,7 @@ export const addTaskGroup = (data: { groupName: string; parentId?: string }) => 
 
 // 获取任务清单分组列表
 export const getTaskGroupList = (parentId?: string) => {
-  return request<GeneralResponse<TaskGroupListVo[]>>({
+  return requestApi<TaskGroupListVo[]>({
     url: '/points-service/points/task/group/list' + (parentId ? `?parentId=${parentId}` : ''),
     method: 'get'
   })
@@ -45,7 +50,7 @@ export const getTaskGroupList = (parentId?: string) => {
 
 // 获取分组数量统计
 export const getTaskGroupStatistics = (): Promise<GeneralResponse<StatisticsLatestTaskNumVo>> => {
-  return request<GeneralResponse<StatisticsLatestTaskNumVo>>({
+  return requestApi<StatisticsLatestTaskNumVo>({
     url: '/points-service/points/task/group/statisticsLatestTaskNum',
     method: 'get'
   })
@@ -57,17 +62,27 @@ export interface TaskBasicsVo {
   taskName: string;
   taskRemark?: string;
   taskGroupId: number;
-  deadlineDate?: string;
+  deadlineDate?: string | null;
   priority?: number;
   isTop?: number;
   completed?: boolean;
   taskStatus?: number;
   sort?: number;
+  rewardPoints?: number;
+  punishPoints?: number;
+  fileList?: TaskFileVo[];
+}
+
+export interface TaskFileVo {
+  id?: number;
+  taskId?: number;
+  fileName?: string;
+  fileUrl: string;
 }
 
 // 获取任务列表
 export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, endDeadlineDate?: string, isDeadline?: boolean) => {
-  return request<GeneralResponse<TaskBasicsVo[]>>({
+  return requestApi<TaskBasicsVo[]>({
     url: '/points-service/points/task/basics/list',
     method: 'post',
     data: { 
@@ -82,7 +97,7 @@ export const getTaskList = (taskGroupId: string, startDeadlineDate?: string, end
 
 // 创建任务
 export const addTask = (data: { taskName: string; taskGroupId: number; deadlineDate?: string | null }) => {
-  return request<GeneralResponse<void>>({
+  return requestApi<void>({
     url: '/points-service/points/task/basics/add',
     method: 'post',
     data
@@ -91,17 +106,25 @@ export const addTask = (data: { taskName: string; taskGroupId: number; deadlineD
 
 // 更新任务
 export const updateTask = (params: TaskBasicsVo) => {
-  return request.put('/points-service/points/task/basics/update', params)
+  return requestApi<void>({
+    url: '/points-service/points/task/basics/update',
+    method: 'put',
+    data: params
+  })
 }
 
 // 重命名分组
 export const renameTaskGroup = (params: { id: number, groupName: string }) => {
-  return request.put('/points-service/points/task/group/update', params)
+  return requestApi<void>({
+    url: '/points-service/points/task/group/update',
+    method: 'put',
+    data: params
+  })
 }
 
 // 删除分组
 export const deleteTaskGroup = (id: number) => {
-  return request<GeneralResponse<void>>({
+  return requestApi<void>({
     url: `/points-service/points/task/group/delete?id=${id}`,
     method: 'delete'
   })
@@ -116,7 +139,7 @@ export interface TaskGroupMoveListVo {
 
 // 获取移动清单列表
 export const getTaskGroupMoveList = () => {
-  return request<GeneralResponse<TaskGroupMoveListVo[]>>({
+  return requestApi<TaskGroupMoveListVo[]>({
     url: '/points-service/points/task/group/moveList',
     method: 'get'
   })
@@ -124,10 +147,9 @@ export const getTaskGroupMoveList = () => {
 
 // 任务记录分页查询
 export const queryTaskRecordsPage = (data: TaskRecordsPageDto) => {
-  return request<GeneralResponse<PageResponse<TaskRecordsPageVo>>>({
+  return requestApi<PageResponse<TaskRecordsPageVo>>({
     url: '/points-service/points/task/basics/page',
     method: 'post',
     data
   })
 }
- 

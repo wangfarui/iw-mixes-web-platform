@@ -157,9 +157,9 @@ import {
   viewPasswordById
 } from "@/api/applicationAccount"
 import SvgIcon from "@/components/SvgIcon.vue";
-import {ElMessage, FormInstance} from "element-plus";
+import {ElMessage} from "element-plus";
 import {useDictStore} from "@/stores/dict";
-import type { TabsPaneContext } from 'element-plus'
+import type { FormInstance, TabsPaneContext } from 'element-plus'
 
 const dictStore = useDictStore();
 
