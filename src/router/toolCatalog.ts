@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, Memo, Operation, Picture, Switch } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -133,6 +133,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['image', 'compress', 'ascii', 'photo', 'pixel', '图片', '压缩', '证件照', '换底色', '像素风'],
         icon: Picture,
         component: () => import('@/views/image-processor/ImageProcessorTool.vue')
+    },
+    {
+        path: 'document-converter',
+        routePath: '/tools/document-converter',
+        routeName: '文档转换工具',
+        title: '文档转换工具',
+        menuTitle: '文档转换',
+        description: '本地处理 Word、Excel、PPT、PDF、文本和图片，支持提取、转换、拆分、合并和打包下载。',
+        category: 'work',
+        scenarios: ['文档转文本', '表格转 JSON/CSV', 'PDF 拆分合并', 'PPT 大纲提取', '图片转 PDF'],
+        tags: ['本地处理', '不上传', 'Worker'],
+        keywords: ['document', 'converter', 'word', 'excel', 'ppt', 'pdf', 'docx', 'xlsx', 'pptx', 'csv', '文档', '转换', '拆分', '合并'],
+        icon: Memo,
+        component: () => import('@/views/document-converter/DocumentConverterTool.vue')
     },
     {
         path: 'color-picker',

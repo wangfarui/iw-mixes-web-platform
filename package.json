@@ -17,6 +17,7 @@
     "test:color-picker": "node scripts/testColorPicker.mjs",
     "test:image-processor": "node scripts/testImageProcessor.mjs",
     "test:text-playground": "node scripts/testTextPlayground.mjs",
+    "test:document-converter": "node scripts/testDocumentConverter.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
@@ -26,11 +27,15 @@
     "diff": "^9.0.0",
     "element-plus": "^2.7.1",
     "fflate": "^0.8.2",
+    "mammoth": "^1.12.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^3.11.174",
     "pinia": "^2.1.7",
     "spark-md5": "^3.0.2",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
-    "vuedraggable": "^4.1.0"
+    "vuedraggable": "^4.1.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
