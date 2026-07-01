@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { DocumentCopy, MagicStick, Operation } from '@element-plus/icons-vue'
+import { DataLine, DocumentCopy, MagicStick, Operation } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -38,6 +38,17 @@ export const toolCatalog: ToolCatalogItem[] = [
         tags: ['本地生成', '不上传'],
         icon: Operation,
         component: () => import('@/views/number-generator/NumberGeneratorTool.vue')
+    },
+    {
+        path: 'calculator',
+        routePath: '/tools/calculator',
+        routeName: '全能计算器',
+        title: '全能计算器',
+        menuTitle: '全能计算器',
+        description: '计算表达式、贷款月供、年终奖个税、单位和汇率换算。',
+        tags: ['本地计算', '不上传'],
+        icon: DataLine,
+        component: () => import('@/views/calculator/CalculatorTool.vue')
     },
     {
         path: 'formatter',

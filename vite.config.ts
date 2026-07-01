@@ -107,6 +107,10 @@ export default ({ command, mode }: any) => {
         '/points-service': {
           target: 'http://localhost:18000',
           changeOrigin: true
+        },
+        '/external-service': {
+          target: 'http://localhost:18000',
+          changeOrigin: true
         }
       }
     },

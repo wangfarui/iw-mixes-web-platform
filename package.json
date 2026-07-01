@@ -11,12 +11,14 @@
     "build-only": "vite build --mode prod",
     "test:text-diff": "node scripts/testTextDiff.mjs",
     "test:number-generator": "node scripts/testNumberGenerator.mjs",
+    "test:calculator": "node scripts/testCalculator.mjs",
     "test:formatter": "node scripts/testFormatter.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
     "axios": "^1.6.8",
+    "decimal.js": "^10.6.0",
     "diff": "^9.0.0",
     "element-plus": "^2.7.1",
     "pinia": "^2.1.7",
