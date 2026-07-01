@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { ChatDotRound, DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -133,6 +133,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['image', 'compress', 'ascii', 'photo', 'pixel', '图片', '压缩', '证件照', '换底色', '像素风'],
         icon: Picture,
         component: () => import('@/views/image-processor/ImageProcessorTool.vue')
+    },
+    {
+        path: 'color-picker',
+        routePath: '/tools/color-picker',
+        routeName: '颜色选择工具',
+        title: '颜色选择工具',
+        menuTitle: '颜色选择',
+        description: '选择、解析和转换颜色，支持 CSS 色值、可读性检查和本地图片像素取色。',
+        category: 'creative',
+        scenarios: ['UI 配色', 'CSS 调试', '图片取色', '设计稿还原', '颜色格式转换'],
+        tags: ['本地处理', '不上传', 'Canvas'],
+        keywords: ['color', 'picker', 'hex', 'rgb', 'rgba', 'hsl', 'cmyk', 'css', 'pixel', '颜色', '取色', '像素'],
+        icon: Brush,
+        component: () => import('@/views/color-picker/ColorPickerTool.vue')
     },
     {
         path: 'text-playground',

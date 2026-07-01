@@ -14,6 +14,7 @@
     "test:calculator": "node scripts/testCalculator.mjs",
     "test:formatter": "node scripts/testFormatter.mjs",
     "test:encoding-converter": "node scripts/testEncodingConverter.mjs",
+    "test:color-picker": "node scripts/testColorPicker.mjs",
     "test:image-processor": "node scripts/testImageProcessor.mjs",
     "test:text-playground": "node scripts/testTextPlayground.mjs",
     "type-check": "vue-tsc --build --force"
