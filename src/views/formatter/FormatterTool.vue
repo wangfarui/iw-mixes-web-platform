@@ -7,6 +7,7 @@
         <span class="privacy-copy">支持 JSON、XML、SQL、Properties、YAML、HTML、CSS、JavaScript、Markdown。</span>
       </div>
       <div class="topbar-actions">
+        <ToolHomeButton />
         <el-switch
           :model-value="historyEnabled"
           active-text="历史"
@@ -382,6 +383,7 @@ import {
   Upload
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ToolHomeButton from '@/views/tools/components/ToolHomeButton.vue'
 import FormatterWorker from '@/workers/formatter.worker?worker'
 import type {
   FormatterConversionResult,

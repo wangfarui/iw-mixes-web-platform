@@ -7,6 +7,7 @@
         <span class="privacy-copy">身份证编号仅用于正则、日期和校验位测试。</span>
       </div>
       <div class="topbar-actions">
+        <ToolHomeButton />
         <el-button type="primary" @click="handleGenerate">
           <el-icon><MagicStick /></el-icon>
           生成
@@ -476,6 +477,7 @@ import {
   RefreshRight
 } from '@element-plus/icons-vue'
 import {ElMessage} from 'element-plus'
+import ToolHomeButton from '@/views/tools/components/ToolHomeButton.vue'
 import type {
   GeneratedNumberRecord,
   NumberExportFormat,

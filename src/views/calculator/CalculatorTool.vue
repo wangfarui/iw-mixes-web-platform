@@ -7,6 +7,7 @@
         <span class="privacy-copy">汇率可实时查询，个税为当前内置规则估算。</span>
       </div>
       <div class="topbar-actions">
+        <ToolHomeButton />
         <el-button :disabled="!currentSnapshot" @click="copyCurrentResult">
           <el-icon><CopyDocument /></el-icon>
           复制
@@ -533,6 +534,7 @@ import {
   RefreshRight,
   Switch as SwitchIcon
 } from '@element-plus/icons-vue'
+import ToolHomeButton from '@/views/tools/components/ToolHomeButton.vue'
 import type {
   BasicCalculationResult,
   CalculatorExportFormat,

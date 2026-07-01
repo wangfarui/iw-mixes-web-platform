@@ -10,6 +10,7 @@
         <span class="privacy-copy">所有比对均在本机浏览器完成，默认不保存历史。</span>
       </div>
       <div class="topbar-actions">
+        <ToolHomeButton />
         <el-switch
           :model-value="settings.theme === 'dark'"
           inline-prompt
@@ -623,6 +624,7 @@ import {
   Upload
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ToolHomeButton from '@/views/tools/components/ToolHomeButton.vue'
 import TextDiffWorker from '@/workers/textDiff.worker?worker'
 import type {
   DiffResult,
