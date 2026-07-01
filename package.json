@@ -15,6 +15,7 @@
     "test:formatter": "node scripts/testFormatter.mjs",
     "test:encoding-converter": "node scripts/testEncodingConverter.mjs",
     "test:image-processor": "node scripts/testImageProcessor.mjs",
+    "test:text-playground": "node scripts/testTextPlayground.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
+import { ChatDotRound, DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -133,6 +133,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['image', 'compress', 'ascii', 'photo', 'pixel', '图片', '压缩', '证件照', '换底色', '像素风'],
         icon: Picture,
         component: () => import('@/views/image-processor/ImageProcessorTool.vue')
+    },
+    {
+        path: 'text-playground',
+        routePath: '/tools/text-playground',
+        routeName: '文字游戏工坊',
+        title: '文字游戏工坊',
+        menuTitle: '文字游戏',
+        description: '生成藏头诗、随机语录、火星文/反犬文转换和弹幕滚动屏。',
+        category: 'creative',
+        scenarios: ['藏头诗', '彩虹屁', '毒鸡汤', '火星文', '弹幕投屏'],
+        tags: ['本地生成', '不上传'],
+        keywords: ['text', 'playground', 'poem', 'quote', 'mars', 'danmaku', '藏头诗', '彩虹屁', '毒鸡汤', '火星文', '反犬文', '弹幕'],
+        icon: ChatDotRound,
+        component: () => import('@/views/text-playground/TextPlaygroundTool.vue')
     },
     {
         path: 'ip-lookup',
