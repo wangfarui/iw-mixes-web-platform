@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { DataLine, DocumentCopy, Location, MagicStick, Operation, Switch } from '@element-plus/icons-vue'
+import { DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -119,6 +119,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['encode', 'decode', 'url', 'base64', 'unicode', 'html', 'hex', 'hash', 'md5', 'sha', '编码', '解码'],
         icon: Switch,
         component: () => import('@/views/encoding-converter/EncodingConverterTool.vue')
+    },
+    {
+        path: 'image-processor',
+        routePath: '/tools/image-processor',
+        routeName: '图片处理工具',
+        title: '图片处理工具',
+        menuTitle: '图片处理',
+        description: '本地完成图片压缩、ASCII 字符画、证件照换底色和像素风生成。',
+        category: 'creative',
+        scenarios: ['图片压缩', '字符画生成', '证件照底色处理', '像素风头像'],
+        tags: ['本地处理', '不上传', 'Canvas'],
+        keywords: ['image', 'compress', 'ascii', 'photo', 'pixel', '图片', '压缩', '证件照', '换底色', '像素风'],
+        icon: Picture,
+        component: () => import('@/views/image-processor/ImageProcessorTool.vue')
     },
     {
         path: 'ip-lookup',
