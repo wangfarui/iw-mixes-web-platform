@@ -13,6 +13,7 @@
     "test:number-generator": "node scripts/testNumberGenerator.mjs",
     "test:calculator": "node scripts/testCalculator.mjs",
     "test:formatter": "node scripts/testFormatter.mjs",
+    "test:encoding-converter": "node scripts/testEncodingConverter.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "diff": "^9.0.0",
     "element-plus": "^2.7.1",
     "pinia": "^2.1.7",
+    "spark-md5": "^3.0.2",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
     "vuedraggable": "^4.1.0"

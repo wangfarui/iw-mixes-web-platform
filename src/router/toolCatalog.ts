@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { DataLine, DocumentCopy, Location, MagicStick, Operation } from '@element-plus/icons-vue'
+import { DataLine, DocumentCopy, Location, MagicStick, Operation, Switch } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -105,6 +105,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['format', 'formatter', 'json', 'xml', 'sql', 'yaml', 'html', 'css', 'javascript', 'markdown', '压缩', '校验', '转换'],
         icon: MagicStick,
         component: () => import('@/views/formatter/FormatterTool.vue')
+    },
+    {
+        path: 'encoding-converter',
+        routePath: '/tools/encoding-converter',
+        routeName: '编码转换工具',
+        title: '编码转换工具',
+        menuTitle: '编码转换',
+        description: '本地完成 URL、Base64、Unicode、HTML、Hex 和 Hash 转换，支持自动识别推荐。',
+        category: 'work',
+        scenarios: ['接口调试', '日志排查', '参数解码', '摘要校验', '编码异常分析'],
+        tags: ['本地处理', '不上传', 'MD5'],
+        keywords: ['encode', 'decode', 'url', 'base64', 'unicode', 'html', 'hex', 'hash', 'md5', 'sha', '编码', '解码'],
+        icon: Switch,
+        component: () => import('@/views/encoding-converter/EncodingConverterTool.vue')
     },
     {
         path: 'ip-lookup',
