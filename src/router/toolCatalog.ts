@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { Brush, ChatDotRound, DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, Operation, Picture, Switch } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -175,5 +175,19 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['ip', 'dns', 'domain', 'host', '公网', '域名', '定位', '网络'],
         icon: Location,
         component: () => import('@/views/ip-lookup/IpLookupTool.vue')
+    },
+    {
+        path: 'network-diagnostics',
+        routePath: '/tools/network-diagnostics',
+        routeName: '网络诊断',
+        title: '网络诊断',
+        menuTitle: '网络诊断',
+        description: '从 IW 外部服务视角检查公网目标的延迟、DNS记录和HTTP响应头。',
+        category: 'work',
+        scenarios: ['网络排查', '域名解析', '响应头检查', '接口联调', '连通性测试'],
+        tags: ['公开接口', '限流保护', '不保存历史'],
+        keywords: ['network', 'ping', 'dns', 'header', 'http', 'latency', '网络诊断', '延迟', '响应头', '连通性'],
+        icon: Connection,
+        component: () => import('@/views/network-diagnostics/NetworkDiagnosticsTool.vue')
     }
 ]
