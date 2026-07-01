@@ -7,15 +7,58 @@
           <h1>工具箱</h1>
           <p>本地优先工具集合，默认不需要登录，打开后即可直接使用。</p>
         </div>
-        <el-button type="primary" @click="openFirstTool">
+        <el-button type="primary" :disabled="!firstMatchedTool" @click="openFirstTool">
           <el-icon><ArrowRight /></el-icon>
-          打开常用工具
+          {{ hasActiveFilters ? '打开匹配工具' : '打开常用工具' }}
         </el-button>
       </header>
 
-      <section class="tool-grid" aria-label="工具列表">
+      <section class="tool-filter" aria-label="工具搜索和分类">
+        <el-input
+          v-model="searchKeyword"
+          class="tool-search"
+          clearable
+          :prefix-icon="Search"
+          placeholder="搜索工具名称、场景、标签或关键字"
+          size="large"
+        />
+        <div class="category-filter" role="tablist" aria-label="工具分类">
+          <button
+            class="category-filter-button"
+            :class="{ active: activeCategory === 'all' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'all'"
+            @click="activeCategory = 'all'"
+          >
+            全部
+          </button>
+          <button
+            v-for="summary in visibleCategorySummaries"
+            :key="summary.category.key"
+            class="category-filter-button"
+            :class="{ active: activeCategory === summary.category.key }"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === summary.category.key"
+            @click="activeCategory = summary.category.key"
+          >
+            {{ summary.category.title }}
+          </button>
+        </div>
+      </section>
+
+      <el-empty
+        v-if="!filteredTools.length"
+        class="empty-state"
+        description="没有匹配的工具"
+      >
+        <el-button type="primary" @click="clearFilters">查看全部工具</el-button>
+      </el-empty>
+
+      <section v-else class="tool-grid" aria-label="工具列表">
         <button
-          v-for="tool in toolCatalog"
+          v-for="tool in filteredTools"
           :key="tool.routePath"
           class="tool-card"
           data-testid="tool-card"
@@ -27,7 +70,7 @@
             <span class="tool-icon">
               <el-icon :size="24"><component :is="tool.icon" /></el-icon>
             </span>
-            <span class="tool-state">可用</span>
+            <span class="tool-state">{{ getToolCategoryTitle(tool) }}</span>
           </div>
           <h2>{{ tool.title }}</h2>
           <p>{{ tool.description }}</p>
@@ -53,16 +96,90 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight } from '@element-plus/icons-vue'
-import { toolCatalog } from '@/router/toolCatalog'
+import { ArrowRight, Search } from '@element-plus/icons-vue'
+import {
+  toolCatalog,
+  toolCategories,
+  type ToolCatalogItem,
+  type ToolCategoryItem,
+  type ToolCategoryKey
+} from '@/router/toolCatalog'
+
+type CategoryFilter = ToolCategoryKey | 'all'
+
+interface CategorySummary {
+  category: ToolCategoryItem
+  count: number
+}
 
 const router = useRouter()
+const searchKeyword = ref('')
+const activeCategory = ref<CategoryFilter>('all')
+
+const categoryMap = new Map(toolCategories.map((category) => [category.key, category]))
+
+const visibleCategorySummaries = computed<CategorySummary[]>(() => {
+  return toolCategories
+    .map((category) => ({
+      category,
+      count: toolCatalog.filter((tool) => tool.category === category.key).length
+    }))
+    .filter((summary) => summary.count > 0)
+})
+
+const normalizedKeyword = computed(() => searchKeyword.value.trim().toLowerCase())
+
+const hasActiveFilters = computed(() => {
+  return Boolean(normalizedKeyword.value) || activeCategory.value !== 'all'
+})
+
+const getToolCategory = (tool: ToolCatalogItem): ToolCategoryItem | undefined => {
+  return categoryMap.get(tool.category)
+}
+
+const getToolCategoryTitle = (tool: ToolCatalogItem): string => {
+  return getToolCategory(tool)?.title || '未分类'
+}
+
+const matchesKeyword = (tool: ToolCatalogItem): boolean => {
+  const keyword = normalizedKeyword.value
+  if (!keyword) {
+    return true
+  }
+
+  const searchableText = [
+    tool.title,
+    tool.menuTitle,
+    tool.routeName,
+    tool.description,
+    ...tool.scenarios,
+    ...tool.tags,
+    ...tool.keywords,
+    getToolCategoryTitle(tool)
+  ].join(' ').toLowerCase()
+
+  return searchableText.includes(keyword)
+}
+
+const filteredTools = computed(() => {
+  return toolCatalog.filter((tool) => {
+    const matchesCategory = activeCategory.value === 'all' || tool.category === activeCategory.value
+    return matchesCategory && matchesKeyword(tool)
+  })
+})
+
+const firstMatchedTool = computed(() => filteredTools.value[0])
+
+const clearFilters = () => {
+  searchKeyword.value = ''
+  activeCategory.value = 'all'
+}
 
 const openFirstTool = () => {
-  const [firstTool] = toolCatalog
-  if (firstTool) {
-    router.push(firstTool.routePath)
+  if (firstMatchedTool.value) {
+    router.push(firstMatchedTool.value.routePath)
   }
 }
 </script>
@@ -115,6 +232,55 @@ const openFirstTool = () => {
   color: #5b6472;
   font-size: 15px;
   line-height: 1.7;
+}
+
+.tool-filter {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding-top: 18px;
+}
+
+.tool-search {
+  min-width: 0;
+}
+
+.category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.category-filter-button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.category-filter-button:hover,
+.category-filter-button:focus-visible {
+  border-color: #409eff;
+  outline: none;
+}
+
+.category-filter-button.active {
+  color: #ffffff;
+  background: #1f7a55;
+  border-color: #1f7a55;
+}
+
+.empty-state {
+  margin-top: 24px;
+  padding: 40px 0;
+  background: #ffffff;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
 }
 
 .tool-grid {
@@ -206,7 +372,7 @@ const openFirstTool = () => {
   font-weight: 700;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .tools-home-shell {
     width: min(100% - 28px, 1120px);
     padding: 24px 0;
@@ -219,6 +385,18 @@ const openFirstTool = () => {
 
   .tools-home-header h1 {
     font-size: 28px;
+  }
+
+  .tool-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .category-filter {
+    justify-content: flex-start;
+  }
+
+  .category-filter-button {
+    flex: 1 1 84px;
   }
 
   .tool-grid {
