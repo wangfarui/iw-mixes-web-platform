@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { DataLine, DocumentCopy, MagicStick, Operation } from '@element-plus/icons-vue'
+import { DataLine, DocumentCopy, Location, MagicStick, Operation } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -60,5 +60,16 @@ export const toolCatalog: ToolCatalogItem[] = [
         tags: ['本地处理', '不上传'],
         icon: MagicStick,
         component: () => import('@/views/formatter/FormatterTool.vue')
+    },
+    {
+        path: 'ip-lookup',
+        routePath: '/tools/ip-lookup',
+        routeName: 'IP地址解析',
+        title: 'IP 地址解析',
+        menuTitle: 'IP 地址解析',
+        description: '查询当前公网 IP，或解析公网 IP、域名、URL Host 的 DNS 与定位信息。',
+        tags: ['公开接口', '本地历史'],
+        icon: Location,
+        component: () => import('@/views/ip-lookup/IpLookupTool.vue')
     }
 ]
