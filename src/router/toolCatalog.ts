@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { DocumentCopy, Operation } from '@element-plus/icons-vue'
+import { DocumentCopy, MagicStick, Operation } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -38,5 +38,16 @@ export const toolCatalog: ToolCatalogItem[] = [
         tags: ['本地生成', '不上传'],
         icon: Operation,
         component: () => import('@/views/number-generator/NumberGeneratorTool.vue')
+    },
+    {
+        path: 'formatter',
+        routePath: '/tools/formatter',
+        routeName: '格式化工具',
+        title: '格式化工具',
+        menuTitle: '格式化工具',
+        description: '格式化、压缩、校验和转换 JSON、XML、SQL、Properties、YAML、HTML、CSS、JavaScript、Markdown。',
+        tags: ['本地处理', '不上传'],
+        icon: MagicStick,
+        component: () => import('@/views/formatter/FormatterTool.vue')
     }
 ]

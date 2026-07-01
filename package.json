@@ -11,6 +11,7 @@
     "build-only": "vite build --mode prod",
     "test:text-diff": "node scripts/testTextDiff.mjs",
     "test:number-generator": "node scripts/testNumberGenerator.mjs",
+    "test:formatter": "node scripts/testFormatter.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {

@@ -604,7 +604,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   ArrowDown,
   ArrowUp,
@@ -640,6 +640,7 @@ import {
   DIFF_LIMITS,
   TEXT_FILE_EXTENSIONS
 } from '@/utils/textDiff/config'
+import { FORMATTER_DIFF_PAYLOAD_KEY } from '@/utils/formatter/config'
 import { applyPreprocessAction } from '@/utils/textDiff/preprocess'
 import {
   buildDisplayRows,
@@ -671,6 +672,13 @@ import {
 } from '@/utils/textDiff/textMetrics'
 
 type InputSide = 'old' | 'new'
+
+interface FormatterDiffPayload {
+  oldText: string
+  newText: string
+  oldFileName?: string
+  newFileName?: string
+}
 
 const preprocessItems: Array<{ action: PreprocessAction; label: string }> = [
   { action: 'json-format', label: 'JSON 格式化' },
@@ -1326,6 +1334,52 @@ const startResultResize = () => {
   window.addEventListener('mousemove', updateResizeRatio)
   window.addEventListener('mouseup', stopResize)
 }
+
+const restoreFormatterDiffPayload = () => {
+  const raw = sessionStorage.getItem(FORMATTER_DIFF_PAYLOAD_KEY)
+  if (!raw) {
+    return
+  }
+
+  sessionStorage.removeItem(FORMATTER_DIFF_PAYLOAD_KEY)
+
+  try {
+    const payload = JSON.parse(raw) as FormatterDiffPayload
+    if (typeof payload.oldText !== 'string' || typeof payload.newText !== 'string') {
+      return
+    }
+
+    oldText.value = payload.oldText
+    newText.value = payload.newText
+    oldFileInfo.value = payload.oldFileName
+      ? {
+        name: payload.oldFileName,
+        size: calculateTextMetrics(payload.oldText).bytes,
+        lines: calculateTextMetrics(payload.oldText).lines,
+        encoding: 'sessionStorage',
+        status: 'ready',
+        message: '从格式化工具导入'
+      }
+      : null
+    newFileInfo.value = payload.newFileName
+      ? {
+        name: payload.newFileName,
+        size: calculateTextMetrics(payload.newText).bytes,
+        lines: calculateTextMetrics(payload.newText).lines,
+        encoding: 'sessionStorage',
+        status: 'ready',
+        message: '从格式化工具导入'
+      }
+      : null
+    ElMessage.success('已从格式化工具载入原文和结果')
+  } catch {
+    // 忽略损坏的临时载荷
+  }
+}
+
+onMounted(() => {
+  restoreFormatterDiffPayload()
+})
 
 onBeforeUnmount(() => {
   window.clearTimeout(autoTimer)
