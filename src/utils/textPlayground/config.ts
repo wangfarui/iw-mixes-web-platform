@@ -4,10 +4,17 @@ import type {
     DanmakuColorMode,
     DanmakuSettings,
     DanmakuSpeed,
+    HomophoneScene,
+    HomophoneSettings,
     QuoteKind,
     QuoteSettings,
     QuoteTone,
+    SocialCopyLength,
+    SocialCopyMood,
+    SocialCopySettings,
     TextOption,
+    ToneRewriteMode,
+    ToneRewriteSettings,
     TransformOperation,
     TransformSettings
 } from '@/types/textPlayground'
@@ -16,6 +23,9 @@ export const MAX_ACROSTIC_HEADS = 16
 export const MAX_ACROSTIC_COUNT = 8
 export const MAX_QUOTE_COUNT = 80
 export const MAX_DANMAKU_LINES = 120
+export const MAX_HOMOPHONE_COUNT = 24
+export const MAX_SOCIAL_COPY_COUNT = 24
+export const MAX_TONE_REWRITE_COUNT = 16
 
 export const ACROSTIC_STYLE_OPTIONS: Array<TextOption<AcrosticStyle>> = [
     {label: '古风', value: 'classical', description: '偏诗意、祝词和意象'},
@@ -61,6 +71,33 @@ export const DANMAKU_COLOR_OPTIONS: Array<TextOption<DanmakuColorMode>> = [
     {label: '高对比', value: 'contrast'}
 ]
 
+export const HOMOPHONE_SCENE_OPTIONS: Array<TextOption<HomophoneScene>> = [
+    {label: '日常聊天', value: 'daily', description: '轻松、接话和冷笑话'},
+    {label: '职场摸鱼', value: 'workday', description: '会议、工位和下班梗'},
+    {label: '恋爱暧昧', value: 'love', description: '甜一点但不油腻'},
+    {label: '节日祝福', value: 'festival', description: '生日、节日和仪式感'},
+    {label: '社交配文', value: 'social', description: '适合朋友圈和签名'}
+]
+
+export const SOCIAL_COPY_MOOD_OPTIONS: Array<TextOption<SocialCopyMood>> = [
+    {label: '清爽日常', value: 'clean', description: '干净、短句和留白'},
+    {label: '治愈松弛', value: 'healing', description: '温柔、慢下来和小确幸'},
+    {label: '轻松好笑', value: 'funny', description: '自嘲、反差和小包袱'},
+    {label: '微微 emo', value: 'emo', description: '克制低落，不沉重'},
+    {label: '班味文学', value: 'workday', description: '上班、下班和摸鱼'}
+]
+
+export const SOCIAL_COPY_LENGTH_OPTIONS: Array<TextOption<SocialCopyLength>> = [
+    {label: '短句', value: 'short'},
+    {label: '两三句', value: 'medium'}
+]
+
+export const TONE_REWRITE_MODE_OPTIONS: Array<TextOption<ToneRewriteMode>> = [
+    {label: '夸夸', value: 'praise', description: '真诚、明亮和正反馈'},
+    {label: '阴阳怪气', value: 'sarcasm', description: '轻度反讽，不做人身攻击'},
+    {label: '先夸后吐槽', value: 'balanced', description: '保留善意，带一点玩梗'}
+]
+
 export const createDefaultAcrosticSettings = (): AcrosticSettings => ({
     heads: '',
     topic: '快乐生活',
@@ -97,4 +134,24 @@ export const createDefaultDanmakuSettings = (): DanmakuSettings => ({
     colorMode: 'rainbow',
     shuffle: false,
     loop: true
+})
+
+export const createDefaultHomophoneSettings = (): HomophoneSettings => ({
+    keyword: '快乐',
+    scene: 'daily',
+    count: 8
+})
+
+export const createDefaultSocialCopySettings = (): SocialCopySettings => ({
+    topic: '今天也想好好生活',
+    mood: 'clean',
+    length: 'short',
+    count: 6,
+    emoji: true
+})
+
+export const createDefaultToneRewriteSettings = (): ToneRewriteSettings => ({
+    sourceText: '今天的状态还不错',
+    mode: 'praise',
+    count: 5
 })

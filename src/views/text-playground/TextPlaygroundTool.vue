@@ -3,8 +3,8 @@
     <header class="playground-topbar">
       <div class="topbar-title">
         <h1>文字游戏工坊</h1>
-        <el-tag type="success" effect="light">本地生成 / 不上传</el-tag>
-        <span class="privacy-copy">藏头诗、随机语录、文字转换和弹幕滚动屏。</span>
+        <el-tag type="success" effect="light">AI增强 / 本地兜底</el-tag>
+        <span class="privacy-copy">藏头诗、随机语录、谐音梗、朋友圈文案、语气改写和弹幕滚动屏。</span>
       </div>
       <div class="topbar-actions">
         <ToolHomeButton />
@@ -45,6 +45,9 @@
         <el-tabs v-model="activeMode" class="mode-tabs">
           <el-tab-pane label="随机语录" name="quote" />
           <el-tab-pane label="藏头诗" name="acrostic" />
+          <el-tab-pane label="谐音梗" name="homophone" />
+          <el-tab-pane label="朋友圈文案" name="social-copy" />
+          <el-tab-pane label="语气改写" name="tone-rewrite" />
           <el-tab-pane label="文字转换" name="transform" />
           <el-tab-pane label="弹幕屏" name="danmaku" />
         </el-tabs>
@@ -164,6 +167,171 @@
                 <el-switch v-model="acrosticSettings.rhyme" active-text="尾字押韵" />
               </el-form-item>
             </div>
+          </el-form>
+        </section>
+
+        <section v-if="activeMode === 'homophone'" class="settings-block">
+          <div class="section-head">
+            <div>
+              <h2>谐音梗</h2>
+              <p>输入关键词，生成适合聊天、弹幕和配文的轻松谐音梗。</p>
+            </div>
+            <el-button text @click="runHomophone">
+              <el-icon><RefreshRight /></el-icon>
+              换一批
+            </el-button>
+          </div>
+
+          <el-form label-position="top" class="tool-form">
+            <el-form-item label="关键词">
+              <el-input
+                v-model="homophoneSettings.keyword"
+                maxlength="40"
+                show-word-limit
+                placeholder="例如：快乐、下班、好运"
+              />
+            </el-form-item>
+            <el-form-item label="使用场景">
+              <el-select v-model="homophoneSettings.scene">
+                <el-option
+                  v-for="item in homophoneSceneOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                  <div class="select-option">
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.description }}</span>
+                  </div>
+                </el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="生成数量">
+              <el-input-number
+                v-model="homophoneSettings.count"
+                :min="1"
+                :max="maxHomophoneCount"
+                controls-position="right"
+              />
+            </el-form-item>
+          </el-form>
+        </section>
+
+        <section v-if="activeMode === 'social-copy'" class="settings-block">
+          <div class="section-head">
+            <div>
+              <h2>朋友圈文案</h2>
+              <p>给照片、心情或日常素材生成短句文案。</p>
+            </div>
+            <el-button text @click="runSocialCopy">
+              <el-icon><RefreshRight /></el-icon>
+              换一批
+            </el-button>
+          </div>
+
+          <el-form label-position="top" class="tool-form">
+            <el-form-item label="主题或素材">
+              <el-input
+                v-model="socialCopySettings.topic"
+                type="textarea"
+                resize="none"
+                :rows="4"
+                maxlength="120"
+                show-word-limit
+                placeholder="例如：周末散步、下班路上的晚霞、一杯咖啡"
+              />
+            </el-form-item>
+            <div class="form-grid two">
+              <el-form-item label="情绪风格">
+                <el-select v-model="socialCopySettings.mood">
+                  <el-option
+                    v-for="item in socialCopyMoodOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  >
+                    <div class="select-option">
+                      <strong>{{ item.label }}</strong>
+                      <span>{{ item.description }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+              <el-form-item label="长度">
+                <el-radio-group v-model="socialCopySettings.length">
+                  <el-radio-button
+                    v-for="item in socialCopyLengthOptions"
+                    :key="item.value"
+                    :label="item.value"
+                  >
+                    {{ item.label }}
+                  </el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+            </div>
+            <div class="form-grid two">
+              <el-form-item label="生成数量">
+                <el-input-number
+                  v-model="socialCopySettings.count"
+                  :min="1"
+                  :max="maxSocialCopyCount"
+                  controls-position="right"
+                />
+              </el-form-item>
+              <el-form-item label="附加效果">
+                <el-switch v-model="socialCopySettings.emoji" active-text="emoji" />
+              </el-form-item>
+            </div>
+          </el-form>
+        </section>
+
+        <section v-if="activeMode === 'tone-rewrite'" class="settings-block">
+          <div class="section-head">
+            <div>
+              <h2>夸夸 / 阴阳怪气改写</h2>
+              <p>把一句普通话改写成夸夸、轻度反讽或先夸后吐槽。</p>
+            </div>
+            <el-button text @click="runToneRewrite">
+              <el-icon><RefreshRight /></el-icon>
+              换一批
+            </el-button>
+          </div>
+
+          <el-form label-position="top" class="tool-form">
+            <el-form-item label="原文">
+              <el-input
+                v-model="toneRewriteSettings.sourceText"
+                type="textarea"
+                resize="none"
+                :rows="5"
+                maxlength="240"
+                show-word-limit
+                placeholder="输入要改写的一句话"
+              />
+            </el-form-item>
+            <el-form-item label="改写模式">
+              <el-select v-model="toneRewriteSettings.mode">
+                <el-option
+                  v-for="item in toneRewriteModeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                  <div class="select-option">
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.description }}</span>
+                  </div>
+                </el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="生成数量">
+              <el-input-number
+                v-model="toneRewriteSettings.count"
+                :min="1"
+                :max="maxToneRewriteCount"
+                controls-position="right"
+              />
+            </el-form-item>
           </el-form>
         </section>
 
@@ -288,7 +456,7 @@
             <p>{{ resultSummary }}</p>
           </div>
           <div class="result-actions">
-            <el-button-group v-if="activeMode === 'quote' || activeMode === 'acrostic'">
+            <el-button-group v-if="isRecordMode">
               <el-button :disabled="!activeRecords.length" @click="copyActiveOutput">
                 <el-icon><CopyDocument /></el-icon>
                 复制全部
@@ -321,7 +489,7 @@
           </div>
         </div>
 
-        <template v-if="activeMode === 'quote' || activeMode === 'acrostic'">
+        <template v-if="isRecordMode">
           <el-alert
             v-if="aiNotice"
             class="result-alert"
@@ -427,15 +595,25 @@ import {
   ACROSTIC_STYLE_OPTIONS,
   DANMAKU_COLOR_OPTIONS,
   DANMAKU_SPEED_OPTIONS,
+  HOMOPHONE_SCENE_OPTIONS,
   MAX_ACROSTIC_COUNT,
   MAX_ACROSTIC_HEADS,
+  MAX_HOMOPHONE_COUNT,
   MAX_QUOTE_COUNT,
+  MAX_SOCIAL_COPY_COUNT,
+  MAX_TONE_REWRITE_COUNT,
   QUOTE_KIND_OPTIONS,
   QUOTE_TONE_OPTIONS,
+  SOCIAL_COPY_LENGTH_OPTIONS,
+  SOCIAL_COPY_MOOD_OPTIONS,
+  TONE_REWRITE_MODE_OPTIONS,
   TRANSFORM_OPERATION_OPTIONS,
   createDefaultAcrosticSettings,
   createDefaultDanmakuSettings,
+  createDefaultHomophoneSettings,
   createDefaultQuoteSettings,
+  createDefaultSocialCopySettings,
+  createDefaultToneRewriteSettings,
   createDefaultTransformSettings
 } from '@/utils/textPlayground/config'
 import {
@@ -450,6 +628,11 @@ import {
   getDanmakuTrackTop
 } from '@/utils/textPlayground/danmaku'
 import {
+  generateHomophoneRecords,
+  generateSocialCopyRecords,
+  generateToneRewriteRecords
+} from '@/utils/textPlayground/creative'
+import {
   downloadTextContent,
   formatDanmakuLines,
   formatTextPlaygroundRecords,
@@ -459,11 +642,17 @@ import {
 const activeMode = ref<TextPlaygroundMode>('quote')
 const acrosticSettings = reactive(createDefaultAcrosticSettings())
 const quoteSettings = reactive(createDefaultQuoteSettings())
+const homophoneSettings = reactive(createDefaultHomophoneSettings())
+const socialCopySettings = reactive(createDefaultSocialCopySettings())
+const toneRewriteSettings = reactive(createDefaultToneRewriteSettings())
 const transformSettings = reactive(createDefaultTransformSettings())
 const danmakuSettings = reactive(createDefaultDanmakuSettings())
 
 const quoteRecords = ref<TextPlaygroundRecord[]>(generateQuoteRecords(quoteSettings))
 const acrosticRecords = ref<TextPlaygroundRecord[]>([])
+const homophoneRecords = ref<TextPlaygroundRecord[]>(generateHomophoneRecords(homophoneSettings))
+const socialCopyRecords = ref<TextPlaygroundRecord[]>(generateSocialCopyRecords(socialCopySettings))
+const toneRewriteRecords = ref<TextPlaygroundRecord[]>(generateToneRewriteRecords(toneRewriteSettings))
 const transformInput = ref('欢迎来到文字游戏工坊')
 const transformResult = ref<TextTransformResult | null>(transformText(transformInput.value, transformSettings))
 const danmakuLines = ref<DanmakuLine[]>(buildDanmakuLines(danmakuSettings))
@@ -478,13 +667,40 @@ const quoteToneOptions = QUOTE_TONE_OPTIONS
 const transformOperationOptions = TRANSFORM_OPERATION_OPTIONS
 const danmakuSpeedOptions = DANMAKU_SPEED_OPTIONS
 const danmakuColorOptions = DANMAKU_COLOR_OPTIONS
+const homophoneSceneOptions = HOMOPHONE_SCENE_OPTIONS
+const socialCopyMoodOptions = SOCIAL_COPY_MOOD_OPTIONS
+const socialCopyLengthOptions = SOCIAL_COPY_LENGTH_OPTIONS
+const toneRewriteModeOptions = TONE_REWRITE_MODE_OPTIONS
 const maxQuoteCount = MAX_QUOTE_COUNT
 const maxAcrosticHeads = MAX_ACROSTIC_HEADS
 const maxAcrosticCount = MAX_ACROSTIC_COUNT
+const maxHomophoneCount = MAX_HOMOPHONE_COUNT
+const maxSocialCopyCount = MAX_SOCIAL_COPY_COUNT
+const maxToneRewriteCount = MAX_TONE_REWRITE_COUNT
+
+const isRecordMode = computed(() => {
+  return activeMode.value === 'quote'
+    || activeMode.value === 'acrostic'
+    || activeMode.value === 'homophone'
+    || activeMode.value === 'social-copy'
+    || activeMode.value === 'tone-rewrite'
+})
 
 const resultTitle = computed(() => {
   if (activeMode.value === 'acrostic') {
     return '藏头诗结果'
+  }
+
+  if (activeMode.value === 'homophone') {
+    return '谐音梗结果'
+  }
+
+  if (activeMode.value === 'social-copy') {
+    return '朋友圈文案结果'
+  }
+
+  if (activeMode.value === 'tone-rewrite') {
+    return '语气改写结果'
   }
 
   if (activeMode.value === 'transform') {
@@ -499,7 +715,7 @@ const resultTitle = computed(() => {
 })
 
 const supportsAiMode = computed(() => {
-  return activeMode.value === 'quote' || activeMode.value === 'acrostic' || activeMode.value === 'danmaku'
+  return activeMode.value !== 'transform'
 })
 
 const primaryActionLabel = computed(() => {
@@ -509,6 +725,18 @@ const primaryActionLabel = computed(() => {
 
   if (activeMode.value === 'transform') {
     return '开始转换'
+  }
+
+  if (activeMode.value === 'homophone') {
+    return 'AI生成谐音梗'
+  }
+
+  if (activeMode.value === 'social-copy') {
+    return 'AI生成朋友圈文案'
+  }
+
+  if (activeMode.value === 'tone-rewrite') {
+    return 'AI改写'
   }
 
   if (activeMode.value === 'danmaku') {
@@ -525,6 +753,18 @@ const activeRecords = computed<TextPlaygroundRecord[]>(() => {
 
   if (activeMode.value === 'quote') {
     return quoteRecords.value
+  }
+
+  if (activeMode.value === 'homophone') {
+    return homophoneRecords.value
+  }
+
+  if (activeMode.value === 'social-copy') {
+    return socialCopyRecords.value
+  }
+
+  if (activeMode.value === 'tone-rewrite') {
+    return toneRewriteRecords.value
   }
 
   return []
@@ -581,6 +821,36 @@ const runAcrostic = () => {
   ElMessage.success(`已生成 ${acrosticRecords.value.length} 版藏头诗`)
 }
 
+const runHomophone = () => {
+  if (!homophoneSettings.keyword.trim()) {
+    ElMessage.warning('请先输入谐音梗关键词')
+    return
+  }
+
+  homophoneRecords.value = generateHomophoneRecords(homophoneSettings)
+  ElMessage.success(`已生成 ${homophoneRecords.value.length} 条谐音梗`)
+}
+
+const runSocialCopy = () => {
+  if (!socialCopySettings.topic.trim()) {
+    ElMessage.warning('请先输入朋友圈主题')
+    return
+  }
+
+  socialCopyRecords.value = generateSocialCopyRecords(socialCopySettings)
+  ElMessage.success(`已生成 ${socialCopyRecords.value.length} 条朋友圈文案`)
+}
+
+const runToneRewrite = () => {
+  if (!toneRewriteSettings.sourceText.trim()) {
+    ElMessage.warning('请先输入要改写的原文')
+    return
+  }
+
+  toneRewriteRecords.value = generateToneRewriteRecords(toneRewriteSettings)
+  ElMessage.success(`已生成 ${toneRewriteRecords.value.length} 条改写`)
+}
+
 const runTransform = () => {
   if (!transformInput.value.trim()) {
     transformResult.value = null
@@ -617,6 +887,12 @@ const handleLocalAction = () => {
   aiNotice.value = ''
   if (activeMode.value === 'acrostic') {
     runAcrostic()
+  } else if (activeMode.value === 'homophone') {
+    runHomophone()
+  } else if (activeMode.value === 'social-copy') {
+    runSocialCopy()
+  } else if (activeMode.value === 'tone-rewrite') {
+    runToneRewrite()
   } else if (activeMode.value === 'danmaku') {
     runDanmaku()
   } else {
@@ -637,6 +913,18 @@ const getAiBusinessType = (): ToolAiBusinessType | null => {
     return 'TEXT_GAME_DANMAKU'
   }
 
+  if (activeMode.value === 'homophone') {
+    return 'TEXT_GAME_HOMOPHONE'
+  }
+
+  if (activeMode.value === 'social-copy') {
+    return 'TEXT_GAME_SOCIAL_COPYWRITING'
+  }
+
+  if (activeMode.value === 'tone-rewrite') {
+    return 'TEXT_GAME_TONE_REWRITE'
+  }
+
   return null
 }
 
@@ -649,6 +937,32 @@ const buildAiMessage = (): Record<string, unknown> => {
       lineLength: acrosticSettings.lineLength,
       count: acrosticSettings.count,
       rhyme: acrosticSettings.rhyme
+    }
+  }
+
+  if (activeMode.value === 'homophone') {
+    return {
+      keyword: homophoneSettings.keyword,
+      scene: homophoneSettings.scene,
+      count: Math.min(12, homophoneSettings.count)
+    }
+  }
+
+  if (activeMode.value === 'social-copy') {
+    return {
+      topic: socialCopySettings.topic,
+      mood: socialCopySettings.mood,
+      length: socialCopySettings.length,
+      count: Math.min(10, socialCopySettings.count),
+      emoji: socialCopySettings.emoji
+    }
+  }
+
+  if (activeMode.value === 'tone-rewrite') {
+    return {
+      sourceText: toneRewriteSettings.sourceText,
+      mode: toneRewriteSettings.mode,
+      count: Math.min(8, toneRewriteSettings.count)
     }
   }
 
@@ -671,10 +985,17 @@ const buildAiMessage = (): Record<string, unknown> => {
 }
 
 const createAiRecords = (
-  mode: 'quote' | 'acrostic',
+  mode: TextPlaygroundRecord['mode'],
   aiResult: ToolAiGenerateVo
 ): TextPlaygroundRecord[] => {
-  const label = mode === 'quote' ? 'AI语录' : 'AI藏头诗'
+  const labelMap: Record<TextPlaygroundRecord['mode'], string> = {
+    quote: 'AI语录',
+    acrostic: 'AI藏头诗',
+    homophone: 'AI谐音梗',
+    'social-copy': 'AI朋友圈文案',
+    'tone-rewrite': 'AI语气改写'
+  }
+  const label = labelMap[mode]
   const createdAt = new Date().toISOString()
 
   return (aiResult.items || []).map((content, index) => ({
@@ -696,6 +1017,12 @@ const createAiRecords = (
 const applyAiResult = (aiResult: ToolAiGenerateVo) => {
   if (activeMode.value === 'acrostic') {
     acrosticRecords.value = createAiRecords('acrostic', aiResult)
+  } else if (activeMode.value === 'homophone') {
+    homophoneRecords.value = createAiRecords('homophone', aiResult)
+  } else if (activeMode.value === 'social-copy') {
+    socialCopyRecords.value = createAiRecords('social-copy', aiResult)
+  } else if (activeMode.value === 'tone-rewrite') {
+    toneRewriteRecords.value = createAiRecords('tone-rewrite', aiResult)
   } else if (activeMode.value === 'danmaku') {
     danmakuSettings.sourceText = (aiResult.items || []).join('\n')
     danmakuLines.value = buildDanmakuLines(danmakuSettings)
@@ -712,6 +1039,12 @@ const fallbackToLocal = (reason: string) => {
   aiNotice.value = `${reason}，已自动使用本地离线方案。`
   if (activeMode.value === 'acrostic') {
     runAcrostic()
+  } else if (activeMode.value === 'homophone') {
+    runHomophone()
+  } else if (activeMode.value === 'social-copy') {
+    runSocialCopy()
+  } else if (activeMode.value === 'tone-rewrite') {
+    runToneRewrite()
   } else if (activeMode.value === 'danmaku') {
     runDanmaku()
   } else {
@@ -728,6 +1061,21 @@ const runAiGenerate = async () => {
 
   if (activeMode.value === 'acrostic' && !acrosticSettings.heads.trim()) {
     ElMessage.warning('请先输入藏头文字')
+    return
+  }
+
+  if (activeMode.value === 'homophone' && !homophoneSettings.keyword.trim()) {
+    ElMessage.warning('请先输入谐音梗关键词')
+    return
+  }
+
+  if (activeMode.value === 'social-copy' && !socialCopySettings.topic.trim()) {
+    ElMessage.warning('请先输入朋友圈主题')
+    return
+  }
+
+  if (activeMode.value === 'tone-rewrite' && !toneRewriteSettings.sourceText.trim()) {
+    ElMessage.warning('请先输入要改写的原文')
     return
   }
 
@@ -841,14 +1189,21 @@ const handleExport = (command: string | number | object) => {
 const clearAll = () => {
   Object.assign(acrosticSettings, createDefaultAcrosticSettings())
   Object.assign(quoteSettings, createDefaultQuoteSettings())
+  Object.assign(homophoneSettings, createDefaultHomophoneSettings(), {keyword: ''})
+  Object.assign(socialCopySettings, createDefaultSocialCopySettings(), {topic: ''})
+  Object.assign(toneRewriteSettings, createDefaultToneRewriteSettings(), {sourceText: ''})
   Object.assign(transformSettings, createDefaultTransformSettings())
   Object.assign(danmakuSettings, createDefaultDanmakuSettings(), {sourceText: ''})
   quoteRecords.value = []
   acrosticRecords.value = []
+  homophoneRecords.value = []
+  socialCopyRecords.value = []
+  toneRewriteRecords.value = []
   transformInput.value = ''
   transformResult.value = null
   danmakuLines.value = []
   danmakuPaused.value = false
+  aiNotice.value = ''
 }
 
 const getDanmakuStyle = (line: DanmakuLine) => ({

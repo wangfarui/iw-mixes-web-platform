@@ -1,6 +1,9 @@
 export type TextPlaygroundMode =
     | 'quote'
     | 'acrostic'
+    | 'homophone'
+    | 'social-copy'
+    | 'tone-rewrite'
     | 'transform'
     | 'danmaku'
 
@@ -42,6 +45,29 @@ export type DanmakuColorMode =
     | 'rainbow'
     | 'contrast'
 
+export type HomophoneScene =
+    | 'daily'
+    | 'workday'
+    | 'love'
+    | 'festival'
+    | 'social'
+
+export type SocialCopyMood =
+    | 'clean'
+    | 'healing'
+    | 'funny'
+    | 'emo'
+    | 'workday'
+
+export type SocialCopyLength =
+    | 'short'
+    | 'medium'
+
+export type ToneRewriteMode =
+    | 'praise'
+    | 'sarcasm'
+    | 'balanced'
+
 export type TextPlaygroundExportFormat =
     | 'txt'
     | 'markdown'
@@ -51,6 +77,9 @@ export type ToolAiBusinessType =
     | 'TEXT_GAME_ACROSTIC'
     | 'TEXT_GAME_QUOTE'
     | 'TEXT_GAME_DANMAKU'
+    | 'TEXT_GAME_HOMOPHONE'
+    | 'TEXT_GAME_SOCIAL_COPYWRITING'
+    | 'TEXT_GAME_TONE_REWRITE'
 
 export type ToolAiLimitCode =
     | 42901
@@ -100,6 +129,26 @@ export interface DanmakuSettings {
     colorMode: DanmakuColorMode
     shuffle: boolean
     loop: boolean
+}
+
+export interface HomophoneSettings {
+    keyword: string
+    scene: HomophoneScene
+    count: number
+}
+
+export interface SocialCopySettings {
+    topic: string
+    mood: SocialCopyMood
+    length: SocialCopyLength
+    count: number
+    emoji: boolean
+}
+
+export interface ToneRewriteSettings {
+    sourceText: string
+    mode: ToneRewriteMode
+    count: number
 }
 
 export interface TextMetrics {

@@ -36,6 +36,7 @@ const bundleModule = async (entry, outfileName) => {
 const config = await bundleModule('src/utils/textPlayground/config.ts', 'config.mjs')
 const acrostic = await bundleModule('src/utils/textPlayground/acrostic.ts', 'acrostic.mjs')
 const quotes = await bundleModule('src/utils/textPlayground/quotes.ts', 'quotes.mjs')
+const creative = await bundleModule('src/utils/textPlayground/creative.ts', 'creative.mjs')
 const transforms = await bundleModule('src/utils/textPlayground/transforms.ts', 'transforms.mjs')
 const danmaku = await bundleModule('src/utils/textPlayground/danmaku.ts', 'danmaku.mjs')
 const exporters = await bundleModule('src/utils/textPlayground/exporters.ts', 'exporters.mjs')
@@ -58,6 +59,31 @@ const quoteRecords = quotes.generateQuoteRecords(quoteSettings)
 assert.equal(quoteRecords.length, 5)
 assert.ok(quoteRecords.every((record) => record.content.length > 8))
 assert.equal(quotes.getQuoteKindLabel('dark'), '毒鸡汤')
+
+const homophoneSettings = config.createDefaultHomophoneSettings()
+homophoneSettings.keyword = '快乐'
+homophoneSettings.count = 3
+const homophoneRecords = creative.generateHomophoneRecords(homophoneSettings)
+assert.equal(homophoneRecords.length, 3)
+assert.equal(homophoneRecords[0].mode, 'homophone')
+assert.ok(homophoneRecords.some((record) => record.meta.join(' ').includes('筷勒')))
+
+const socialCopySettings = config.createDefaultSocialCopySettings()
+socialCopySettings.topic = '下班路上的晚霞'
+socialCopySettings.length = 'medium'
+socialCopySettings.emoji = false
+const socialCopyRecords = creative.generateSocialCopyRecords(socialCopySettings)
+assert.equal(socialCopyRecords.length, 6)
+assert.equal(socialCopyRecords[0].mode, 'social-copy')
+assert.ok(socialCopyRecords[0].content.includes('下班路上的晚霞'))
+
+const toneRewriteSettings = config.createDefaultToneRewriteSettings()
+toneRewriteSettings.sourceText = '今天做得不错'
+toneRewriteSettings.mode = 'sarcasm'
+const toneRewriteRecords = creative.generateToneRewriteRecords(toneRewriteSettings)
+assert.equal(toneRewriteRecords.length, 5)
+assert.equal(toneRewriteRecords[0].mode, 'tone-rewrite')
+assert.ok(toneRewriteRecords[0].content.includes('今天做得不错'))
 
 const mars = transforms.transformText('我是abc123', {
   operation: 'mars',
