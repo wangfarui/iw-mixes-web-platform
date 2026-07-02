@@ -84,28 +84,47 @@
 
         <section class="watch-list" aria-label="自选股列表">
           <el-empty v-if="!watchlist.length" description="添加股票后会保存到本地浏览器" />
-          <div
-            v-for="item in watchlist"
+          <draggable
             v-else
-            :key="item.symbol"
-            :class="['watch-row', { active: item.symbol === selectedSymbol }]"
+            v-model="watchlist"
+            item-key="symbol"
+            tag="div"
+            class="watch-sort-list"
+            handle=".watch-drag-handle"
+            ghost-class="watch-row-ghost"
+            chosen-class="watch-row-chosen"
+            drag-class="watch-row-drag"
+            :animation="160"
+            @end="handleWatchSortEnd"
           >
-            <button type="button" class="watch-main" @click="selectSymbol(item.symbol)">
-              <span class="watch-name">{{ quoteMap[item.symbol]?.name || item.name || item.symbol }}</span>
-              <span class="watch-symbol">{{ formatDisplaySymbol(item) }}</span>
-            </button>
-            <div class="watch-quote">
-              <strong :class="trendClass(quoteMap[item.symbol]?.changePercent)">
-                {{ formatPrice(quoteMap[item.symbol]?.price) }}
-              </strong>
-              <span :class="trendClass(quoteMap[item.symbol]?.changePercent)">
-                {{ formatPercent(quoteMap[item.symbol]?.changePercent) }}
-              </span>
-            </div>
-            <el-button text circle :aria-label="`删除${item.symbol}`" @click="removeSymbol(item.symbol)">
-              <el-icon><Close /></el-icon>
-            </el-button>
-          </div>
+            <template #item="{ element: item }">
+              <div :class="['watch-row', { active: item.symbol === selectedSymbol }]">
+                <button
+                  type="button"
+                  class="watch-drag-handle"
+                  :aria-label="`拖拽排序${item.symbol}`"
+                  title="拖拽排序"
+                >
+                  <el-icon><Rank /></el-icon>
+                </button>
+                <button type="button" class="watch-main" @click="selectSymbol(item.symbol)">
+                  <span class="watch-name">{{ quoteMap[item.symbol]?.name || item.name || item.symbol }}</span>
+                  <span class="watch-symbol">{{ formatDisplaySymbol(item) }}</span>
+                </button>
+                <div class="watch-quote">
+                  <strong :class="trendClass(quoteMap[item.symbol]?.changePercent)">
+                    {{ formatPrice(quoteMap[item.symbol]?.price) }}
+                  </strong>
+                  <span :class="trendClass(quoteMap[item.symbol]?.changePercent)">
+                    {{ formatPercent(quoteMap[item.symbol]?.changePercent) }}
+                  </span>
+                </div>
+                <el-button text circle :aria-label="`删除${item.symbol}`" @click="removeSymbol(item.symbol)">
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+            </template>
+          </draggable>
         </section>
       </aside>
 
@@ -254,7 +273,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Close, Delete, Download, Plus, Refresh, Upload } from '@element-plus/icons-vue'
+import { Close, Delete, Download, Plus, Rank, Refresh, Upload } from '@element-plus/icons-vue'
+import draggable from 'vuedraggable'
 import {
   CandlestickSeries,
   ColorType,
@@ -398,6 +418,10 @@ const removeSymbol = (symbol: string) => {
       renderChart()
     }
   }
+  persistState()
+}
+
+const handleWatchSortEnd = () => {
   persistState()
 }
 
@@ -886,9 +910,15 @@ onUnmounted(() => {
   overflow: auto;
 }
 
+.watch-sort-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .watch-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 32px;
+  grid-template-columns: 28px minmax(0, 1fr) auto 32px;
   align-items: center;
   gap: 8px;
   padding: 10px;
@@ -901,6 +931,41 @@ onUnmounted(() => {
 .watch-row.active {
   border-color: #409eff;
   background: #f0f7ff;
+}
+
+.watch-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: grab;
+}
+
+.watch-drag-handle:active {
+  cursor: grabbing;
+}
+
+.watch-drag-handle:hover,
+.watch-row.active .watch-drag-handle {
+  background: #eaf4ff;
+  color: #409eff;
+}
+
+.watch-row-ghost {
+  opacity: 0.45;
+}
+
+.watch-row-chosen {
+  border-color: #409eff;
+}
+
+.watch-row-drag {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
 }
 
 .watch-main {
