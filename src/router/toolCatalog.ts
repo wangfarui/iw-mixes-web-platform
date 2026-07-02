@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, Memo, Operation, Picture, Switch } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -91,6 +91,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['calculator', 'loan', 'tax', 'currency', 'unit', '表达式', '房贷', '车贷', '个税', '汇率'],
         icon: DataLine,
         component: () => import('@/views/calculator/CalculatorTool.vue')
+    },
+    {
+        path: 'stock-tracker',
+        routePath: '/tools/stock-tracker',
+        routeName: '股票跟踪',
+        title: '股票跟踪',
+        menuTitle: '股票跟踪',
+        description: '跟踪沪深A股自选列表，查看最新行情、K线、成交量和均线。',
+        category: 'life',
+        scenarios: ['自选股查看', 'A股行情跟踪', 'K线观察', '本地收藏股票'],
+        tags: ['公开行情', '本地自选'],
+        keywords: ['stock', 'kline', 'quote', '股票', 'A股', '行情', 'K线', '自选股'],
+        icon: TrendCharts,
+        component: () => import('@/views/stock-tracker/StockTrackerTool.vue')
     },
     {
         path: 'formatter',

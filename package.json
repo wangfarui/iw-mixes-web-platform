@@ -18,6 +18,7 @@
     "test:image-processor": "node scripts/testImageProcessor.mjs",
     "test:text-playground": "node scripts/testTextPlayground.mjs",
     "test:document-converter": "node scripts/testDocumentConverter.mjs",
+    "test:stock-tracker": "node scripts/testStockTracker.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "diff": "^9.0.0",
     "element-plus": "^2.7.1",
     "fflate": "^0.8.2",
+    "lightweight-charts": "^5.2.0",
     "mammoth": "^1.12.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
