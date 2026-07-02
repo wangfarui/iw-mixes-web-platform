@@ -66,12 +66,43 @@
         <span>鄂公网安备42018502007471</span>
       </a>
     </div>
+    <el-dialog
+        v-model="inviteDialogVisible"
+        title="新用户注册"
+        width="360"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+    >
+      <el-form label-width="76px" @submit.prevent>
+        <el-form-item label="邀请码">
+          <el-input
+              v-model="inviteForm.inviteCode"
+              maxlength="6"
+              placeholder="请输入邀请码"
+              clearable
+              @input="formatInviteCode"
+              @keyup.enter="submitInviteCode"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="cancelInviteDialog">取消</el-button>
+        <el-button type="primary" :loading="inviteSubmitting" @click="submitInviteCode">完成注册</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import {reactive, toRefs, ref} from "vue";
-import {loginByPasswordApi, refreshDictCache, loginByVerificationCodeApi, getPhoneVerificationCodeApi, getEmailVerificationCodeApi} from "@/api/login.ts";
+import {
+  loginByPasswordApi,
+  refreshDictCache,
+  loginByVerificationCodeApi,
+  getPhoneVerificationCodeApi,
+  getEmailVerificationCodeApi,
+  registerByVerificationCodeInviteApi
+} from "@/api/login.ts";
 import router from '@/router'
 import {ElMessage} from "element-plus";
 
@@ -82,6 +113,12 @@ const dictStore = useDictStore();
 
 const isCountingDown = ref(false) // 标记是否处于倒计时状态
 const count = ref(60) // 初始倒计时时间
+const inviteDialogVisible = ref(false)
+const inviteSubmitting = ref(false)
+const inviteForm = reactive({
+  registerTicket: '',
+  inviteCode: ''
+})
 
 const data = reactive({
   userInfo: {
@@ -146,9 +183,50 @@ function loginByVerificationCode() {
   loading.value = true;
   loginByVerificationCodeApi(userInfo.value).then(data => {
     loading.value = false;
+    if (data.data && data.data.inviteRequired) {
+      openInviteDialog(data.data.registerTicket)
+      return
+    }
     loginSuccessAfter(data);
   }).catch(err => {
     loading.value = false;
+  })
+}
+
+function openInviteDialog(registerTicket) {
+  inviteForm.registerTicket = registerTicket || ''
+  inviteForm.inviteCode = ''
+  inviteDialogVisible.value = true
+}
+
+function cancelInviteDialog() {
+  inviteDialogVisible.value = false
+  inviteForm.registerTicket = ''
+  inviteForm.inviteCode = ''
+}
+
+function formatInviteCode(value) {
+  inviteForm.inviteCode = String(value || '').toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)
+}
+
+function submitInviteCode() {
+  if (inviteSubmitting.value) return
+  if (!inviteForm.registerTicket) {
+    ElMessage.warning('注册状态已失效，请重新获取验证码')
+    cancelInviteDialog()
+    return
+  }
+  if (!/^[0-9A-Z]{6}$/.test(inviteForm.inviteCode)) {
+    ElMessage.warning('请输入6位邀请码')
+    return
+  }
+
+  inviteSubmitting.value = true
+  registerByVerificationCodeInviteApi(inviteForm).then(data => {
+    inviteDialogVisible.value = false
+    loginSuccessAfter(data)
+  }).finally(() => {
+    inviteSubmitting.value = false
   })
 }
 

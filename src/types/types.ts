@@ -2,11 +2,24 @@ export type UserLoginVO = {
     account?: string
     password?: string
     phoneNumber?: string
+    emailAddress?: string
     verificationCode?: string
+    loginWay?: number
+    inviteRequired?: boolean
+    registerTicket?: string
 }
 
 export type UserInfoVo = {
     name: string
+    tokenValue?: string
+    inviteRequired?: boolean
+    registerTicket?: string
+    roleType?: number
+}
+
+export type LoginInviteRegisterDto = {
+    registerTicket: string
+    inviteCode: string
 }
 
 export type UserPasswordEditDto = {

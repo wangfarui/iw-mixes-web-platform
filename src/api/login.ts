@@ -2,7 +2,7 @@ import request from "@/api/request";
 import {
 	useDictStore
 } from "@/stores/dict";
-import type {UserLoginVO, UserPasswordEditDto} from "@/types/types";
+import type {LoginInviteRegisterDto, UserLoginVO, UserPasswordEditDto} from "@/types/types";
 
 
 // 账号密码登录
@@ -13,6 +13,11 @@ export const loginByPasswordApi = (user: UserLoginVO) => {
 // 验证码登录
 export const loginByVerificationCodeApi = (user: UserLoginVO) => {
     return request.post('/auth-service/login/verificationCode', user);
+}
+
+// 验证码登录新用户根据邀请码完成注册
+export const registerByVerificationCodeInviteApi = (dto: LoginInviteRegisterDto) => {
+    return request.post('/auth-service/login/verificationCode/invite', dto);
 }
 
 // 查询字典类型集合
