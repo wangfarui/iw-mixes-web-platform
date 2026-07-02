@@ -2,7 +2,9 @@
 
 ## 项目定位
 
-`iw-mixes-web-platform` 是 IW 系统的 Web 管理平台，面向桌面端管理和数据维护场景。当前覆盖餐食、菜品、记账记录、任务、积分、字典、账号、网站导航、AI 会话任务等模块，通过后端兼容入口访问 `../iw-mixes-server`。
+`iw-mixes-web-platform` 是 IW 系统当前唯一默认 Web 管理端迭代项目，面向桌面端管理和数据维护场景。用户说 `web项目`、`前端`、`管理端` 或 `后台页面` 时，默认进入本项目；如果用户同时说 `微信小程序`、`wx` 或 `小程序`，则应进入 `../iw-mixes-app-wx`。
+
+当前覆盖餐食、菜品、记账记录、任务、积分、字典、账号、网站导航、AI 会话任务等模块，通过后端兼容入口访问 `../iw-mixes-server`。
 
 Web 端开发重点是：清晰的路由、稳定的表格/表单/详情交互、类型一致、API 路径正确、和小程序端共享同一后端语义。
 
@@ -86,6 +88,7 @@ Vite proxy 在 `vite.config.ts`：
 - `/eat-service` -> `http://localhost:18000`
 - `/bookkeeping-service` -> `http://localhost:18000`
 - `/points-service` -> `http://localhost:18000`
+- `/external-service` -> `http://localhost:18000`
 
 本地 `18000` 由 `iw-mixes-server` 的 `iw-core` dev profile 兼容旧入口前缀。生产环境由 Nginx 转发到 `iw-core` 或 `iw-external`；Web 端 API 路径仍保留 `/auth-service`、`/bookkeeping-service`、`/eat-service`、`/points-service`、`/external-service` 前缀。
 
@@ -153,6 +156,7 @@ npm run preview
 
 - 先读本文件，再读根目录 `../AGENTS.md` 了解跨项目关系。
 - 不要修改 `dist/`、`node_modules/`、`.vite/` 等构建产物和缓存。
+- 不要把 `前端` 误解成旧 uni-app 项目；单独说 `前端` 默认就是本 Web 项目，涉及微信小程序时才去 `../iw-mixes-app-wx`。
 - API 路径变更必须同步后端 Controller 和小程序端可能的调用。
 - 调整公共请求封装会影响所有页面，要优先做全局回归思考。
 - 页面新增字段时，同步检查 `src/types`、表格列、表单项、详情显示、API 入参出参。
