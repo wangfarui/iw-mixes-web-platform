@@ -37,7 +37,11 @@ export const useDictStore = defineStore('common', () => {
         EAT_DISHES_STATUS: '3004', // 餐饮-菜品状态 code
         BOOKKEEPING_RECORD_TAG: '4001', // 记账-记录标签 id
         BOOKKEEPING_RECORD_TYPE: '4002', // 记账-记录分类 code
-        BOOKKEEPING_RECORD_CATEGORY: '4003' // 记账-记录类型 code
+        BOOKKEEPING_RECORD_CATEGORY: '4003', // 记账-记录类型 code
+        WARDROBE_ITEM_CATEGORY: '5002', // 衣柜-衣物分类 code
+        WARDROBE_ITEM_COLOR: '5003', // 衣柜-衣物颜色 code
+        WARDROBE_ITEM_SCENE: '5004', // 衣柜-衣物场景 code
+        WARDROBE_ITEM_STYLE: '5005' // 衣柜-衣物风格 code
     });
 
     /**
