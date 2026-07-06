@@ -19,10 +19,12 @@
     "test:text-playground": "node scripts/testTextPlayground.mjs",
     "test:document-converter": "node scripts/testDocumentConverter.mjs",
     "test:stock-tracker": "node scripts/testStockTracker.mjs",
+    "test:address-generator": "node scripts/testAddressGenerator.mjs",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
+    "@faker-js/faker": "^9.9.0",
     "axios": "^1.6.8",
     "decimal.js": "^10.6.0",
     "diff": "^9.0.0",

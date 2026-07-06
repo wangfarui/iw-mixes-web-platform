@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, MapLocation, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -77,6 +77,20 @@ export const toolCatalog: ToolCatalogItem[] = [
         keywords: ['number', 'id', 'uuid', 'mock', '测试数据', '身份证', '序列号'],
         icon: Operation,
         component: () => import('@/views/number-generator/NumberGeneratorTool.vue')
+    },
+    {
+        path: 'address-generator',
+        routePath: '/tools/address-generator',
+        routeName: '地址生成器',
+        title: '地址生成器',
+        menuTitle: '地址生成器',
+        description: '生成一条全球用户测试资料和地址信息，支持复制、导出和浏览器本地保存。',
+        category: 'work',
+        scenarios: ['接口联调', '表单测试', '导入模板准备', 'Demo 用户资料'],
+        tags: ['本地生成', '本地保存', '不上传'],
+        keywords: ['address', 'profile', 'faker', 'mock', 'user', 'global', '地址', '用户资料', '测试资料', '本地保存'],
+        icon: MapLocation,
+        component: () => import('@/views/address-generator/AddressGeneratorTool.vue')
     },
     {
         path: 'calculator',
