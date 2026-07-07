@@ -324,12 +324,15 @@ import {
 } from '@/utils/stock-tracker/indicators'
 
 const SUCCESS_CODE = 200
+const DAILY_THREE_MONTH_TRADING_DAYS = 66
+const WEEKLY_ONE_YEAR_WEEKS = 52
+const MONTHLY_THREE_YEAR_MONTHS = 36
 
 const intervalOptions: Array<{ value: StockTrackerInterval; label: string; shortLabel: string; limit: number }> = [
   { value: 'intraday', label: '当日分时', shortLabel: '分时', limit: 240 },
-  { value: 'daily', label: '日K', shortLabel: '日K', limit: 180 },
-  { value: 'weekly', label: '周K', shortLabel: '周K', limit: 120 },
-  { value: 'monthly', label: '月K', shortLabel: '月K', limit: 120 }
+  { value: 'daily', label: '日K', shortLabel: '日K', limit: DAILY_THREE_MONTH_TRADING_DAYS },
+  { value: 'weekly', label: '周K', shortLabel: '周K', limit: WEEKLY_ONE_YEAR_WEEKS },
+  { value: 'monthly', label: '月K', shortLabel: '月K', limit: MONTHLY_THREE_YEAR_MONTHS }
 ]
 
 const initialState = loadStockTrackerState()
