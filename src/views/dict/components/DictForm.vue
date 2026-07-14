@@ -10,6 +10,15 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item v-if="isWardrobeItemSubcategory" label="所属品类" prop="parentId">
+        <el-select v-model="formData.parentId" placeholder="请选择所属品类" style="width: 400px">
+          <el-option v-for="item in parentCategoryOptions"
+                     :key="item.id"
+                     :label="item.dictName"
+                     :value="item.id"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item label="字典code" prop="dictCode">
         <el-input-number v-model="formData.dictCode" :precision="0" :controls="false"/>
       </el-form-item>
@@ -41,8 +50,9 @@
 </template>
 
 <script setup lang="ts">
-import {ref, onMounted} from "vue"
+import {computed, ref, onMounted, watch} from "vue"
 import type {FormInstance} from "element-plus"
+import {ElMessage} from "element-plus"
 import router from "@/router"
 import {useRoute} from 'vue-router';
 import {addDict, updateDict, queryDictDetail} from "@/api/dict"
@@ -69,6 +79,20 @@ const id = route.params.id as string;
 
 const formRef = ref<FormInstance>()
 
+const isWardrobeItemSubcategory = computed(() => {
+  return Number(formData.value.dictType) === Number(dictStore.dictTypeEnum.WARDROBE_ITEM_SUBCATEGORY)
+})
+
+const parentCategoryOptions = computed(() => {
+  return dictStore.getDictDataArray(dictStore.dictTypeEnum.WARDROBE_ITEM_CATEGORY) || []
+})
+
+watch(() => formData.value.dictType, () => {
+  if (!isWardrobeItemSubcategory.value) {
+    formData.value.parentId = 0
+  }
+})
+
 onMounted(() => {
   if (props.operate == "UPDATE") {
     queryDictDetail(id).then(res => {
@@ -79,6 +103,10 @@ onMounted(() => {
 
 const handleDialogConfirm = (formEl: FormInstance | undefined) => {
   if (!formEl) return
+  if (isWardrobeItemSubcategory.value && !formData.value.parentId) {
+    ElMessage.warning('请选择所属品类')
+    return
+  }
   if (props.operate == "ADD") {
     // 新增字典
     addDict(formData.value).then(res => {

@@ -8,6 +8,7 @@ type DictTypeObject = {
 
 type DictSimpleObject = {
     id: number,
+    parentId?: number,
     dictCode: number,
     dictName: string
 }
@@ -38,10 +39,11 @@ export const useDictStore = defineStore('common', () => {
         BOOKKEEPING_RECORD_TAG: '4001', // 记账-记录标签 id
         BOOKKEEPING_RECORD_TYPE: '4002', // 记账-记录分类 code
         BOOKKEEPING_RECORD_CATEGORY: '4003', // 记账-记录类型 code
-        WARDROBE_ITEM_CATEGORY: '5002', // 衣柜-衣物分类 code
+        WARDROBE_ITEM_CATEGORY: '5002', // 衣柜-衣物品类 code
         WARDROBE_ITEM_COLOR: '5003', // 衣柜-衣物颜色 code
         WARDROBE_ITEM_SCENE: '5004', // 衣柜-衣物场景 code
-        WARDROBE_ITEM_STYLE: '5005' // 衣柜-衣物风格 code
+        WARDROBE_ITEM_STYLE: '5005', // 衣柜-衣物风格 code
+        WARDROBE_ITEM_SUBCATEGORY: '5006' // 衣柜-衣物款式 code
     });
 
     /**

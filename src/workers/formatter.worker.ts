@@ -1,11 +1,11 @@
 import type { FormatterWorkerRequest, FormatterWorkerResponse } from '@/types/formatter'
 import { formatText } from '@/utils/formatter/formatters'
 
-self.onmessage = (event: MessageEvent<FormatterWorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<FormatterWorkerRequest>) => {
   const { id, input, fileName, settings } = event.data
 
   try {
-    const result = formatText(input, settings, fileName)
+    const result = await formatText(input, settings, fileName)
     const response: FormatterWorkerResponse = {
       id,
       ok: true,

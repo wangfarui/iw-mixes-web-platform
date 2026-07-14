@@ -1,6 +1,7 @@
 
 export type DictListData =  {
     id: number,
+    parentId?: number,
     dictType: number,
     dictCode?: number,
     dictName: string,

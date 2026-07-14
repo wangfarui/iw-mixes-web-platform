@@ -53,6 +53,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="dictName" label="字典名称" width="180"/>
+        <el-table-column label="所属品类" width="180">
+          <template #default="{ row }">
+            {{ getParentCategoryName(row) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="sort" label="排序值" width="180"/>
         <el-table-column prop="dictStatus" label="字典状态" width="180">
           <template #default="{ row }">
@@ -121,6 +126,13 @@ function searchPage() {
   }).finally(() => {
     loading.value = false
   })
+}
+
+function getParentCategoryName(row: DictListData) {
+  if (Number(row.dictType) !== Number(dictStore.dictTypeEnum.WARDROBE_ITEM_SUBCATEGORY)) {
+    return ''
+  }
+  return dictStore.getDictNameById(dictStore.dictTypeEnum.WARDROBE_ITEM_CATEGORY, Number(row.parentId || 0))
 }
 
 function resetSearch() {

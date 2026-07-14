@@ -59,7 +59,7 @@ const files = await bundleModule('src/utils/formatter/files.ts', 'files.mjs')
 
 const settings = config.createDefaultFormatterSettings()
 
-const json = formatters.formatText('{"b":1,"a":{"d":2,"c":1}}', {
+const json = await formatters.formatText('{"b":1,"a":{"d":2,"c":1}}', {
   ...settings,
   language: 'json',
   sortKeys: true
@@ -75,25 +75,157 @@ assert.equal(json.output, [
   '}'
 ].join('\n'))
 
-const invalidJson = formatters.formatText('{"a":}', { ...settings, language: 'json' })
+const invalidJson = await formatters.formatText('{"a":}', { ...settings, language: 'json' })
 assert.equal(invalidJson.issues[0].level, 'error')
 assert.match(invalidJson.issues[0].message, /JSON|Expected|Unexpected/i)
 
-const xml = formatters.formatText('<root><item id="1">A</item><empty/></root>', {
+const xml = await formatters.formatText('<root><item id="1">A</item><empty/></root>', {
   ...settings,
   language: 'xml'
 })
-assert.match(xml.output, /<root>\n  <item id="1">\n    A\n  <\/item>\n  <empty\/>\n<\/root>/)
+assert.equal(xml.output, '<root>\n  <item id="1">A</item>\n  <empty/>\n</root>')
 
-const sql = formatters.formatText('select id,name from users where age>18 and status=\'A\' order by name', {
+const sql = await formatters.formatText('select id,name from users where age>18 and status=\'A\' order by name', {
   ...settings,
   language: 'sql'
 })
 assert.match(sql.output, /^SELECT\n\s+id,/)
-assert.match(sql.output, /\nFROM users/)
+assert.match(sql.output, /\nFROM\n\s+users/)
 assert.match(sql.output, /\n\s+AND status/)
 
-const props = formatters.formatText('b=2\n# comment\na : 1\nb=3', {
+const complexSqlInput = [
+  'select a.id,b.name,count(*) cnt from account a',
+  'left join bill b on a.id=b.account_id',
+  'where a.age>=18 and b.status<>\'deleted\' and b.owner_id!=:ownerId',
+  'and b.payload->>\'name\'=\'O\'\'Reilly\'',
+  'group by a.id,b.name order by b.name desc'
+].join(' ')
+const complexSqlExpected = [
+  'SELECT',
+  '  a.id,',
+  '  b.name,',
+  '  count(*) cnt',
+  'FROM',
+  '  account a',
+  '  LEFT JOIN bill b ON a.id = b.account_id',
+  'WHERE',
+  '  a.age >= 18',
+  '  AND b.status <> \'deleted\'',
+  '  AND b.owner_id != :ownerId',
+  '  AND b.payload->>\'name\' = \'O\'\'Reilly\'',
+  'GROUP BY',
+  '  a.id,',
+  '  b.name',
+  'ORDER BY',
+  '  b.name DESC'
+].join('\n')
+const complexSql = await formatters.formatText(complexSqlInput, {
+  ...settings,
+  language: 'sql'
+})
+assert.equal(complexSql.output, complexSqlExpected)
+const repeatedComplexSql = await formatters.formatText(complexSql.output, {
+  ...settings,
+  language: 'sql'
+})
+assert.equal(repeatedComplexSql.output, complexSqlExpected)
+
+const compactSql = await formatters.formatText(complexSqlExpected, {
+  ...settings,
+  language: 'sql',
+  mode: 'compact'
+})
+assert.equal(
+  compactSql.output,
+  'SELECT a.id, b.name, count(*) cnt FROM account a LEFT JOIN bill b ON a.id = b.account_id WHERE a.age >= 18 AND b.status <> \'deleted\' AND b.owner_id != :ownerId AND b.payload->>\'name\' = \'O\'\'Reilly\' GROUP BY a.id, b.name ORDER BY b.name DESC'
+)
+
+const createTableInput = 'create table if not exists `demo_table` (`id` bigint(20) not null auto_increment comment \'主键\', `amount` decimal(19,4) default null comment \'金额\', primary key (`id`), key `idx_amount` (`amount`)) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci comment=\'示例表\';'
+const createTableExpected = [
+  'CREATE TABLE IF NOT EXISTS `demo_table` (',
+  '  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT \'主键\',',
+  '  `amount` decimal(19,4) DEFAULT NULL COMMENT \'金额\',',
+  '  PRIMARY KEY (`id`),',
+  '  KEY `idx_amount` (`amount`)',
+  ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'示例表\';'
+].join('\n')
+const createTableSql = await formatters.formatText(createTableInput, {
+  ...settings,
+  language: 'sql'
+})
+assert.equal(createTableSql.output, createTableExpected)
+const repeatedCreateTableSql = await formatters.formatText(createTableSql.output, {
+  ...settings,
+  language: 'sql'
+})
+assert.equal(repeatedCreateTableSql.output, createTableExpected)
+
+const insertSelectInput = [
+  'INSERT INTO msg_push_config (domain_id, org_id, message_type, root_biz_type, message_type_name, status, created_by, created_by_name, updated_by, updated_by_name, gmt_created, gmt_modified)',
+  'SELECT r.domain_id, r.org_id, r.message_type, IFNULL((SELECT MIN(b.root_biz_type) FROM msg_biz_type b WHERE b.domain_id = r.domain_id AND b.biz_type = r.message_type), 0), MAX(IFNULL(r.message_type_name, \'\')), 1, 0, \'\', 0, \'\', MIN(r.gmt_created), MAX(r.gmt_modified)',
+  'FROM msg_recipient_config r WHERE r.delete_status = 1 GROUP BY r.domain_id, r.org_id, r.message_type;'
+].join(' ')
+const insertSelectExpected = [
+  'INSERT INTO',
+  '  msg_push_config (',
+  '    domain_id,',
+  '    org_id,',
+  '    message_type,',
+  '    root_biz_type,',
+  '    message_type_name,',
+  '    status,',
+  '    created_by,',
+  '    created_by_name,',
+  '    updated_by,',
+  '    updated_by_name,',
+  '    gmt_created,',
+  '    gmt_modified',
+  '  )',
+  'SELECT',
+  '  r.domain_id,',
+  '  r.org_id,',
+  '  r.message_type,',
+  '  IFNULL(',
+  '    (',
+  '      SELECT',
+  '        MIN(b.root_biz_type)',
+  '      FROM',
+  '        msg_biz_type b',
+  '      WHERE',
+  '        b.domain_id = r.domain_id',
+  '        AND b.biz_type = r.message_type',
+  '    ),',
+  '    0',
+  '  ),',
+  '  MAX(IFNULL(r.message_type_name, \'\')),',
+  '  1,',
+  '  0,',
+  '  \'\',',
+  '  0,',
+  '  \'\',',
+  '  MIN(r.gmt_created),',
+  '  MAX(r.gmt_modified)',
+  'FROM',
+  '  msg_recipient_config r',
+  'WHERE',
+  '  r.delete_status = 1',
+  'GROUP BY',
+  '  r.domain_id,',
+  '  r.org_id,',
+  '  r.message_type;'
+].join('\n')
+const insertSelectSql = await formatters.formatText(insertSelectInput, {
+  ...settings,
+  language: 'sql'
+})
+assert.equal(insertSelectSql.output, insertSelectExpected)
+const repeatedInsertSelectSql = await formatters.formatText(insertSelectSql.output, {
+  ...settings,
+  language: 'sql'
+})
+assert.equal(repeatedInsertSelectSql.output, insertSelectExpected)
+
+const props = await formatters.formatText('b=2\n# comment\na : 1\nb=3', {
   ...settings,
   language: 'properties',
   sortKeys: true
@@ -101,21 +233,21 @@ const props = formatters.formatText('b=2\n# comment\na : 1\nb=3', {
 assert.equal(props.output, 'a = 1\nb = 2\nb = 3')
 assert.ok(props.warnings.some((warning) => warning.includes('重复 key')))
 
-const yaml = formatters.formatText('root:\n\tname:test\n\n', {
+const yaml = await formatters.formatText('root:\n\tname:test\n\n', {
   ...settings,
   language: 'yaml'
 })
 assert.match(yaml.output, /root:\n  name: test/)
 assert.ok(yaml.warnings.some((warning) => warning.includes('Tab')))
 
-const css = formatters.formatText('.a{color:red;margin:0}.b{display:block}', {
+const css = await formatters.formatText('.a{color:red;margin:0}.b{display:block}', {
   ...settings,
   language: 'css'
 })
 assert.match(css.output, /\.a \{/)
 assert.match(css.output, /color: red;/)
 
-const markdown = formatters.formatText('# A\n\n\ntext  ', {
+const markdown = await formatters.formatText('# A\n\n\ntext  ', {
   ...settings,
   language: 'markdown'
 })
@@ -123,6 +255,18 @@ assert.equal(markdown.output, '# A\n\ntext')
 
 const detected = formatters.detectFormatterLanguage('select * from t')
 assert.equal(detected, 'sql')
+
+const detectedJavascript = formatters.detectFormatterLanguage('const demo=(name)=>{return {name,ok:true}}')
+assert.equal(detectedJavascript, 'javascript')
+
+const detectedProperties = formatters.detectFormatterLanguage([
+  '# datasource',
+  'spring.datasource.workflow.url=jdbc:mysql://10.0.34.104:3306/online_workflow?allowMultiQueries=true',
+  'createStartDate=2019-09-09',
+  'pagehelper.params=count=countSql',
+  'processKey=baseBpmn'
+].join('\n'))
+assert.equal(detectedProperties, 'properties')
 
 const jsonToProperties = converters.convertFormatterText(
   '{"db":{"host":"localhost","port":3306},"enabled":true}',

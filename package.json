@@ -35,11 +35,15 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
     "pinia": "^2.1.7",
+    "prettier": "^3.9.4",
+    "properties-file": "^5.0.5",
     "spark-md5": "^3.0.2",
+    "sql-formatter": "^15.8.2",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
     "vuedraggable": "^4.1.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xml-formatter": "^3.7.0"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
