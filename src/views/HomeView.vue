@@ -110,6 +110,10 @@
                 <el-icon><SvgIcon dir="home"  name="account-manage" /></el-icon>
                 <span>账号管理</span>
               </el-menu-item>
+              <el-menu-item index="/secret">
+                <el-icon><Key /></el-icon>
+                <span>密钥管理</span>
+              </el-menu-item>
               <el-menu-item index="/website/navigation">
                 <el-icon><SvgIcon dir="home" name="dict-manage" /></el-icon>
                 <span>网站管理</span>
@@ -228,7 +232,8 @@ import {
   Expand,
   Fold,
   HomeFilled,
-  Operation
+  Operation,
+  Key
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
 import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";

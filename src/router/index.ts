@@ -103,6 +103,11 @@ const router = createRouter({
                     component: () => import('@/views/account/AccountManagement.vue')
                 },
                 {
+                    path: '/secret',
+                    name: '密钥管理',
+                    component: () => import('@/views/secret/SecretManagement.vue')
+                },
+                {
                     path: '/website/navigation',
                     name: '网站管理',
                     component: () => import('@/views/website/WebsiteManagement.vue')
