@@ -37,10 +37,11 @@
             </el-icon>
           </div>
           <!-- 菜单 -->
-          <el-menu 
-            router 
+          <el-menu
             :collapse="isCollapse"
-            :collapse-transition="true">
+            :collapse-transition="true"
+            @select="handleMenuSelect"
+          >
             <el-menu-item index="/">
               <el-icon><HomeFilled /></el-icon>
               <template #title>首页</template>
@@ -119,20 +120,10 @@
                 <span>网站管理</span>
               </el-menu-item>
             </el-sub-menu>
-            <el-sub-menu index="6">
-              <template #title>
-                <el-icon><Operation /></el-icon>
-                <span>工具箱</span>
-              </template>
-              <el-menu-item
-                v-for="tool in toolCatalog"
-                :key="tool.routePath"
-                :index="tool.routePath"
-              >
-                <el-icon><component :is="tool.icon" /></el-icon>
-                <span>{{ tool.menuTitle }}</span>
-              </el-menu-item>
-            </el-sub-menu>
+            <el-menu-item index="/tools/home">
+              <el-icon><Operation /></el-icon>
+              <template #title>工具箱</template>
+            </el-menu-item>
 
           </el-menu>
         </el-aside>
@@ -221,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, reactive, onMounted, computed} from 'vue'
+import {ref, reactive, onMounted} from 'vue'
 import {RouterView} from 'vue-router'
 import router from "@/router";
 import {getCurrentInstance} from "vue";
@@ -240,7 +231,6 @@ import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from 
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
 import versionPollingService from '@/services/versionPollingService'
-import { toolCatalog } from '@/router/toolCatalog'
 
 const {proxy} = getCurrentInstance()!;
 
@@ -268,6 +258,18 @@ const isCollapse = ref(false)
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
+}
+
+const handleMenuSelect = (index: string) => {
+  if (index === '/tools/home') {
+    const toolsTab = window.open(router.resolve(index).href, '_blank')
+    if (toolsTab) {
+      toolsTab.opener = null
+    }
+    return
+  }
+
+  router.push(index)
 }
 
 onMounted(() => {

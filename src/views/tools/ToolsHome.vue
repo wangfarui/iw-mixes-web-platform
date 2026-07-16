@@ -7,9 +7,9 @@
           <h1>工具箱</h1>
           <p>本地优先工具集合，默认不需要登录，打开后即可直接使用。</p>
         </div>
-        <el-button type="primary" :disabled="!firstMatchedTool" @click="openFirstTool">
-          <el-icon><ArrowRight /></el-icon>
-          {{ hasActiveFilters ? '打开匹配工具' : '打开常用工具' }}
+        <el-button type="primary" @click="returnToManagementPlatform">
+          <el-icon><Back /></el-icon>
+          返回管理平台
         </el-button>
       </header>
 
@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Search } from '@element-plus/icons-vue'
+import { ArrowRight, Back, Search } from '@element-plus/icons-vue'
 import {
   toolCatalog,
   toolCategories,
@@ -130,10 +130,6 @@ const visibleCategorySummaries = computed<CategorySummary[]>(() => {
 })
 
 const normalizedKeyword = computed(() => searchKeyword.value.trim().toLowerCase())
-
-const hasActiveFilters = computed(() => {
-  return Boolean(normalizedKeyword.value) || activeCategory.value !== 'all'
-})
 
 const getToolCategory = (tool: ToolCatalogItem): ToolCategoryItem | undefined => {
   return categoryMap.get(tool.category)
@@ -170,17 +166,13 @@ const filteredTools = computed(() => {
   })
 })
 
-const firstMatchedTool = computed(() => filteredTools.value[0])
-
 const clearFilters = () => {
   searchKeyword.value = ''
   activeCategory.value = 'all'
 }
 
-const openFirstTool = () => {
-  if (firstMatchedTool.value) {
-    router.push(firstMatchedTool.value.routePath)
-  }
+const returnToManagementPlatform = () => {
+  router.push('/')
 }
 </script>
 
