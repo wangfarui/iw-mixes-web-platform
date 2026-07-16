@@ -29,6 +29,7 @@ const bundleModule = async (entry, outfileName) => {
 
 const storage = await bundleModule('src/utils/stock-tracker/storage.ts', 'storage.mjs')
 const indicators = await bundleModule('src/utils/stock-tracker/indicators.ts', 'indicators.mjs')
+const chartRange = await bundleModule('src/utils/stock-tracker/chartRange.ts', 'chart-range.mjs')
 
 assert.deepEqual(storage.normalizeStockSymbolInput('000001').exchange, 'SZ')
 assert.deepEqual(storage.normalizeStockSymbolInput('600519').exchange, 'SH')
@@ -54,6 +55,7 @@ const exported = storage.buildStockTrackerExport(state)
 const imported = storage.parseStockTrackerImport(exported)
 assert.equal(imported.watchlist.length, state.watchlist.length)
 assert.equal(imported.interval, 'intraday')
+assert.equal(imported.autoInterval, true)
 assert.equal(imported.refreshSeconds, 5)
 
 const candles = [
@@ -95,5 +97,50 @@ assert.equal(indicators.formatChartCrosshairTime(chartTime, 'weekly'), '2026-W27
 assert.equal(indicators.formatChartTickTime(chartTime, 'weekly'), '26-W27')
 assert.equal(indicators.formatChartCrosshairTime(chartTime, 'monthly'), '2026-07')
 assert.equal(indicators.formatChartTickTime(chartTime, 'monthly'), '2026-07')
+
+const dailyCandles = [
+  { time: 2, close: 12 },
+  { time: 3, close: 13 }
+]
+assert.deepEqual(chartRange.mergeStockCandles(dailyCandles, [
+  { time: 1, close: 10 },
+  { time: 2, close: 11 }
+]), [
+  { time: 1, close: 10 },
+  { time: 2, close: 11 },
+  { time: 3, close: 13 }
+])
+assert.equal(chartRange.resolveAutoInterval({
+  interval: 'daily',
+  visibleFrom: chartTime - 200 * 86400,
+  visibleTo: chartTime,
+  visibleLogicalBars: 140,
+  loadedBars: 180,
+  nearLatest: true
+}), 'weekly')
+assert.equal(chartRange.resolveAutoInterval({
+  interval: 'weekly',
+  visibleFrom: chartTime - 90 * 86400,
+  visibleTo: chartTime,
+  visibleLogicalBars: 13,
+  loadedBars: 156,
+  nearLatest: false
+}), 'daily')
+assert.equal(chartRange.resolveAutoInterval({
+  interval: 'daily',
+  visibleFrom: chartTime - 2 * 86400,
+  visibleTo: chartTime,
+  visibleLogicalBars: 3,
+  loadedBars: 180,
+  nearLatest: true
+}), 'intraday')
+assert.equal(chartRange.resolveAutoInterval({
+  interval: 'daily',
+  visibleFrom: chartTime - 2 * 86400,
+  visibleTo: chartTime,
+  visibleLogicalBars: 3,
+  loadedBars: 180,
+  nearLatest: false
+}), 'daily')
 
 console.log('stock tracker tests passed')

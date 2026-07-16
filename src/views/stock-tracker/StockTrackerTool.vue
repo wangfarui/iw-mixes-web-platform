@@ -9,7 +9,7 @@
       </div>
       <div class="topbar-actions">
         <ToolHomeButton />
-        <el-button :loading="loading" :disabled="!selectedSymbol" @click="refreshCurrent">
+        <el-button :loading="loading" :disabled="!selectedSymbol" @click="refreshCurrent(true)">
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
@@ -56,7 +56,7 @@
         <section class="settings-panel">
           <div class="setting-line">
             <span>周期</span>
-            <el-select v-model="activeInterval" size="small" @change="reloadCandles">
+            <el-select v-model="activeInterval" size="small" @change="handleManualIntervalChange">
               <el-option
                 v-for="item in intervalOptions"
                 :key="item.value"
@@ -64,6 +64,10 @@
                 :value="item.value"
               />
             </el-select>
+          </div>
+          <div class="setting-line">
+            <span>自动周期</span>
+            <el-switch v-model="autoInterval" @change="handleAutoIntervalToggle" />
           </div>
           <div class="setting-line">
             <span>自动刷新</span>
@@ -188,16 +192,23 @@
 
         <section class="chart-panel">
           <div class="chart-toolbar">
-            <el-radio-group v-model="activeInterval" @change="reloadCandles">
-              <el-radio-button
-                v-for="item in intervalOptions"
-                :key="item.value"
-                :value="item.value"
-              >
-                {{ item.shortLabel }}
-              </el-radio-button>
-            </el-radio-group>
-            <div class="chart-legend">
+            <div class="chart-period-controls">
+              <el-radio-group v-model="activeInterval" @change="handleManualIntervalChange">
+                <el-radio-button
+                  v-for="item in intervalOptions"
+                  :key="item.value"
+                  :value="item.value"
+                >
+                  {{ item.shortLabel }}
+                </el-radio-button>
+              </el-radio-group>
+              <el-tag v-if="autoInterval" type="primary" effect="plain">自动周期</el-tag>
+            </div>
+            <div v-if="activeInterval === 'intraday'" class="chart-legend">
+              <span><i class="ma intraday-price" />分时价格</span>
+              <span><i class="ma previous-close" />昨收</span>
+            </div>
+            <div v-else class="chart-legend">
               <span><i class="ma ma5" />MA5</span>
               <span><i class="ma ma10" />MA10</span>
               <span><i class="ma ma20" />MA20</span>
@@ -206,6 +217,8 @@
 
           <div class="chart-box">
             <div ref="chartContainerRef" class="chart-container" />
+            <div v-if="loadingHistory" class="history-state">正在加载更早数据</div>
+            <div v-else-if="reachedHistoryStart" class="history-state">已到最早数据</div>
             <div v-if="loading" class="chart-overlay">
               <el-icon class="is-loading"><Refresh /></el-icon>
               <span>正在加载行情</span>
@@ -281,11 +294,14 @@ import {
   createChart,
   HistogramSeries,
   LineSeries,
+  LineStyle,
   type CandlestickData,
   type HistogramData,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type LineData,
+  type LogicalRange,
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
@@ -322,17 +338,27 @@ import {
   getQuoteTrendType,
   toChartTimestamp
 } from '@/utils/stock-tracker/indicators'
+import {
+  mergeStockCandles,
+  resolveAutoInterval,
+  toChartDate
+} from '@/utils/stock-tracker/chartRange'
 
 const SUCCESS_CODE = 200
-const DAILY_THREE_MONTH_TRADING_DAYS = 66
-const WEEKLY_ONE_YEAR_WEEKS = 52
-const MONTHLY_THREE_YEAR_MONTHS = 36
+const HISTORY_LOAD_THRESHOLD = 20
+const AUTO_INTERVAL_DEBOUNCE_MS = 280
 
-const intervalOptions: Array<{ value: StockTrackerInterval; label: string; shortLabel: string; limit: number }> = [
-  { value: 'intraday', label: '当日分时', shortLabel: '分时', limit: 240 },
-  { value: 'daily', label: '日K', shortLabel: '日K', limit: DAILY_THREE_MONTH_TRADING_DAYS },
-  { value: 'weekly', label: '周K', shortLabel: '周K', limit: WEEKLY_ONE_YEAR_WEEKS },
-  { value: 'monthly', label: '月K', shortLabel: '月K', limit: MONTHLY_THREE_YEAR_MONTHS }
+const intervalOptions: Array<{
+  value: StockTrackerInterval
+  label: string
+  shortLabel: string
+  limit: number
+  initialVisibleBars: number
+}> = [
+  { value: 'intraday', label: '当日分时', shortLabel: '分时', limit: 240, initialVisibleBars: 240 },
+  { value: 'daily', label: '日K', shortLabel: '日K', limit: 180, initialVisibleBars: 66 },
+  { value: 'weekly', label: '周K', shortLabel: '周K', limit: 156, initialVisibleBars: 52 },
+  { value: 'monthly', label: '月K', shortLabel: '月K', limit: 120, initialVisibleBars: 36 }
 ]
 
 const initialState = loadStockTrackerState()
@@ -340,6 +366,7 @@ const initialState = loadStockTrackerState()
 const watchlist = ref(initialState.watchlist)
 const selectedSymbol = ref(initialState.selectedSymbol)
 const activeInterval = ref<StockTrackerInterval>(initialState.interval)
+const autoInterval = ref(initialState.autoInterval)
 const autoRefresh = ref(initialState.autoRefresh)
 const refreshSeconds = ref(initialState.refreshSeconds)
 const symbolInput = ref('')
@@ -347,6 +374,8 @@ const currentQuote = ref<StockTrackerQuoteVo>()
 const currentSeries = ref<StockTrackerCandleSeriesVo>()
 const quoteMap = ref<Record<string, StockTrackerQuoteVo>>({})
 const loading = ref(false)
+const loadingHistory = ref(false)
+const reachedHistoryStart = ref(false)
 const apiError = ref('')
 const activeTab = ref('candles')
 const lastRefreshedAt = ref<string>()
@@ -355,12 +384,22 @@ const importInputRef = ref<HTMLInputElement>()
 
 let chart: IChartApi | undefined
 let candleSeries: ISeriesApi<'Candlestick'> | undefined
+let intradaySeries: ISeriesApi<'Line'> | undefined
 let volumeSeries: ISeriesApi<'Histogram'> | undefined
 let ma5Series: ISeriesApi<'Line'> | undefined
 let ma10Series: ISeriesApi<'Line'> | undefined
 let ma20Series: ISeriesApi<'Line'> | undefined
 let resizeObserver: ResizeObserver | undefined
 let refreshTimer: number | undefined
+let autoIntervalTimer: number | undefined
+let previousCloseLine: IPriceLine | undefined
+let applyingChartRange = false
+let requestSerial = 0
+
+interface VisibleTimeRange {
+  from: number
+  to: number
+}
 
 const selectedIntervalOption = computed(() => intervalOptions.find((item) => item.value === activeInterval.value) || intervalOptions[0])
 
@@ -388,6 +427,7 @@ const persistState = () => {
     watchlist: watchlist.value,
     selectedSymbol: selectedSymbol.value,
     interval: activeInterval.value,
+    autoInterval: autoInterval.value,
     autoRefresh: autoRefresh.value,
     refreshSeconds: refreshSeconds.value
   }
@@ -437,19 +477,28 @@ const selectSymbol = async (symbol: string) => {
   await refreshCurrent()
 }
 
-const refreshCurrent = async () => {
+const refreshCurrent = async (preserveViewport = false) => {
   if (!selectedSymbol.value) {
     apiError.value = '请先添加或选择一只股票或ETF'
     return
   }
 
+  const serial = ++requestSerial
+  const requestedSymbol = selectedSymbol.value
+  const requestedInterval = activeInterval.value
+  const visibleRange = preserveViewport ? getVisibleTimeRange() : undefined
+  const followLatest = preserveViewport && isChartNearLatest()
   loading.value = true
   apiError.value = ''
   try {
     const [quoteResponse, candlesResponse] = await Promise.all([
-      queryStockQuote(selectedSymbol.value),
-      queryStockCandles(selectedSymbol.value, activeInterval.value, selectedIntervalOption.value.limit)
+      queryStockQuote(requestedSymbol),
+      queryStockCandles(requestedSymbol, requestedInterval, selectedIntervalOption.value.limit)
     ])
+
+    if (serial !== requestSerial || requestedSymbol !== selectedSymbol.value || requestedInterval !== activeInterval.value) {
+      return
+    }
 
     if (quoteResponse.code === SUCCESS_CODE && quoteResponse.data) {
       currentQuote.value = quoteResponse.data
@@ -463,7 +512,20 @@ const refreshCurrent = async () => {
     }
 
     if (candlesResponse.code === SUCCESS_CODE && candlesResponse.data) {
-      currentSeries.value = candlesResponse.data
+      const existingSeries = currentSeries.value
+      if (preserveViewport && existingSeries?.symbol === requestedSymbol && existingSeries.interval === requestedInterval) {
+        currentSeries.value = {
+          ...candlesResponse.data,
+          candles: mergeStockCandles(existingSeries.candles, candlesResponse.data.candles),
+          hasMoreBefore: existingSeries.hasMoreBefore,
+          nextEndTime: existingSeries.nextEndTime,
+          oldestTime: existingSeries.oldestTime,
+          warnings: Array.from(new Set([...(existingSeries.warnings || []), ...(candlesResponse.data.warnings || [])]))
+        }
+      } else {
+        currentSeries.value = candlesResponse.data
+        reachedHistoryStart.value = false
+      }
     } else {
       apiError.value = candlesResponse.message || apiError.value || 'K线加载失败'
       currentSeries.value = undefined
@@ -473,18 +535,32 @@ const refreshCurrent = async () => {
     persistState()
     await refreshWatchQuotes()
     await nextTick()
-    renderChart()
+    renderChart({ visibleRange, initial: !preserveViewport })
+    if (followLatest) {
+      scrollChartToLatest()
+    }
   } catch (error: any) {
     apiError.value = error?.message || '行情服务请求失败'
     renderChart()
   } finally {
-    loading.value = false
+    if (serial === requestSerial) {
+      loading.value = false
+    }
   }
 }
 
-const reloadCandles = async () => {
+const handleManualIntervalChange = async () => {
+  autoInterval.value = false
+  reachedHistoryStart.value = false
   persistState()
-  await refreshCurrent()
+  await refreshCurrent(false)
+}
+
+const handleAutoIntervalToggle = () => {
+  persistState()
+  if (autoInterval.value) {
+    scheduleAutoIntervalCheck()
+  }
 }
 
 const refreshWatchQuotes = async () => {
@@ -520,6 +596,7 @@ const handleImport = async (event: Event) => {
     watchlist.value = imported.watchlist
     selectedSymbol.value = imported.selectedSymbol
     activeInterval.value = imported.interval
+    autoInterval.value = imported.autoInterval
     autoRefresh.value = imported.autoRefresh
     refreshSeconds.value = imported.refreshSeconds
     persistState()
@@ -535,6 +612,7 @@ const exportWatchlist = () => {
     watchlist: watchlist.value,
     selectedSymbol: selectedSymbol.value,
     interval: activeInterval.value,
+    autoInterval: autoInterval.value,
     autoRefresh: autoRefresh.value,
     refreshSeconds: refreshSeconds.value
   })
@@ -564,6 +642,7 @@ const clearLocalState = async () => {
     quoteMap.value = {}
     apiError.value = ''
     lastRefreshedAt.value = undefined
+    reachedHistoryStart.value = false
     renderChart()
     ElMessage.success('已清空本地数据')
   } catch {
@@ -597,6 +676,8 @@ const initChart = () => {
     },
     timeScale: {
       borderVisible: false,
+      fixRightEdge: true,
+      rightOffset: 0,
       timeVisible: activeInterval.value === 'intraday',
       tickMarkFormatter: (time: Time) => formatChartTickTime(time, activeInterval.value)
     },
@@ -612,6 +693,13 @@ const initChart = () => {
     downColor: '#16835f',
     borderDownColor: '#16835f',
     wickDownColor: '#16835f'
+  })
+  intradaySeries = chart.addSeries(LineSeries, {
+    color: '#2563eb',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: true,
+    crosshairMarkerVisible: true
   })
   volumeSeries = chart.addSeries(HistogramSeries, {
     priceFormat: {
@@ -630,6 +718,7 @@ const initChart = () => {
   ma5Series = chart.addSeries(LineSeries, { color: '#f5a623', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
   ma10Series = chart.addSeries(LineSeries, { color: '#1f78d1', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
   ma20Series = chart.addSeries(LineSeries, { color: '#7b61ff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+  chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleLogicalRangeChange)
 
   resizeObserver = new ResizeObserver(() => {
     if (chart && chartContainerRef.value) {
@@ -639,13 +728,22 @@ const initChart = () => {
   resizeObserver.observe(chartContainerRef.value)
 }
 
-const renderChart = () => {
+const renderChart = (options: {
+  visibleRange?: VisibleTimeRange
+  logicalRange?: { from: number; to: number }
+  initial?: boolean
+} = {}) => {
   if (!chart) {
     return
   }
   const candles = currentSeries.value?.candles || []
   if (!candles.length) {
+    if (previousCloseLine && intradaySeries) {
+      intradaySeries.removePriceLine(previousCloseLine)
+      previousCloseLine = undefined
+    }
     candleSeries?.setData([])
+    intradaySeries?.setData([])
     volumeSeries?.setData([])
     ma5Series?.setData([])
     ma10Series?.setData([])
@@ -660,38 +758,109 @@ const renderChart = () => {
     low: item.low,
     close: item.close
   }))
+  const intradayData: LineData[] = candles.map((item) => ({
+    time: getChartTime(item),
+    value: item.close
+  }))
   const volumeData: HistogramData[] = candles.map((item) => ({
     time: getChartTime(item),
     value: item.volume || 0,
     color: item.close >= item.open ? 'rgba(217, 48, 38, 0.35)' : 'rgba(22, 131, 95, 0.35)'
   }))
 
-  candleSeries?.setData(candlestickData)
+  const isIntraday = activeInterval.value === 'intraday'
+  candleSeries?.setData(isIntraday ? [] : candlestickData)
+  intradaySeries?.setData(isIntraday ? intradayData : [])
   volumeSeries?.setData(volumeData)
-  ma5Series?.setData(toLineData(candles, 5))
-  ma10Series?.setData(toLineData(candles, 10))
-  ma20Series?.setData(toLineData(candles, 20))
+  ma5Series?.setData(isIntraday ? [] : toLineData(candles, 5))
+  ma10Series?.setData(isIntraday ? [] : toLineData(candles, 10))
+  ma20Series?.setData(isIntraday ? [] : toLineData(candles, 20))
+  if (previousCloseLine && intradaySeries) {
+    intradaySeries.removePriceLine(previousCloseLine)
+    previousCloseLine = undefined
+  }
+  if (isIntraday && currentQuote.value?.previousClose && intradaySeries) {
+    previousCloseLine = intradaySeries.createPriceLine({
+      price: currentQuote.value.previousClose,
+      color: '#94a3b8',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: '昨收'
+    })
+  }
   chart.applyOptions({
     localization: {
       locale: 'zh-CN',
       timeFormatter: (time: Time) => formatChartCrosshairTime(time, activeInterval.value)
     },
     timeScale: {
+      fixRightEdge: true,
+      rightOffset: 0,
       timeVisible: activeInterval.value === 'intraday',
       tickMarkFormatter: (time: Time) => formatChartTickTime(time, activeInterval.value)
     }
   })
-  if (activeInterval.value === 'intraday') {
-    const visibleRange = getIntradayVisibleRange(candles[0].tradeTime, currentSeries.value?.market)
-    if (visibleRange) {
-      chart.timeScale().setVisibleRange({
-        from: visibleRange.from as UTCTimestamp,
-        to: visibleRange.to as UTCTimestamp
-      })
+  if (options.logicalRange && !isIntraday) {
+    setChartVisibleLogicalRange(options.logicalRange)
+    return
+  }
+  if (options.visibleRange && !(isIntraday && options.initial)) {
+    setChartVisibleRange(options.visibleRange)
+    return
+  }
+  if (isIntraday) {
+    const sessionRange = getIntradayVisibleRange(candles[0].tradeTime, currentSeries.value?.market)
+    const latestTime = Number(getChartTime(candles[candles.length - 1]))
+    if (sessionRange && latestTime > sessionRange.from) {
+      setChartVisibleRange({ from: sessionRange.from, to: latestTime })
+      return
+    }
+    if (candles.length) {
+      setChartVisibleLogicalRange({ from: 0, to: candles.length - 1 })
       return
     }
   }
-  chart.timeScale().fitContent()
+  if (options.initial) {
+    const visibleBars = selectedIntervalOption.value.initialVisibleBars
+    setChartVisibleLogicalRange({
+      from: Math.max(0, candles.length - visibleBars),
+      to: candles.length - 1
+    })
+  }
+}
+
+const setChartVisibleRange = (range: VisibleTimeRange) => {
+  if (!chart) {
+    return
+  }
+  applyingChartRange = true
+  chart.timeScale().setVisibleRange({
+    from: range.from as UTCTimestamp,
+    to: range.to as UTCTimestamp
+  })
+  window.setTimeout(() => {
+    applyingChartRange = false
+  }, 0)
+}
+
+const setChartVisibleLogicalRange = (range: { from: number; to: number }) => {
+  if (!chart) {
+    return
+  }
+  applyingChartRange = true
+  chart.timeScale().setVisibleLogicalRange(range)
+  window.setTimeout(() => {
+    applyingChartRange = false
+  }, 0)
+}
+
+const getVisibleTimeRange = (): VisibleTimeRange | undefined => {
+  const range = chart?.timeScale().getVisibleRange()
+  if (!range || typeof range.from !== 'number' || typeof range.to !== 'number') {
+    return undefined
+  }
+  return { from: range.from, to: range.to }
 }
 
 const toLineData = (candles: StockTrackerCandleVo[], period: number): LineData[] => {
@@ -706,6 +875,160 @@ const getChartTime = (candle: StockTrackerCandleVo): UTCTimestamp => {
   return toChartTimestamp(candle.tradeTime, candle.time) as UTCTimestamp
 }
 
+const getActivePriceSeries = () => {
+  return activeInterval.value === 'intraday' ? intradaySeries : candleSeries
+}
+
+const isChartNearLatest = () => {
+  const logicalRange = chart?.timeScale().getVisibleLogicalRange()
+  const barsInfo = logicalRange ? getActivePriceSeries()?.barsInLogicalRange(logicalRange) : undefined
+  return barsInfo == null || barsInfo.barsAfter < 3
+}
+
+const scrollChartToLatest = () => {
+  if (!chart) {
+    return
+  }
+  applyingChartRange = true
+  chart.timeScale().scrollToRealTime()
+  window.setTimeout(() => {
+    applyingChartRange = false
+  }, 0)
+}
+
+const handleVisibleLogicalRangeChange = (logicalRange: LogicalRange | null) => {
+  if (!logicalRange || applyingChartRange || loading.value || loadingHistory.value || !currentSeries.value?.candles.length) {
+    return
+  }
+  const series = getActivePriceSeries()
+  const barsInfo = series?.barsInLogicalRange(logicalRange)
+  if (activeInterval.value !== 'intraday' && barsInfo && barsInfo.barsBefore < HISTORY_LOAD_THRESHOLD) {
+    if (currentSeries.value.hasMoreBefore && currentSeries.value.nextEndTime) {
+      void loadOlderCandles()
+    } else if (currentSeries.value.hasMoreBefore === false) {
+      reachedHistoryStart.value = true
+    }
+  }
+  scheduleAutoIntervalCheck()
+}
+
+const scheduleAutoIntervalCheck = () => {
+  if (autoIntervalTimer) {
+    window.clearTimeout(autoIntervalTimer)
+  }
+  if (!autoInterval.value) {
+    return
+  }
+  autoIntervalTimer = window.setTimeout(() => {
+    void applyAutoIntervalForVisibleRange()
+  }, AUTO_INTERVAL_DEBOUNCE_MS)
+}
+
+const applyAutoIntervalForVisibleRange = async () => {
+  const visibleRange = getVisibleTimeRange()
+  const logicalRange = chart?.timeScale().getVisibleLogicalRange()
+  const series = getActivePriceSeries()
+  const barsInfo = logicalRange ? series?.barsInLogicalRange(logicalRange) : undefined
+  if (!visibleRange || !logicalRange || !currentSeries.value || loading.value || loadingHistory.value) {
+    return
+  }
+  const targetInterval = resolveAutoInterval({
+    interval: activeInterval.value,
+    visibleFrom: visibleRange.from,
+    visibleTo: visibleRange.to,
+    visibleLogicalBars: logicalRange.to - logicalRange.from,
+    loadedBars: currentSeries.value.candles.length,
+    nearLatest: barsInfo == null || barsInfo.barsAfter < 3
+  })
+  if (targetInterval !== activeInterval.value) {
+    await switchAutoInterval(targetInterval, visibleRange, barsInfo == null || barsInfo.barsAfter < 3)
+  }
+}
+
+const switchAutoInterval = async (
+  targetInterval: StockTrackerInterval,
+  anchorRange: VisibleTimeRange,
+  nearLatest: boolean
+) => {
+  if (!selectedSymbol.value) {
+    return
+  }
+  const sourceInterval = activeInterval.value
+  const requestedSymbol = selectedSymbol.value
+  const serial = ++requestSerial
+  const option = intervalOptions.find((item) => item.value === targetInterval) || intervalOptions[0]
+  const endTime = targetInterval === 'intraday' || nearLatest ? undefined : toChartDate(anchorRange.to)
+  loading.value = true
+  try {
+    const response = await queryStockCandles(requestedSymbol, targetInterval, option.limit, endTime)
+    if (serial !== requestSerial || requestedSymbol !== selectedSymbol.value || response.code !== SUCCESS_CODE || !response.data) {
+      return
+    }
+    activeInterval.value = targetInterval
+    currentSeries.value = response.data
+    reachedHistoryStart.value = false
+    persistState()
+    await nextTick()
+    if (sourceInterval === 'intraday' && targetInterval === 'daily') {
+      const latestCandle = response.data.candles[response.data.candles.length - 1]
+      const latestTime = latestCandle ? getChartTime(latestCandle) : anchorRange.to
+      renderChart({
+        visibleRange: { from: Number(latestTime) - 30 * 24 * 60 * 60, to: Number(latestTime) },
+        initial: false
+      })
+    } else {
+      renderChart({ visibleRange: anchorRange, initial: targetInterval === 'intraday' })
+    }
+  } catch (error: any) {
+    apiError.value = error?.message || 'K线周期切换失败'
+  } finally {
+    if (serial === requestSerial) {
+      loading.value = false
+    }
+  }
+}
+
+const loadOlderCandles = async () => {
+  const series = currentSeries.value
+  const symbol = selectedSymbol.value
+  if (!series || !symbol || loadingHistory.value || activeInterval.value === 'intraday'
+    || !series.hasMoreBefore || !series.nextEndTime) {
+    return
+  }
+  const interval = activeInterval.value
+  const endTime = series.nextEndTime
+  const logicalRange = chart?.timeScale().getVisibleLogicalRange()
+  loadingHistory.value = true
+  try {
+    const response = await queryStockCandles(symbol, interval, selectedIntervalOption.value.limit, endTime)
+    if (symbol !== selectedSymbol.value || interval !== activeInterval.value || response.code !== SUCCESS_CODE || !response.data) {
+      return
+    }
+    const mergedCandles = mergeStockCandles(response.data.candles, series.candles)
+    const addedBars = mergedCandles.length - series.candles.length
+    currentSeries.value = {
+      ...series,
+      candles: mergedCandles,
+      hasMoreBefore: response.data.hasMoreBefore,
+      nextEndTime: response.data.nextEndTime,
+      oldestTime: response.data.oldestTime || series.oldestTime,
+      warnings: Array.from(new Set([...(series.warnings || []), ...(response.data.warnings || [])]))
+    }
+    reachedHistoryStart.value = response.data.hasMoreBefore === false
+    await nextTick()
+    renderChart({
+      logicalRange: logicalRange
+        ? { from: logicalRange.from + addedBars, to: logicalRange.to + addedBars }
+        : undefined,
+      initial: false
+    })
+  } catch (error: any) {
+    apiError.value = error?.message || '更早K线加载失败'
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
 const setupAutoRefresh = () => {
   if (refreshTimer) {
     window.clearInterval(refreshTimer)
@@ -715,7 +1038,7 @@ const setupAutoRefresh = () => {
     return
   }
   refreshTimer = window.setInterval(() => {
-    refreshCurrent()
+    refreshCurrent(true)
   }, refreshSeconds.value * 1000)
 }
 
@@ -755,7 +1078,7 @@ const formatDateTime = (value?: string) => {
   })
 }
 
-watch([watchlist, selectedSymbol, activeInterval, autoRefresh, refreshSeconds], () => {
+watch([watchlist, selectedSymbol, activeInterval, autoInterval, autoRefresh, refreshSeconds], () => {
   persistState()
 }, { deep: true })
 
@@ -776,6 +1099,10 @@ onUnmounted(() => {
   if (refreshTimer) {
     window.clearInterval(refreshTimer)
   }
+  if (autoIntervalTimer) {
+    window.clearTimeout(autoIntervalTimer)
+  }
+  chart?.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleLogicalRangeChange)
   resizeObserver?.disconnect()
   chart?.remove()
 })
@@ -1077,6 +1404,13 @@ onUnmounted(() => {
   border-bottom: 1px solid #edf1f7;
 }
 
+.chart-period-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .chart-legend {
   display: flex;
   align-items: center;
@@ -1111,6 +1445,16 @@ onUnmounted(() => {
   background: #7b61ff;
 }
 
+.intraday-price {
+  background: #2563eb;
+}
+
+.previous-close {
+  height: 0;
+  border-top: 1px dashed #94a3b8;
+  background: transparent;
+}
+
 .chart-box {
   position: relative;
   min-height: 430px;
@@ -1119,6 +1463,21 @@ onUnmounted(() => {
 .chart-container {
   width: 100%;
   height: 430px;
+}
+
+.history-state {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 4px 8px;
+  border: 1px solid #dbe3ee;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #64748b;
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
 }
 
 .chart-overlay,

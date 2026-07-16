@@ -43,7 +43,8 @@ export const queryStockBatchQuotes = async (symbols: string[]): Promise<GeneralR
 export const queryStockCandles = async (
     symbol: string,
     interval: StockTrackerInterval,
-    limit?: number
+    limit?: number,
+    endTime?: string
 ): Promise<GeneralResponse<StockTrackerCandleSeriesVo>> => {
     const response = await stockTrackerRequest.get<GeneralResponse<StockTrackerCandleSeriesVo>>(
         '/external-service/api/stock-tracker/candles',
@@ -51,7 +52,8 @@ export const queryStockCandles = async (
             params: {
                 symbol,
                 interval,
-                limit
+                limit,
+                endTime
             }
         }
     )

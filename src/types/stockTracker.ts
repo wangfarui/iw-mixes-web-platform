@@ -56,6 +56,10 @@ export interface StockTrackerCandleSeriesVo {
     source: string
     generatedAt: string
     candles: StockTrackerCandleVo[]
+    hasMoreBefore?: boolean
+    nextEndTime?: string
+    oldestTime?: string
+    newestTime?: string
     warnings: string[]
 }
 
@@ -70,6 +74,7 @@ export interface StockTrackerLocalState {
     watchlist: StockTrackerWatchItem[]
     selectedSymbol?: string
     interval: StockTrackerInterval
+    autoInterval: boolean
     autoRefresh: boolean
     refreshSeconds: number
 }

@@ -54,6 +54,7 @@ export const createDefaultStockTrackerState = (): StockTrackerLocalState => ({
     watchlist: DEFAULT_WATCHLIST.map((item) => ({ ...item })),
     selectedSymbol: DEFAULT_WATCHLIST[0]?.symbol,
     interval: DEFAULT_INTERVAL,
+    autoInterval: true,
     autoRefresh: false,
     refreshSeconds: DEFAULT_REFRESH_SECONDS
 })
@@ -248,6 +249,7 @@ const normalizeStoredState = (value: Partial<StockTrackerLocalState>): StockTrac
         watchlist,
         selectedSymbol,
         interval: normalizeInterval(value.interval),
+        autoInterval: value.autoInterval !== false,
         autoRefresh: value.autoRefresh === true,
         refreshSeconds: normalizeRefreshSeconds(value.refreshSeconds)
     }
