@@ -7,8 +7,10 @@ import type {
 import {
   FORMAT_EXTENSIONS,
   IMAGE_FILE_EXTENSIONS,
+  IMAGE_MIME_TYPES,
   IMAGE_PROCESSOR_LIMITS
 } from './config'
+import { isSvgImageFile, readSvgFile } from './svg'
 
 export const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -47,12 +49,12 @@ export const getFormatExtension = (mimeType: ImageOutputFormat | string) => {
 
 export const isSupportedImageFile = (file: File) => {
   const extension = getFileExtension(file.name)
-  return IMAGE_FILE_EXTENSIONS.has(extension) || file.type.startsWith('image/')
+  return IMAGE_FILE_EXTENSIONS.has(extension) || IMAGE_MIME_TYPES.has(file.type)
 }
 
 export const validateImageFile = (file: File) => {
   if (!isSupportedImageFile(file)) {
-    throw new Error('仅支持 PNG、JPG、WebP 和 GIF 图片')
+    throw new Error('仅支持 PNG、JPG、WebP、GIF 和 SVG 图片')
   }
 
   if (file.size > IMAGE_PROCESSOR_LIMITS.maxImageBytes) {
@@ -71,7 +73,9 @@ export const loadImageElement = (src: string): Promise<HTMLImageElement> => {
 
 export const readImageFileItem = async (file: File): Promise<ImageFileItem> => {
   validateImageFile(file)
-  const objectUrl = URL.createObjectURL(file)
+  const isSvg = isSvgImageFile(file)
+  const svg = isSvg ? await readSvgFile(file) : null
+  const objectUrl = URL.createObjectURL(svg?.blob || file)
 
   try {
     const image = await loadImageElement(objectUrl)
@@ -80,13 +84,13 @@ export const readImageFileItem = async (file: File): Promise<ImageFileItem> => {
       file,
       name: file.name,
       size: file.size,
-      type: file.type || 'image/png',
-      width: image.naturalWidth || image.width,
-      height: image.naturalHeight || image.height,
+      type: isSvg ? 'image/svg+xml' : file.type || 'image/png',
+      width: svg?.width || image.naturalWidth || image.width || 1,
+      height: svg?.height || image.naturalHeight || image.height || 1,
       objectUrl,
       lastModified: file.lastModified,
       status: 'ready',
-      message: '读取完成'
+      message: svg?.sanitized ? '读取完成，已移除不安全的 SVG 内容' : '读取完成'
     }
   } catch (error) {
     URL.revokeObjectURL(objectUrl)

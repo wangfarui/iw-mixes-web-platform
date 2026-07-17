@@ -1,4 +1,4 @@
-export type ImageProcessorMode = 'compress' | 'ascii' | 'idPhoto' | 'pixel'
+export type ImageProcessorMode = 'compress' | 'svg' | 'ascii' | 'idPhoto' | 'pixel'
 
 export type ImageOutputFormat = 'image/jpeg' | 'image/png' | 'image/webp'
 
@@ -15,9 +15,20 @@ export type ManualMaskMark = 0 | 1 | 2
 export interface ImageProcessorSettings {
   mode: ImageProcessorMode
   compress: CompressionSettings
+  svg: SvgConvertSettings
   ascii: AsciiSettings
   idPhoto: IdPhotoSettings
   pixel: PixelSettings
+}
+
+export interface SvgConvertSettings {
+  width: number
+  height: number
+  keepAspectRatio: boolean
+  format: ImageOutputFormat
+  quality: number
+  transparent: boolean
+  backgroundColor: string
 }
 
 export interface CompressionSettings {

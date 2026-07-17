@@ -5,7 +5,8 @@ import type {
   IdPhotoPresetKey,
   ImageOutputFormat,
   ImageProcessorMode,
-  ImageProcessorSettings
+  ImageProcessorSettings,
+  SvgConvertSettings
 } from '@/types/imageProcessor'
 
 export const IMAGE_PROCESSOR_LIMITS = {
@@ -15,15 +16,26 @@ export const IMAGE_PROCESSOR_LIMITS = {
   workerMaxPixels: 5_000_000,
   workerMaxDimension: 1800,
   asciiMaxWidth: 180,
-  previewMaxDimension: 1600
+  previewMaxDimension: 1600,
+  svgMaxDimension: 8000,
+  svgMaxPixels: 32_000_000
 } as const
 
-export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif'
+export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg'
 
-export const IMAGE_FILE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif'])
+export const IMAGE_FILE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'])
+
+export const IMAGE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml'
+])
 
 export const MODE_LABELS: Record<ImageProcessorMode, string> = {
   compress: '图片压缩',
+  svg: 'SVG 转图片',
   ascii: '图片转 ASCII',
   idPhoto: '证件照换底色',
   pixel: '像素风生成'
@@ -114,9 +126,20 @@ export const createDefaultCompressionSettings = (): CompressionSettings => ({
   keepOriginalSize: false
 })
 
+export const createDefaultSvgConvertSettings = (): SvgConvertSettings => ({
+  width: 1024,
+  height: 1024,
+  keepAspectRatio: true,
+  format: 'image/png',
+  quality: 0.92,
+  transparent: true,
+  backgroundColor: '#ffffff'
+})
+
 export const createDefaultImageSettings = (): ImageProcessorSettings => ({
   mode: 'compress',
   compress: createDefaultCompressionSettings(),
+  svg: createDefaultSvgConvertSettings(),
   ascii: {
     width: 96,
     charset: 'standard',

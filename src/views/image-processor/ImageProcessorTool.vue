@@ -4,11 +4,11 @@
       <div class="topbar-title">
         <h1>图片处理工具</h1>
         <el-tag type="success" effect="light">本地处理 / 不上传</el-tag>
-        <span class="privacy-copy">压缩、ASCII、证件照换底色和像素风生成均在当前浏览器完成。</span>
+        <span class="privacy-copy">SVG 转换、压缩、ASCII、证件照换底色和像素风生成均在当前浏览器完成。</span>
       </div>
       <div class="topbar-actions">
         <ToolHomeButton />
-        <el-button type="primary" :disabled="!activeImage || status === 'running'" @click="runProcessing">
+        <el-button type="primary" :disabled="!canProcess" @click="runProcessing">
           <el-icon><MagicStick /></el-icon>
           开始处理
         </el-button>
@@ -62,7 +62,7 @@
         >
           <el-icon><Upload /></el-icon>
           <strong>拖入或选择图片</strong>
-          <span>支持 PNG、JPG、WebP、GIF；也可以直接粘贴剪贴板图片。</span>
+          <span>支持 SVG、PNG、JPG、WebP、GIF；也可以直接粘贴剪贴板图片。</span>
         </div>
         <input
           ref="fileInputRef"
@@ -90,6 +90,7 @@
             <span>
               <strong>{{ image.name }}</strong>
               <small>{{ image.width }} x {{ image.height }} · {{ formatBytes(image.size) }}</small>
+              <small v-if="image.message !== '读取完成'" class="file-message">{{ image.message }}</small>
             </span>
             <el-button text type="danger" @click.stop="removeImage(image.id)">移除</el-button>
           </button>
@@ -106,6 +107,7 @@
           <div class="panel-actions">
             <el-radio-group v-model="settings.mode" size="small">
               <el-radio-button label="compress">压缩</el-radio-button>
+              <el-radio-button label="svg" :disabled="!activeImageIsSvg">SVG 转图片</el-radio-button>
               <el-radio-button label="ascii">ASCII</el-radio-button>
               <el-radio-button label="idPhoto">证件照</el-radio-button>
               <el-radio-button label="pixel">像素风</el-radio-button>
@@ -223,6 +225,61 @@
           </el-form-item>
           <el-form-item label="尺寸">
             <el-switch v-model="settings.compress.keepOriginalSize" active-text="保留原尺寸" />
+          </el-form-item>
+        </el-form>
+
+        <el-form v-else-if="settings.mode === 'svg'" label-position="top" class="settings-form">
+          <el-form-item label="输出格式">
+            <el-select v-model="settings.svg.format">
+              <el-option label="PNG" value="image/png" />
+              <el-option label="JPG" value="image/jpeg" />
+              <el-option label="WebP" value="image/webp" />
+            </el-select>
+          </el-form-item>
+          <div class="size-row">
+            <el-form-item label="宽度">
+              <el-input-number
+                v-model="settings.svg.width"
+                :min="1"
+                :max="IMAGE_PROCESSOR_LIMITS.svgMaxDimension"
+                controls-position="right"
+                @change="handleSvgWidthChange"
+              />
+            </el-form-item>
+            <el-form-item label="高度">
+              <el-input-number
+                v-model="settings.svg.height"
+                :min="1"
+                :max="IMAGE_PROCESSOR_LIMITS.svgMaxDimension"
+                controls-position="right"
+                @change="handleSvgHeightChange"
+              />
+            </el-form-item>
+          </div>
+          <el-form-item label="尺寸比例">
+            <div class="inline-switches">
+              <el-switch v-model="settings.svg.keepAspectRatio" active-text="锁定原图比例" />
+              <el-button text type="primary" @click="resetSvgDimensions">恢复原始尺寸</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="背景">
+            <el-switch
+              v-model="settings.svg.transparent"
+              active-text="透明背景"
+              :disabled="settings.svg.format === 'image/jpeg'"
+            />
+          </el-form-item>
+          <el-form-item v-if="!settings.svg.transparent || settings.svg.format === 'image/jpeg'" label="背景颜色">
+            <el-color-picker v-model="settings.svg.backgroundColor" />
+          </el-form-item>
+          <el-form-item label="质量">
+            <el-slider
+              v-model="settings.svg.quality"
+              :min="0.1"
+              :max="1"
+              :step="0.01"
+              :disabled="settings.svg.format === 'image/png'"
+            />
           </el-form-item>
         </el-form>
 
@@ -386,6 +443,8 @@ import {
   getIdPhotoBackgroundColor
 } from '@/utils/image-processor/config'
 import { compressImageFile } from '@/utils/image-processor/compress'
+import { isSvgImageFile } from '@/utils/image-processor/svg'
+import { convertSvgFile } from '@/utils/image-processor/svgConvert'
 import {
   calculateLimitedSize,
   createImageId,
@@ -429,10 +488,17 @@ let worker: Worker | null = null
 let requestId = 0
 
 const activeImage = computed(() => images.value.find((item) => item.id === activeImageId.value) || null)
+const activeImageIsSvg = computed(() => activeImage.value ? isSvgImageFile(activeImage.value) : false)
+const canProcess = computed(() => {
+  return Boolean(activeImage.value) && status.value !== 'running' && (settings.mode !== 'svg' || activeImageIsSvg.value)
+})
 const modeTitle = computed(() => MODE_LABELS[settings.mode])
 const modeDescription = computed(() => {
   if (settings.mode === 'compress') {
     return '调整尺寸、质量和格式，适合批量减小图片体积。'
+  }
+  if (settings.mode === 'svg') {
+    return '按指定尺寸把 SVG 栅格化为 PNG、JPG 或 WebP，可保留透明背景。'
   }
   if (settings.mode === 'ascii') {
     return '把图片采样成字符画，可复制文本或导出 HTML / PNG。'
@@ -445,6 +511,9 @@ const modeDescription = computed(() => {
 const previewSummary = computed(() => {
   if (!activeImage.value) {
     return '导入图片后开始处理。'
+  }
+  if (settings.mode === 'svg') {
+    return `${activeImage.value.name} · ${settings.svg.width} x ${settings.svg.height}`
   }
   return `${activeImage.value.name} · ${settings.mode === 'idPhoto' ? `${settings.idPhoto.width} x ${settings.idPhoto.height}` : `${activeImage.value.width} x ${activeImage.value.height}`}`
 })
@@ -472,13 +541,28 @@ watch(() => settings.idPhoto.preset, (preset) => {
   resetManualMask()
 })
 
+watch(() => settings.svg.format, (format) => {
+  if (format === 'image/jpeg') {
+    settings.svg.transparent = false
+  }
+})
+
 watch(() => settings.mode, () => {
+  if (settings.mode === 'svg') {
+    resetSvgDimensions()
+  }
   clearResult()
   resetManualMask()
   errorMessage.value = ''
 })
 
 watch(activeImageId, () => {
+  if (activeImageIsSvg.value) {
+    settings.mode = 'svg'
+    resetSvgDimensions()
+  } else if (settings.mode === 'svg') {
+    settings.mode = 'compress'
+  }
   clearResult()
   resetManualMask()
   errorMessage.value = ''
@@ -593,6 +677,44 @@ const prepareManualMask = (width: number, height: number) => {
   }
 }
 
+const getSafeSvgSize = (width: number, height: number) => {
+  let scale = Math.min(1, IMAGE_PROCESSOR_LIMITS.svgMaxDimension / Math.max(width, height))
+  if (width * height * scale * scale > IMAGE_PROCESSOR_LIMITS.svgMaxPixels) {
+    scale = Math.sqrt(IMAGE_PROCESSOR_LIMITS.svgMaxPixels / (width * height))
+  }
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  }
+}
+
+const resetSvgDimensions = () => {
+  if (!activeImage.value || !activeImageIsSvg.value) {
+    return
+  }
+  const size = getSafeSvgSize(activeImage.value.width, activeImage.value.height)
+  settings.svg.width = size.width
+  settings.svg.height = size.height
+}
+
+const handleSvgWidthChange = (value?: number) => {
+  if (!settings.svg.keepAspectRatio || !activeImage.value || !value) {
+    return
+  }
+  const size = getSafeSvgSize(value, value * activeImage.value.height / activeImage.value.width)
+  settings.svg.width = size.width
+  settings.svg.height = size.height
+}
+
+const handleSvgHeightChange = (value?: number) => {
+  if (!settings.svg.keepAspectRatio || !activeImage.value || !value) {
+    return
+  }
+  const size = getSafeSvgSize(value * activeImage.value.width / activeImage.value.height, value)
+  settings.svg.width = size.width
+  settings.svg.height = size.height
+}
+
 const cancelProcessing = () => {
   if (worker) {
     worker.terminate()
@@ -636,6 +758,27 @@ const runProcessing = async () => {
         summary: `${formatBytes(image.size)} -> ${formatBytes(compressed.blob.size)}`,
         compressionRatio: compressed.compressionRatio,
         warnings: compressed.warnings
+      })
+      return
+    }
+
+    if (settings.mode === 'svg') {
+      const converted = await convertSvgFile(image, settings.svg)
+      setResult({
+        id: createImageId(),
+        sourceId: image.id,
+        sourceName: image.name,
+        mode: 'svg',
+        outputName: converted.outputName,
+        width: converted.width,
+        height: converted.height,
+        size: converted.blob.size,
+        mimeType: converted.mimeType,
+        blob: converted.blob,
+        blobUrl: URL.createObjectURL(converted.blob),
+        durationMs: converted.durationMs,
+        summary: `${converted.width} x ${converted.height} ${getFormatExtension(converted.mimeType).toUpperCase()}`,
+        warnings: converted.warnings
       })
       return
     }
@@ -704,7 +847,7 @@ const runBatchCompress = async () => {
   }
 }
 
-const prepareImageData = async (image: ImageFileItem, mode: ImageProcessorMode) => {
+const prepareImageData = async (image: ImageFileItem, mode: Exclude<ImageProcessorMode, 'compress' | 'svg'>) => {
   if (mode === 'idPhoto') {
     const background = getIdPhotoBackgroundColor(settings.idPhoto.background, settings.idPhoto.customColor)
     const canvas = await drawImageToCanvas(
@@ -726,7 +869,7 @@ const prepareImageData = async (image: ImageFileItem, mode: ImageProcessorMode) 
   }
 }
 
-const runWorker = (imageData: ImageData, mode: Exclude<ImageProcessorMode, 'compress'>) => {
+const runWorker = (imageData: ImageData, mode: Exclude<ImageProcessorMode, 'compress' | 'svg'>) => {
   return new Promise<ImageWorkerPayload>((resolve, reject) => {
     requestId += 1
     const currentId = requestId
@@ -1171,6 +1314,10 @@ const clearManualMask = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-item .file-message {
+  color: #b45309;
 }
 
 .file-item strong {

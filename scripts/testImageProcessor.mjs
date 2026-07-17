@@ -32,6 +32,7 @@ const ascii = await bundleModule('src/utils/image-processor/ascii.ts', 'ascii.mj
 const pixel = await bundleModule('src/utils/image-processor/pixel.ts', 'pixel.mjs')
 const background = await bundleModule('src/utils/image-processor/background.ts', 'background.mjs')
 const files = await bundleModule('src/utils/image-processor/files.ts', 'files.mjs')
+const svg = await bundleModule('src/utils/image-processor/svg.ts', 'svg.mjs')
 
 const defaults = config.createDefaultImageSettings()
 
@@ -65,6 +66,24 @@ assert.deepEqual(contained, {
 const kept = files.calculateContainSize(4000, 2000, 1000, 1000, true)
 assert.equal(kept.width, 4000)
 assert.equal(kept.height, 2000)
+
+assert.match(config.IMAGE_ACCEPT, /image\/svg\+xml/)
+assert.equal(Math.round(svg.parseSvgLength('2.54cm')), 96)
+assert.deepEqual(svg.resolveSvgDimensions(null, null, '0 0 640 360'), {
+  width: 640,
+  height: 360
+})
+assert.deepEqual(svg.resolveSvgDimensions('320', null, '0 0 640 360'), {
+  width: 320,
+  height: 180
+})
+assert.deepEqual(svg.resolveSvgDimensions(null, null, '0 0 0.4 0.4'), {
+  width: 1,
+  height: 1
+})
+assert.equal(svg.isSafeSvgReference('#local-gradient'), true)
+assert.equal(svg.isSafeSvgReference('data:image/png;base64,AAAA'), true)
+assert.equal(svg.isSafeSvgReference('https://example.com/tracker.png'), false)
 
 const pixelSource = {
   width: 4,
