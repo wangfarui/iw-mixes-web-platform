@@ -161,3 +161,17 @@ npm run preview
 - 调整公共请求封装会影响所有页面，要优先做全局回归思考。
 - 页面新增字段时，同步检查 `src/types`、表格列、表单项、详情显示、API 入参出参。
 - 复杂 UI 改动完成后，优先用 `npm run type-check` 和 `npm run build` 验证。
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the five canonical engineering-skill labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses the single-context layout. See `docs/agents/domain.md`.
