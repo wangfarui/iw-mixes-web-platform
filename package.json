@@ -20,6 +20,11 @@
     "test:document-converter": "node scripts/testDocumentConverter.mjs",
     "test:stock-tracker": "node scripts/testStockTracker.mjs",
     "test:address-generator": "node scripts/testAddressGenerator.mjs",
+    "test:ai-launcher": "node scripts/testAiLauncher.mjs",
+    "ai-launcher:install": "node scripts/aiLauncher.mjs install",
+    "ai-launcher:uninstall": "node scripts/aiLauncher.mjs uninstall",
+    "ai-launcher:status": "node scripts/aiLauncher.mjs status",
+    "ai-launcher:pair": "node scripts/aiLauncher.mjs pair",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {

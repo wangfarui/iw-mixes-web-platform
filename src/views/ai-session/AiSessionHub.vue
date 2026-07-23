@@ -85,6 +85,15 @@
           <div class="panel-title">会话任务列表</div>
           <div class="panel-subtitle">共 {{ tasks.length }} 条记录。</div>
         </div>
+        <div class="launcher-summary">
+          <el-tag :type="launcherStatusTagType" effect="plain">
+            {{ launcherStatusText }}
+          </el-tag>
+          <el-button :loading="launcherConnectionState === 'checking'" @click="openLauncherDialog">
+            <el-icon><Connection /></el-icon>
+            本机启动器
+          </el-button>
+        </div>
       </div>
 
         <el-table :data="tasks" row-key="id" style="width: 100%">
@@ -141,8 +150,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
+            <el-tooltip :content="getQuickLaunchTip(row)" placement="top">
+              <span>
+                <el-button
+                  link
+                  type="success"
+                  :loading="launchingTaskId === row.id"
+                  :disabled="!canQuickLaunch(row)"
+                  @click="quickLaunchTask(row)"
+                >
+                  <el-icon><VideoPlay /></el-icon>
+                  开启
+                </el-button>
+              </span>
+            </el-tooltip>
             <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
             <el-button link type="primary" @click="copyText(row.resumeCommand, '继续命令')">复制命令</el-button>
             <el-button link type="danger" @click="removeTask(row)">删除</el-button>
@@ -181,23 +204,54 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="8">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="工具" prop="toolType">
               <el-select v-model="formState.toolType" style="width: 100%">
                 <el-option v-for="tool in toolOptions" :key="tool" :label="tool" :value="tool" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="8">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="任务状态" prop="taskStatus">
               <el-select v-model="formState.taskStatus" style="width: 100%">
                 <el-option v-for="status in taskStatusOptions" :key="status" :label="status" :value="status" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="8">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="模型">
               <el-input v-model="formState.modelName" maxlength="64" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="模型提供方">
+              <el-select
+                v-model="formState.modelProvider"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                placeholder="输入或选择模型提供方"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="item in modelProviderOptions"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                >
+                  <div class="local-option">
+                    <span>{{ item }}</span>
+                    <el-icon
+                      class="local-option-remove"
+                      @mousedown.stop.prevent
+                      @click.stop="removeLocalOption('modelProvider', item)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </div>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -216,8 +270,33 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="工作区">
-              <el-input v-model="formState.workspacePath" maxlength="255" />
+            <el-form-item label="工作区" prop="workspacePath">
+              <el-select
+                v-model="formState.workspacePath"
+                filterable
+                allow-create
+                default-first-option
+                placeholder="输入或选择本机工作区绝对路径"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="item in workspaceOptions"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                >
+                  <div class="local-option">
+                    <span>{{ item }}</span>
+                    <el-icon
+                      class="local-option-remove"
+                      @mousedown.stop.prevent
+                      @click.stop="removeLocalOption('workspace', item)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </div>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -242,6 +321,51 @@
         <el-button @click="formDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitForm">
           保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="launcherDialogVisible"
+      title="本机启动器"
+      width="560px"
+      :close-on-click-modal="false"
+    >
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="连接状态">
+          <el-tag :type="launcherStatusTagType" effect="plain">
+            {{ launcherStatusText }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="安装命令">
+          <div class="launcher-command">
+            <code>npm run ai-launcher:install</code>
+            <el-button link type="primary" @click="copyText('npm run ai-launcher:install', '安装命令')">
+              复制
+            </el-button>
+          </div>
+        </el-descriptions-item>
+      </el-descriptions>
+
+      <el-form label-width="92px" class="launcher-pair-form">
+        <el-form-item label="配对令牌">
+          <el-input
+            v-model="launcherTokenInput"
+            type="password"
+            show-password
+            maxlength="128"
+            autocomplete="off"
+            placeholder="输入安装时生成的配对令牌"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button :loading="launcherConnectionState === 'checking'" @click="refreshLauncherStatus(true)">
+          检测状态
+        </el-button>
+        <el-button type="primary" :loading="launcherConnectionState === 'checking'" @click="saveLauncherPairing">
+          保存并连接
         </el-button>
       </template>
     </el-dialog>
@@ -344,7 +468,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { FolderOpened, Plus } from '@element-plus/icons-vue'
+import { Close, Connection, FolderOpened, Plus, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
@@ -354,6 +478,20 @@ import {
   queryAiTaskPage,
   updateAiTask
 } from '@/api/aiTask'
+import {
+  AiLauncherError,
+  getAiLauncherToken,
+  launchAiSession,
+  queryAiLauncherStatus,
+  setAiLauncherToken,
+  type AiLauncherStatus
+} from '@/services/aiLauncherClient'
+import {
+  getAiTaskLocalOptions,
+  rememberAiTaskLocalOption,
+  removeAiTaskLocalOption,
+  type AiTaskLocalOptionType
+} from '@/services/aiTaskLocalOptions'
 import type * as AiTaskType from '@/types/aiTask'
 
 type ToolType = 'Codex' | 'Claude Code' | 'Gemini CLI'
@@ -361,6 +499,7 @@ type TaskStatus = '进行中' | '已完成' | '暂停'
 type ImportTool = 'claude' | 'codex'
 type ImportSourceMode = 'none' | 'files' | 'directory'
 type NoticeType = 'success' | 'warning' | 'info' | 'error'
+type LauncherConnectionState = 'checking' | 'offline' | 'unpaired' | 'ready'
 
 interface AiSessionTask {
   id: number
@@ -372,6 +511,7 @@ interface AiSessionTask {
   projectName: string
   workspacePath: string
   modelName: string
+  modelProvider: string
   gitBranch: string
   transcriptPath: string
   resumeCommand: string
@@ -390,6 +530,7 @@ interface FormState {
   projectName: string
   workspacePath: string
   modelName: string
+  modelProvider: string
   gitBranch: string
   transcriptPath: string
   resumeCommand: string
@@ -451,6 +592,13 @@ const formDialogVisible = ref(false)
 const formDialogMode = ref<'create' | 'edit'>('create')
 const importDialogVisible = ref(false)
 const importLoading = ref(false)
+const launcherDialogVisible = ref(false)
+const launcherTokenInput = ref('')
+const launcherConnectionState = ref<LauncherConnectionState>('checking')
+const launcherStatus = ref<AiLauncherStatus>()
+const launchingTaskId = ref<number>()
+const workspaceOptions = ref<string[]>([])
+const modelProviderOptions = ref<string[]>([])
 const tasks = ref<AiSessionTask[]>([])
 const importTool = ref<ImportTool>('claude')
 const importSourceLabel = ref('未选择')
@@ -478,6 +626,7 @@ const formState = reactive<FormState>({
   projectName: '',
   workspacePath: '',
   modelName: '',
+  modelProvider: '',
   gitBranch: '',
   transcriptPath: '',
   resumeCommand: ''
@@ -487,7 +636,8 @@ const formRules: FormRules = {
   title: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   toolType: [{ required: true, message: '请选择工具', trigger: 'change' }],
   sessionKey: [{ required: true, message: '请输入 sessionKey', trigger: 'blur' }],
-  taskStatus: [{ required: true, message: '请选择任务状态', trigger: 'change' }]
+  taskStatus: [{ required: true, message: '请选择任务状态', trigger: 'change' }],
+  workspacePath: [{ required: true, message: '请输入工作区绝对路径', trigger: 'change' }]
 }
 
 const formDialogTitle = computed(() => formDialogMode.value === 'create' ? '新建 AI 会话任务' : '编辑 AI 会话任务')
@@ -517,6 +667,26 @@ const importSourceTagType = computed(() => {
   return importSourceMode.value === 'directory' || importSourceMode.value === 'files' ? 'success' : 'info'
 })
 
+const launcherStatusText = computed(() => {
+  const statusTextMap: Record<LauncherConnectionState, string> = {
+    checking: '正在检测',
+    offline: '未检测到启动器',
+    unpaired: '等待配对',
+    ready: '启动器已连接'
+  }
+  return statusTextMap[launcherConnectionState.value]
+})
+
+const launcherStatusTagType = computed(() => {
+  const typeMap: Record<LauncherConnectionState, 'success' | 'warning' | 'info'> = {
+    checking: 'info',
+    offline: 'info',
+    unpaired: 'warning',
+    ready: 'success'
+  }
+  return typeMap[launcherConnectionState.value]
+})
+
 const resetForm = () => {
   formState.id = undefined
   formState.title = ''
@@ -527,6 +697,7 @@ const resetForm = () => {
   formState.projectName = ''
   formState.workspacePath = ''
   formState.modelName = ''
+  formState.modelProvider = ''
   formState.gitBranch = ''
   formState.transcriptPath = ''
   formState.resumeCommand = ''
@@ -576,7 +747,7 @@ const normalizeOptionalText = (value: string) => {
   return normalized || undefined
 }
 
-const buildResumeCommand = (toolType: ToolType, sessionKey: string) => {
+const buildResumeCommand = (toolType: ToolType, sessionKey: string, modelProvider = '') => {
   if (!sessionKey.trim()) {
     return ''
   }
@@ -586,7 +757,8 @@ const buildResumeCommand = (toolType: ToolType, sessionKey: string) => {
   if (toolType === 'Gemini CLI') {
     return `gemini session resume ${sessionKey}`
   }
-  return `codex resume ${sessionKey}`
+  const providerConfig = modelProvider.trim() ? ` -c model_provider=${modelProvider.trim()}` : ''
+  return `codex resume ${sessionKey}${providerConfig}`
 }
 
 const prefillResumeCommand = () => {
@@ -594,7 +766,11 @@ const prefillResumeCommand = () => {
     ElMessage.warning('请先输入 sessionKey')
     return
   }
-  formState.resumeCommand = buildResumeCommand(formState.toolType, formState.sessionKey)
+  formState.resumeCommand = buildResumeCommand(
+    formState.toolType,
+    formState.sessionKey,
+    formState.modelProvider
+  )
 }
 
 const mapTaskVo = (task: AiTaskType.AiTaskPageVo | AiTaskType.AiTaskDetailVo): AiSessionTask => {
@@ -608,6 +784,7 @@ const mapTaskVo = (task: AiTaskType.AiTaskPageVo | AiTaskType.AiTaskDetailVo): A
     projectName: task.projectName || '',
     workspacePath: task.workspacePath || '',
     modelName: task.modelName || '',
+    modelProvider: task.modelProvider || '',
     gitBranch: task.gitBranch || '',
     transcriptPath: task.transcriptPath || '',
     resumeCommand: task.resumeCommand || '',
@@ -630,7 +807,11 @@ const buildPageDto = (): AiTaskType.AiTaskPageDto => {
 }
 
 const buildSaveDto = (): AiTaskType.AiTaskAddDto => {
-  const resumeCommand = formState.resumeCommand.trim() || buildResumeCommand(formState.toolType, formState.sessionKey)
+  const resumeCommand = formState.resumeCommand.trim() || buildResumeCommand(
+    formState.toolType,
+    formState.sessionKey,
+    formState.modelProvider
+  )
   return {
     title: formState.title.trim(),
     description: normalizeOptionalText(formState.description),
@@ -638,8 +819,9 @@ const buildSaveDto = (): AiTaskType.AiTaskAddDto => {
     sessionKey: formState.sessionKey.trim(),
     taskStatus: getTaskStatusCode(formState.taskStatus),
     projectName: normalizeOptionalText(formState.projectName),
-    workspacePath: normalizeOptionalText(formState.workspacePath),
+    workspacePath: formState.workspacePath.trim(),
     modelName: normalizeOptionalText(formState.modelName),
+    modelProvider: normalizeOptionalText(formState.modelProvider),
     gitBranch: normalizeOptionalText(formState.gitBranch),
     transcriptPath: normalizeOptionalText(formState.transcriptPath),
     resumeCommand: normalizeOptionalText(resumeCommand)
@@ -676,6 +858,7 @@ const openEditDialog = async (task: AiSessionTask) => {
   formState.projectName = detail.projectName
   formState.workspacePath = detail.workspacePath
   formState.modelName = detail.modelName
+  formState.modelProvider = detail.modelProvider
   formState.gitBranch = detail.gitBranch
   formState.transcriptPath = detail.transcriptPath
   formState.resumeCommand = detail.resumeCommand
@@ -705,6 +888,8 @@ const submitForm = async () => {
     ElMessage.success('会话任务已更新')
   }
 
+  workspaceOptions.value = rememberAiTaskLocalOption('workspace', formState.workspacePath)
+  modelProviderOptions.value = rememberAiTaskLocalOption('modelProvider', formState.modelProvider)
   formDialogVisible.value = false
   await loadTaskPage()
 }
@@ -719,6 +904,129 @@ const copyText = async (text: string, label: string) => {
     ElMessage.success(`${label}已复制`)
   } catch {
     ElMessage.warning(`无法直接复制${label}，请手动复制`)
+  }
+}
+
+const removeLocalOption = (type: AiTaskLocalOptionType, value: string) => {
+  const nextOptions = removeAiTaskLocalOption(type, value)
+  if (type === 'workspace') {
+    workspaceOptions.value = nextOptions
+  } else {
+    modelProviderOptions.value = nextOptions
+  }
+}
+
+const getToolLauncherKey = (toolType: ToolType) => {
+  if (toolType === 'Claude Code') {
+    return 'claude'
+  }
+  if (toolType === 'Gemini CLI') {
+    return 'gemini'
+  }
+  return 'codex'
+}
+
+const canQuickLaunch = (task: AiSessionTask) => {
+  if (!task.workspacePath.trim() || !task.sessionKey.trim() || launchingTaskId.value === task.id) {
+    return false
+  }
+  if (launcherConnectionState.value !== 'ready') {
+    return true
+  }
+  return launcherStatus.value?.tools[getToolLauncherKey(task.toolType)] !== false
+}
+
+const getQuickLaunchTip = (task: AiSessionTask) => {
+  if (!task.workspacePath.trim()) {
+    return '请先编辑并补充工作区'
+  }
+  if (!task.sessionKey.trim()) {
+    return '当前任务缺少 Session'
+  }
+  if (
+    launcherConnectionState.value === 'ready' &&
+    launcherStatus.value?.tools[getToolLauncherKey(task.toolType)] === false
+  ) {
+    return `本机未检测到 ${task.toolType}`
+  }
+  if (launcherConnectionState.value !== 'ready') {
+    return '点击连接本机启动器'
+  }
+  return '在本机 Terminal 中继续会话'
+}
+
+const refreshLauncherStatus = async (notify = false) => {
+  launcherConnectionState.value = 'checking'
+  try {
+    const status = await queryAiLauncherStatus()
+    launcherStatus.value = status
+    launcherConnectionState.value = status.paired ? 'ready' : 'unpaired'
+    if (notify) {
+      ElMessage.success(status.paired ? '本机启动器连接成功' : '已检测到启动器，请完成配对')
+    }
+    return status.paired
+  } catch (error) {
+    launcherStatus.value = undefined
+    launcherConnectionState.value = error instanceof AiLauncherError && error.status === 401
+      ? 'unpaired'
+      : 'offline'
+    if (notify) {
+      ElMessage.warning(error instanceof Error ? error.message : '无法连接本机启动器')
+    }
+    return false
+  }
+}
+
+const openLauncherDialog = () => {
+  launcherTokenInput.value = getAiLauncherToken()
+  launcherDialogVisible.value = true
+  void refreshLauncherStatus()
+}
+
+const saveLauncherPairing = async () => {
+  if (!launcherTokenInput.value.trim()) {
+    ElMessage.warning('请输入配对令牌')
+    return
+  }
+  setAiLauncherToken(launcherTokenInput.value)
+  const connected = await refreshLauncherStatus(true)
+  if (connected) {
+    launcherDialogVisible.value = false
+  }
+}
+
+const quickLaunchTask = async (task: AiSessionTask) => {
+  if (!task.workspacePath.trim()) {
+    ElMessage.warning('请先编辑并补充工作区')
+    return
+  }
+  if (launcherConnectionState.value !== 'ready') {
+    const connected = await refreshLauncherStatus()
+    if (!connected) {
+      openLauncherDialog()
+      return
+    }
+  }
+
+  launchingTaskId.value = task.id
+  try {
+    await launchAiSession({
+      toolType: getToolTypeCode(task.toolType),
+      sessionKey: task.sessionKey,
+      workspacePath: task.workspacePath,
+      modelProvider: normalizeOptionalText(task.modelProvider)
+    })
+    workspaceOptions.value = rememberAiTaskLocalOption('workspace', task.workspacePath)
+    modelProviderOptions.value = rememberAiTaskLocalOption('modelProvider', task.modelProvider)
+    ElMessage.success('已在 Terminal 中打开会话')
+  } catch (error) {
+    if (error instanceof AiLauncherError && error.status === 401) {
+      launcherConnectionState.value = 'unpaired'
+      openLauncherDialog()
+    }
+    ElMessage.error(error instanceof Error ? error.message : '快捷开启失败')
+  } finally {
+    launchingTaskId.value = undefined
   }
 }
 
@@ -1233,6 +1541,7 @@ const importDraftToForm = (draft: DetectedSessionDraft) => {
   formState.projectName = draft.cwd ? inferProjectNameFromPath(draft.cwd) : ''
   formState.workspacePath = draft.cwd
   formState.modelName = draft.modelName
+  formState.modelProvider = ''
   formState.gitBranch = draft.gitBranch
   formState.transcriptPath = draft.transcriptPath
   formState.resumeCommand = draft.resumeCommand
@@ -1260,7 +1569,11 @@ watch(
 )
 
 onMounted(() => {
+  workspaceOptions.value = getAiTaskLocalOptions('workspace')
+  modelProviderOptions.value = getAiTaskLocalOptions('modelProvider')
+  launcherTokenInput.value = getAiLauncherToken()
   void loadTaskPage()
+  void refreshLauncherStatus()
 })
 </script>
 
@@ -1331,7 +1644,31 @@ onMounted(() => {
 }
 
 .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 16px;
+}
+
+.launcher-summary,
+.launcher-command {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.launcher-pair-form {
+  margin-top: 18px;
+}
+
+.launcher-command {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.launcher-command code {
+  word-break: break-all;
 }
 
 .panel-title {
@@ -1385,6 +1722,24 @@ onMounted(() => {
 
 .manual-command-field :deep(.el-input) {
   flex: 1;
+}
+
+.local-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.local-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.local-option-remove {
+  flex: 0 0 auto;
+  color: #98a2b3;
 }
 
 .import-toolbar {
@@ -1486,6 +1841,7 @@ onMounted(() => {
 
 @media (max-width: 900px) {
   .hero-panel,
+  .panel-head,
   .import-toolbar {
     flex-direction: column;
     align-items: flex-start;

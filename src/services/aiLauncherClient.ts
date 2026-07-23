@@ -1,0 +1,92 @@
+import type { ToolTypeCode } from '@/types/aiTask'
+
+const LAUNCHER_BASE_URL = 'http://127.0.0.1:17321/v1'
+const LAUNCHER_TOKEN_KEY = 'iw.aiSession.launcherToken.v1'
+
+export type AiLauncherStatus = {
+  version: string
+  paired: boolean
+  tools: {
+    codex?: boolean
+    claude?: boolean
+    gemini?: boolean
+  }
+}
+
+export type AiLauncherRequest = {
+  toolType: ToolTypeCode
+  sessionKey: string
+  workspacePath: string
+  modelProvider?: string
+}
+
+export class AiLauncherError extends Error {
+  code: string
+  status?: number
+
+  constructor(message: string, code = 'LAUNCHER_UNAVAILABLE', status?: number) {
+    super(message)
+    this.name = 'AiLauncherError'
+    this.code = code
+    this.status = status
+  }
+}
+
+export const getAiLauncherToken = () => window.localStorage.getItem(LAUNCHER_TOKEN_KEY) || ''
+
+export const setAiLauncherToken = (token: string) => {
+  const normalized = token.trim()
+  if (normalized) {
+    window.localStorage.setItem(LAUNCHER_TOKEN_KEY, normalized)
+  } else {
+    window.localStorage.removeItem(LAUNCHER_TOKEN_KEY)
+  }
+}
+
+const requestLauncher = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const token = getAiLauncherToken()
+  const headers = new Headers(init.headers)
+  if (token) {
+    headers.set('X-IW-Launcher-Token', token)
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${LAUNCHER_BASE_URL}${path}`, {
+      ...init,
+      mode: 'cors',
+      cache: 'no-store',
+      headers
+    })
+  } catch {
+    throw new AiLauncherError('无法连接本机启动器，请确认已安装并运行')
+  }
+
+  const body = await response.json().catch(() => ({})) as {
+    code?: string
+    message?: string
+  }
+  if (!response.ok) {
+    throw new AiLauncherError(
+      body.message || '本机启动器请求失败',
+      body.code || 'LAUNCHER_REQUEST_FAILED',
+      response.status
+    )
+  }
+  return body as T
+}
+
+export const queryAiLauncherStatus = () => requestLauncher<AiLauncherStatus>('/status')
+
+export const launchAiSession = (request: AiLauncherRequest) => requestLauncher<{
+  message: string
+  toolType: string
+  commandPreview: string
+  workspacePath: string
+}>('/launch', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(request)
+})

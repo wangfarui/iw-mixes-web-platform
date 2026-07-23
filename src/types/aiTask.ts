@@ -19,8 +19,9 @@ export type AiTaskAddDto = {
   sessionKey: string
   taskStatus: TaskStatusCode
   projectName?: string
-  workspacePath?: string
+  workspacePath: string
   modelName?: string
+  modelProvider?: string
   gitBranch?: string
   transcriptPath?: string
   resumeCommand?: string
@@ -40,6 +41,7 @@ export type AiTaskPageVo = {
   projectName?: string
   workspacePath?: string
   modelName?: string
+  modelProvider?: string
   gitBranch?: string
   transcriptPath?: string
   resumeCommand?: string
