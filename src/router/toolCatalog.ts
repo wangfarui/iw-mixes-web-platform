@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { Brush, ChatDotRound, Connection, DataLine, DocumentCopy, Location, MagicStick, MapLocation, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, Connection, DataAnalysis, DataLine, DocumentCopy, Location, MagicStick, MapLocation, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -50,6 +50,20 @@ export const toolCategories: ToolCategoryItem[] = [
 ]
 
 export const toolCatalog: ToolCatalogItem[] = [
+    {
+        path: 'bmi-calculator',
+        routePath: '/tools/bmi-calculator',
+        routeName: 'BMI 计算器',
+        title: 'BMI 计算器',
+        menuTitle: 'BMI 计算器',
+        description: '输入身高和体重，即时计算中国成人 BMI、体重分类和健康体重参考区间。',
+        category: 'life',
+        scenarios: ['体重自我评估', '健康体重参考'],
+        tags: ['本地计算', '不上传', '成人参考'],
+        keywords: ['bmi', '体质指数', '身高', '体重', '健康体重', '肥胖', '超重'],
+        icon: DataAnalysis,
+        component: () => import('@/views/bmi-calculator/BmiCalculatorTool.vue')
+    },
     {
         path: 'text-diff',
         routePath: '/tools/text-diff',
