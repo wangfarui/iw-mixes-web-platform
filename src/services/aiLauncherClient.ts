@@ -20,6 +20,28 @@ export type AiLauncherRequest = {
   modelProvider?: string
 }
 
+export type AiLauncherSessionDraft = {
+  toolType: 'codex'
+  title: string
+  description: string
+  modelName: string
+  modelProvider: string
+  sessionKey: string
+  workspacePath: string
+  projectName: string
+  gitBranch: string
+  transcriptPath: string
+  resumeCommand: string
+  lastActiveAt: string
+  warnings: string[]
+}
+
+export type AiLauncherOptimizedMetadata = {
+  title: string
+  description: string
+  metadataSource: 'ai'
+}
+
 export class AiLauncherError extends Error {
   code: string
   status?: number
@@ -90,3 +112,49 @@ export const launchAiSession = (request: AiLauncherRequest) => requestLauncher<{
   },
   body: JSON.stringify(request)
 })
+
+export const inspectAiSession = async (resumeCommand: string) => {
+  try {
+    return await requestLauncher<AiLauncherSessionDraft>('/session/inspect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resumeCommand })
+    })
+  } catch (error) {
+    if (error instanceof AiLauncherError && error.code === 'NOT_FOUND') {
+      throw new AiLauncherError(
+        '本机启动器版本过低，请重新执行 npm run ai-launcher:install',
+        'LAUNCHER_UPGRADE_REQUIRED',
+        error.status
+      )
+    }
+    throw error
+  }
+}
+
+export const optimizeAiSessionMetadata = async (request: {
+  resumeCommand: string
+  currentTitle: string
+  currentDescription: string
+}) => {
+  try {
+    return await requestLauncher<AiLauncherOptimizedMetadata>('/session/optimize-metadata', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    })
+  } catch (error) {
+    if (error instanceof AiLauncherError && error.code === 'NOT_FOUND') {
+      throw new AiLauncherError(
+        '本机启动器版本过低，请重新执行 npm run ai-launcher:install',
+        'LAUNCHER_UPGRADE_REQUIRED',
+        error.status
+      )
+    }
+    throw error
+  }
+}

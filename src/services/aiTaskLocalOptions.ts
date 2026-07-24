@@ -1,6 +1,7 @@
 const OPTION_LIMIT = 20
 
 const STORAGE_KEYS = {
+  project: 'iw.aiSession.projectNames.v1',
   workspace: 'iw.aiSession.workspacePaths.v1',
   modelProvider: 'iw.aiSession.modelProviders.v1'
 } as const

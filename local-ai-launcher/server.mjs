@@ -9,6 +9,8 @@ import {
 } from './constants.mjs'
 import { readLauncherConfig, resolveConfigPath } from './config.mjs'
 import { discoverToolExecutables } from './executables.mjs'
+import { createMetadataOptimizer } from './metadataOptimizer.mjs'
+import { createSessionInspector } from './sessionInspector.mjs'
 import { createSessionLauncher } from './sessionLauncher.mjs'
 import { createTerminalAdapter } from './terminalAdapter.mjs'
 
@@ -57,6 +59,8 @@ const applyCorsHeaders = (req, res, allowedOrigins) => {
 export const createLauncherServer = ({
   config,
   sessionLauncher,
+  sessionInspector,
+  metadataOptimizer,
   host = LAUNCHER_HOST,
   port = LAUNCHER_PORT
 }) => {
@@ -132,6 +136,60 @@ export const createLauncherServer = ({
       return
     }
 
+    if (req.method === 'POST' && requestUrl.pathname === '/v1/session/inspect') {
+      if (!hasValidToken) {
+        sendJson(res, 401, { code: 'UNAUTHORIZED', message: '本机启动器尚未配对或令牌无效' })
+        return
+      }
+      if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
+        sendJson(res, 415, { code: 'UNSUPPORTED_MEDIA_TYPE', message: '仅支持 JSON 请求' })
+        return
+      }
+      try {
+        const request = await readJsonBody(req)
+        const result = await sessionInspector.inspect(request)
+        sendJson(res, 200, result)
+      } catch (error) {
+        const statusCode = error?.code === 'PAYLOAD_TOO_LARGE'
+          ? 413
+          : error?.code === 'SESSION_NOT_FOUND'
+            ? 404
+            : 400
+        sendJson(res, statusCode, {
+          code: error?.code || 'SESSION_INSPECT_FAILED',
+          message: error?.message || '读取本地会话失败'
+        })
+      }
+      return
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/v1/session/optimize-metadata') {
+      if (!hasValidToken) {
+        sendJson(res, 401, { code: 'UNAUTHORIZED', message: '本机启动器尚未配对或令牌无效' })
+        return
+      }
+      if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
+        sendJson(res, 415, { code: 'UNSUPPORTED_MEDIA_TYPE', message: '仅支持 JSON 请求' })
+        return
+      }
+      try {
+        const request = await readJsonBody(req)
+        const result = await metadataOptimizer.optimize(request)
+        sendJson(res, 200, result)
+      } catch (error) {
+        const statusCode = error?.code === 'PAYLOAD_TOO_LARGE'
+          ? 413
+          : error?.code === 'SESSION_NOT_FOUND'
+            ? 404
+            : 400
+        sendJson(res, statusCode, {
+          code: error?.code || 'AI_OPTIMIZE_FAILED',
+          message: error?.message || 'AI 优化任务元数据失败'
+        })
+      }
+      return
+    }
+
     sendJson(res, 404, { code: 'NOT_FOUND', message: '本地启动器接口不存在' })
   })
 
@@ -158,9 +216,16 @@ export const startLauncherServer = async (configPath = resolveConfigPath()) => {
     terminalAdapter,
     configuredExecutables: config.executables
   })
+  const sessionInspector = createSessionInspector()
+  const metadataOptimizer = createMetadataOptimizer({
+    sessionInspector,
+    codexExecutable: config.executables.codex
+  })
   const launcherServer = createLauncherServer({
     config,
-    sessionLauncher
+    sessionLauncher,
+    sessionInspector,
+    metadataOptimizer
   })
   await launcherServer.listen()
   process.stdout.write(`IW AI Launcher listening on http://${LAUNCHER_HOST}:${LAUNCHER_PORT}\n`)

@@ -6,19 +6,193 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 
 import { createLauncherServer } from '../local-ai-launcher/server.mjs'
+import {
+  createMetadataOptimizer,
+  loadInteractiveShellEnvironment
+} from '../local-ai-launcher/metadataOptimizer.mjs'
+import { createSessionInspector, parseResumeCommand } from '../local-ai-launcher/sessionInspector.mjs'
 import { createSessionLauncher } from '../local-ai-launcher/sessionLauncher.mjs'
 import { buildTerminalScript } from '../local-ai-launcher/terminalAdapter.mjs'
 
 const tempDir = await mkdtemp(path.join(os.tmpdir(), 'iw-ai-launcher-test-'))
 const workspacePath = path.join(tempDir, "workspace with 'quote'")
 const executablePath = path.join(tempDir, 'codex')
+const optimizerExecutablePath = path.join(tempDir, 'codex-optimizer')
+const optimizerCapturePath = path.join(tempDir, 'optimizer-args.txt')
+const codexHomeDir = path.join(tempDir, '.codex')
+const codexSessionId = '01900000-1234-7000-8000-000000000001'
+const codexSessionDir = path.join(codexHomeDir, 'sessions', '2026', '07', '23')
+const codexTranscriptPath = path.join(codexSessionDir, `rollout-${codexSessionId}.jsonl`)
 const execFileAsync = promisify(execFile)
 await mkdir(workspacePath)
+await mkdir(codexSessionDir, { recursive: true })
+const shellHomeDir = path.join(tempDir, 'shell-home')
+await mkdir(shellHomeDir)
+await writeFile(
+  path.join(shellHomeDir, '.zshrc'),
+  'export IW_TEST_ZSHRC_VALUE="loaded-from-zshrc"\n'
+)
 await writeFile(executablePath, '#!/bin/sh\nprintf "%s\\n" "$@" > "$IW_TEST_CAPTURE"\n')
 await chmod(executablePath, 0o700)
+await writeFile(optimizerExecutablePath, `#!/bin/sh
+if [ -z "$IW_TEST_PROVIDER_KEY" ]; then
+  echo "Missing environment variable: IW_TEST_PROVIDER_KEY" >&2
+  exit 2
+fi
+printf "%s\\n" "$@" > "$IW_TEST_OPTIMIZER_CAPTURE"
+output_file=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then
+    shift
+    output_file="$1"
+  fi
+  shift
+done
+cat >/dev/null
+printf '%s\\n' '{"title":"AI 优化后的名称","description":"AI 优化后的任务描述。"}' > "$output_file"
+`)
+await chmod(optimizerExecutablePath, 0o700)
+await writeFile(path.join(codexHomeDir, 'session_index.jsonl'), [
+  JSON.stringify({
+    id: codexSessionId,
+    thread_name: '实现本地会话识别',
+    updated_at: '2026-07-23T10:00:00.000Z'
+  }),
+  'invalid json line'
+].join('\n'))
+await writeFile(codexTranscriptPath, [
+  JSON.stringify({
+    timestamp: '2026-07-23T09:00:00.000Z',
+    type: 'session_meta',
+    payload: {
+      cwd: workspacePath,
+      model_provider: 'local-provider',
+      git: { branch: 'feature/session-inspector' }
+    }
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-23T09:01:00.000Z',
+    type: 'turn_context',
+    payload: {
+      cwd: workspacePath,
+      model: 'gpt-test-model'
+    }
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-23T09:02:00.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'user_message',
+      message: '请实现本地会话识别功能'
+    }
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-23T09:03:00.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'agent_message',
+      message: '已经完成本地会话检查模块设计。'
+    }
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-23T09:04:00.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'user_message',
+      message: '补充要求：识别过程必须使用本地启动器。'
+    }
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-23T09:05:00.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'task_complete',
+      last_agent_message: '功能和测试均已完成。'
+    }
+  })
+].join('\n'))
 const resolvedWorkspacePath = await realpath(workspacePath)
 
 try {
+  const interactiveShellEnvironment = await loadInteractiveShellEnvironment({
+    baseEnvironment: {
+      HOME: shellHomeDir,
+      PATH: process.env.PATH
+    }
+  })
+  assert.equal(interactiveShellEnvironment.IW_TEST_ZSHRC_VALUE, 'loaded-from-zshrc')
+
+  assert.deepEqual(parseResumeCommand(`codex resume ${codexSessionId}`), {
+    toolType: 'codex',
+    sessionKey: codexSessionId,
+    modelProvider: '',
+    resumeCommand: `codex resume ${codexSessionId}`
+  })
+  const quotedWorkspacePath = `'${workspacePath.split("'").join("'\"'\"'")}'`
+  const copiedScript = `cd -- ${quotedWorkspacePath} && codex resume '${codexSessionId}' -c model_provider='local-provider'`
+  assert.deepEqual(parseResumeCommand(copiedScript), {
+    toolType: 'codex',
+    sessionKey: codexSessionId,
+    modelProvider: 'local-provider',
+    resumeCommand: copiedScript
+  })
+  await assert.rejects(
+    async () => parseResumeCommand(`codex resume ${codexSessionId}; touch /tmp/unsafe`),
+    /命令格式应为/
+  )
+
+  const sessionInspector = createSessionInspector({ codexHomeDir })
+  const inspectedSession = await sessionInspector.inspect({
+    resumeCommand: `codex resume ${codexSessionId} -c model_provider=command-provider`
+  })
+  assert.deepEqual(inspectedSession, {
+    toolType: 'codex',
+    title: '实现本地会话识别',
+    description: '请实现本地会话识别功能；补充：补充要求：识别过程必须使用本地启动器。',
+    modelName: 'gpt-test-model',
+    modelProvider: 'command-provider',
+    sessionKey: codexSessionId,
+    workspacePath,
+    projectName: path.basename(workspacePath),
+    gitBranch: 'feature/session-inspector',
+    transcriptPath: codexTranscriptPath,
+    resumeCommand: `codex resume ${codexSessionId} -c model_provider=command-provider`,
+    lastActiveAt: '2026-07-23T09:05:00.000Z',
+    warnings: []
+  })
+  await assert.rejects(
+    () => sessionInspector.inspect({
+      resumeCommand: 'codex resume 01900000-1234-7000-8000-000000000002'
+    }),
+    /本机未找到对应的 Codex 会话/
+  )
+
+  process.env.IW_TEST_OPTIMIZER_CAPTURE = optimizerCapturePath
+  const metadataOptimizer = createMetadataOptimizer({
+    sessionInspector,
+    codexExecutable: optimizerExecutablePath,
+    resolveEnvironment: async () => ({
+      ...process.env,
+      IW_TEST_PROVIDER_KEY: 'test-provider-key'
+    })
+  })
+  const optimizedMetadata = await metadataOptimizer.optimize({
+    resumeCommand: `codex resume ${codexSessionId}`,
+    currentTitle: inspectedSession.title,
+    currentDescription: inspectedSession.description
+  })
+  assert.deepEqual(optimizedMetadata, {
+    title: 'AI 优化后的名称',
+    description: 'AI 优化后的任务描述。',
+    metadataSource: 'ai'
+  })
+  const optimizerArgs = (await readFile(optimizerCapturePath, 'utf8')).trim().split('\n')
+  assert.ok(optimizerArgs.includes('--ephemeral'))
+  assert.ok(optimizerArgs.includes('--output-schema'))
+  assert.ok(optimizerArgs.includes('read-only'))
+  assert.ok(optimizerArgs.includes('model_provider=local-provider'))
+  assert.ok(optimizerArgs.includes('gpt-test-model'))
+
   let openedSpec
   const sessionLauncher = createSessionLauncher({
     terminalAdapter: {
@@ -110,6 +284,8 @@ try {
   const launcherServer = createLauncherServer({
     config,
     sessionLauncher,
+    sessionInspector,
+    metadataOptimizer,
     port: 0
   })
   await launcherServer.listen()
@@ -159,6 +335,18 @@ try {
   })
   assert.equal(unauthorizedResponse.status, 401)
 
+  const unauthorizedInspectResponse = await fetch(`${baseUrl}/v1/session/inspect`, {
+    method: 'POST',
+    headers: {
+      Origin: 'https://web.itwray.com',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      resumeCommand: `codex resume ${codexSessionId}`
+    })
+  })
+  assert.equal(unauthorizedInspectResponse.status, 401)
+
   const launchResponse = await fetch(`${baseUrl}/v1/launch`, {
     method: 'POST',
     headers: {
@@ -175,6 +363,57 @@ try {
   })
   assert.equal(launchResponse.status, 202)
   assert.equal((await launchResponse.json()).toolType, 'codex')
+
+  const inspectResponse = await fetch(`${baseUrl}/v1/session/inspect`, {
+    method: 'POST',
+    headers: {
+      Origin: 'https://web.itwray.com',
+      'Content-Type': 'application/json',
+      'X-IW-Launcher-Token': 'test-token'
+    },
+    body: JSON.stringify({
+      resumeCommand: `codex resume ${codexSessionId}`
+    })
+  })
+  assert.equal(inspectResponse.status, 200)
+  const inspectBody = await inspectResponse.json()
+  assert.equal(inspectBody.sessionKey, codexSessionId)
+  assert.equal(inspectBody.modelProvider, 'local-provider')
+  assert.equal(inspectBody.projectName, path.basename(workspacePath))
+
+  const invalidInspectResponse = await fetch(`${baseUrl}/v1/session/inspect`, {
+    method: 'POST',
+    headers: {
+      Origin: 'https://web.itwray.com',
+      'Content-Type': 'application/json',
+      'X-IW-Launcher-Token': 'test-token'
+    },
+    body: JSON.stringify({
+      resumeCommand: `codex resume ${codexSessionId}; open -a Calculator`
+    })
+  })
+  assert.equal(invalidInspectResponse.status, 400)
+  assert.equal((await invalidInspectResponse.json()).code, 'INVALID_COMMAND')
+
+  const optimizeResponse = await fetch(`${baseUrl}/v1/session/optimize-metadata`, {
+    method: 'POST',
+    headers: {
+      Origin: 'https://web.itwray.com',
+      'Content-Type': 'application/json',
+      'X-IW-Launcher-Token': 'test-token'
+    },
+    body: JSON.stringify({
+      resumeCommand: `codex resume ${codexSessionId}`,
+      currentTitle: inspectedSession.title,
+      currentDescription: inspectedSession.description
+    })
+  })
+  assert.equal(optimizeResponse.status, 200)
+  assert.deepEqual(await optimizeResponse.json(), {
+    title: 'AI 优化后的名称',
+    description: 'AI 优化后的任务描述。',
+    metadataSource: 'ai'
+  })
 
   await launcherServer.close()
   process.stdout.write('AI launcher tests passed\n')

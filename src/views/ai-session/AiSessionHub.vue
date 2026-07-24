@@ -1,28 +1,5 @@
 <template>
   <div class="ai-session-page">
-    <section class="hero-panel">
-      <div class="hero-copy">
-        <span class="hero-eyebrow">AI 会话任务</span>
-        <p>
-          用最小结构管理 Codex、Claude Code、Gemini CLI 会话。自动导入只负责生成草稿，最终保存前仍可手工修正。
-        </p>
-      </div>
-      <div class="hero-actions">
-        <el-button type="primary" @click="openCreateDialog">
-          <el-icon><Plus /></el-icon>
-          新建记录
-        </el-button>
-        <el-button @click="openImportDialog('claude')">
-          <el-icon><FolderOpened /></el-icon>
-          导入 Claude
-        </el-button>
-        <el-button @click="openImportDialog('codex')">
-          <el-icon><FolderOpened /></el-icon>
-          导入 Codex
-        </el-button>
-      </div>
-    </section>
-
     <section class="filter-panel">
       <el-row :gutter="12">
         <el-col :xs="24" :sm="12" :md="8" :lg="6">
@@ -73,7 +50,7 @@
           <el-input
             v-model="filters.workspaceKeyword"
             clearable
-            placeholder="工作区关键字"
+            placeholder="搜索工作区"
           />
         </el-col>
       </el-row>
@@ -85,7 +62,7 @@
           <div class="panel-title">会话任务列表</div>
           <div class="panel-subtitle">共 {{ tasks.length }} 条记录。</div>
         </div>
-        <div class="launcher-summary">
+        <div class="panel-actions">
           <el-tag :type="launcherStatusTagType" effect="plain">
             {{ launcherStatusText }}
           </el-tag>
@@ -93,24 +70,71 @@
             <el-icon><Connection /></el-icon>
             本机启动器
           </el-button>
+          <el-dropdown @command="handleImportCommand">
+            <el-button>
+              <el-icon><FolderOpened /></el-icon>
+              导入会话
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="codex">导入 Codex</el-dropdown-item>
+                <el-dropdown-item command="claude">导入 Claude</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button type="primary" @click="openCreateDialog">
+            <el-icon><Plus /></el-icon>
+            新建记录
+          </el-button>
         </div>
       </div>
 
-        <el-table :data="tasks" row-key="id" style="width: 100%">
-        <el-table-column label="任务" min-width="260">
+      <el-table
+        :data="tasks"
+        row-key="id"
+        border
+        style="width: 100%"
+        @header-dragend="handleColumnResize"
+      >
+        <el-table-column
+          column-key="task"
+          label="任务"
+          :width="tableColumnWidths.task"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.task"
+          resizable
+        >
           <template #default="{ row }">
             <div class="task-cell">
               <div class="task-title-row">
                 <span class="task-title">{{ row.title }}</span>
               </div>
-              <div class="task-description">
-                {{ displayText(row.description, '未填写描述') }}
+              <div v-if="row.description.trim()" class="task-description">
+                {{ row.description }}
               </div>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="任务状态" width="120">
+        <el-table-column
+          column-key="project"
+          label="项目"
+          :width="tableColumnWidths.project"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.project"
+          resizable
+        >
+          <template #default="{ row }">
+            {{ displayText(row.projectName, '--') }}
+          </template>
+        </el-table-column>
+
+        <el-table-column
+          column-key="taskStatus"
+          label="任务状态"
+          :width="tableColumnWidths.taskStatus"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.taskStatus"
+          resizable
+        >
           <template #default="{ row }">
             <el-tag :type="getTaskStatusType(row.taskStatus)" effect="light">
               {{ row.taskStatus }}
@@ -118,7 +142,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="工具" width="150">
+        <el-table-column
+          column-key="tool"
+          label="工具"
+          :width="tableColumnWidths.tool"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.tool"
+          resizable
+        >
           <template #default="{ row }">
             <el-tag :type="getToolTagType(row.toolType)" effect="plain">
               {{ row.toolType }}
@@ -126,49 +156,81 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="Session" min-width="220">
+        <el-table-column
+          column-key="workspace"
+          label="工作区"
+          :width="tableColumnWidths.workspace"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.workspace"
+          resizable
+        >
+          <template #default="{ row }">
+            {{ displayText(row.workspacePath, '--') }}
+          </template>
+        </el-table-column>
+
+        <el-table-column
+          column-key="session"
+          label="Session"
+          :width="tableColumnWidths.session"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.session"
+          resizable
+        >
           <template #default="{ row }">
             <div class="session-cell">
               <span class="session-main">{{ row.sessionKey }}</span>
-              <span class="session-sub">{{ displayText(row.modelName, '未填写模型') }}</span>
+              <span v-if="row.modelName.trim()" class="session-sub">{{ row.modelName }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="项目 / 工作区" min-width="240">
-          <template #default="{ row }">
-            <div class="session-cell">
-              <span class="session-main">{{ displayText(row.projectName, '--') }}</span>
-              <span class="session-sub">{{ displayText(row.workspacePath, '--') }}</span>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="最近活跃" width="160">
+        <el-table-column
+          column-key="lastActive"
+          label="最近活跃"
+          :width="tableColumnWidths.lastActive"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.lastActive"
+          resizable
+        >
           <template #default="{ row }">
             {{ formatDateTime(row.lastActiveAt) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column
+          column-key="actions"
+          label="操作"
+          :width="tableColumnWidths.actions"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.actions"
+          fixed="right"
+          align="right"
+          header-align="right"
+          resizable
+        >
           <template #default="{ row }">
-            <el-tooltip :content="getQuickLaunchTip(row)" placement="top">
-              <span>
-                <el-button
-                  link
-                  type="success"
-                  :loading="launchingTaskId === row.id"
-                  :disabled="!canQuickLaunch(row)"
-                  @click="quickLaunchTask(row)"
-                >
-                  <el-icon><VideoPlay /></el-icon>
-                  开启
-                </el-button>
+            <div class="row-actions">
+              <el-tooltip :content="getQuickLaunchTip(row)" placement="top">
+                <span class="row-action-item">
+                  <el-button
+                    link
+                    type="success"
+                    :loading="launchingTaskId === row.id"
+                    :disabled="!canQuickLaunch(row)"
+                    @click="quickLaunchTask(row)"
+                  >
+                    <el-icon><VideoPlay /></el-icon>
+                    开启
+                  </el-button>
+                </span>
+              </el-tooltip>
+              <span class="row-action-item">
+                <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
               </span>
-            </el-tooltip>
-            <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
-            <el-button link type="primary" @click="copyText(row.resumeCommand, '继续命令')">复制命令</el-button>
-            <el-button link type="danger" @click="removeTask(row)">删除</el-button>
+              <span class="row-action-item">
+                <el-button link type="primary" @click="copyTaskCommand(row)">复制命令</el-button>
+              </span>
+              <span class="row-action-item">
+                <el-button link type="danger" @click="removeTask(row)">删除</el-button>
+              </span>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -189,7 +251,19 @@
         <el-row :gutter="12">
           <el-col :span="24">
             <el-form-item label="任务名称" prop="title">
-              <el-input v-model="formState.title" maxlength="80" show-word-limit />
+              <div class="task-name-field">
+                <el-input v-model="formState.title" maxlength="80" show-word-limit />
+                <el-button
+                  type="primary"
+                  plain
+                  :loading="optimizingMetadata"
+                  :disabled="formState.toolType !== 'Codex' || (!formState.resumeCommand.trim() && !formState.sessionKey.trim())"
+                  @click="optimizeTaskMetadata"
+                >
+                  <el-icon><MagicStick /></el-icon>
+                  AI优化
+                </el-button>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -261,7 +335,33 @@
           </el-col>
           <el-col :xs="24" :sm="12">
             <el-form-item label="项目">
-              <el-input v-model="formState.projectName" maxlength="64" />
+              <el-select
+                v-model="formState.projectName"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                placeholder="输入或选择项目"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="item in projectOptions"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                >
+                  <div class="local-option">
+                    <span>{{ item }}</span>
+                    <el-icon
+                      class="local-option-remove"
+                      @mousedown.stop.prevent
+                      @click.stop="removeLocalOption('project', item)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </div>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
@@ -305,11 +405,23 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="继续命令">
+            <el-form-item label="会话命令">
               <div class="manual-command-field">
-                <el-input v-model="formState.resumeCommand" maxlength="255" />
-                <el-button @click="prefillResumeCommand">
-                  生成命令
+                <el-input
+                  v-model="formState.resumeCommand"
+                  maxlength="255"
+                  placeholder="例如 codex resume <session-id>"
+                />
+                <el-button
+                  v-if="formDialogMode === 'create'"
+                  type="primary"
+                  plain
+                  :loading="inspectingSession"
+                  :disabled="!formState.resumeCommand.trim()"
+                  @click="inspectResumeCommand"
+                >
+                  <el-icon><Search /></el-icon>
+                  识别命令
                 </el-button>
               </div>
             </el-form-item>
@@ -468,7 +580,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { Close, Connection, FolderOpened, Plus, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowDown, Close, Connection, FolderOpened, MagicStick, Plus, Search, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
@@ -481,7 +593,9 @@ import {
 import {
   AiLauncherError,
   getAiLauncherToken,
+  inspectAiSession,
   launchAiSession,
+  optimizeAiSessionMetadata,
   queryAiLauncherStatus,
   setAiLauncherToken,
   type AiLauncherStatus
@@ -584,6 +698,70 @@ const TASK_STATUS_LABEL_MAP: Record<AiTaskType.TaskStatusCode, TaskStatus> = {
 const toolOptions: ToolType[] = ['Codex', 'Claude Code', 'Gemini CLI']
 const taskStatusOptions: TaskStatus[] = ['进行中', '已完成', '暂停']
 
+const TABLE_COLUMN_WIDTH_STORAGE_KEY = 'iw.aiSession.tableColumnWidths.v1'
+const TABLE_COLUMN_KEYS = [
+  'task',
+  'project',
+  'taskStatus',
+  'tool',
+  'workspace',
+  'session',
+  'lastActive',
+  'actions'
+] as const
+type TableColumnKey = typeof TABLE_COLUMN_KEYS[number]
+type TableColumnWidths = Record<TableColumnKey, number>
+
+const TABLE_COLUMN_DEFAULT_WIDTHS: TableColumnWidths = {
+  task: 280,
+  project: 130,
+  taskStatus: 108,
+  tool: 128,
+  workspace: 280,
+  session: 240,
+  lastActive: 160,
+  actions: 240
+}
+
+const TABLE_COLUMN_MIN_WIDTHS: TableColumnWidths = {
+  task: 180,
+  project: 90,
+  taskStatus: 92,
+  tool: 100,
+  workspace: 180,
+  session: 180,
+  lastActive: 140,
+  actions: 240
+}
+
+const readTableColumnWidths = (): TableColumnWidths => {
+  try {
+    const storedWidths = JSON.parse(
+      window.localStorage.getItem(TABLE_COLUMN_WIDTH_STORAGE_KEY) || '{}'
+    ) as Partial<Record<TableColumnKey, unknown>>
+    return TABLE_COLUMN_KEYS.reduce<TableColumnWidths>((widths, key) => {
+      const storedWidth = Number(storedWidths[key])
+      const normalizedStoredWidth = key === 'actions' && storedWidth === 300
+        ? TABLE_COLUMN_DEFAULT_WIDTHS.actions
+        : storedWidth
+      widths[key] = Number.isFinite(normalizedStoredWidth)
+        ? Math.max(TABLE_COLUMN_MIN_WIDTHS[key], Math.round(normalizedStoredWidth))
+        : TABLE_COLUMN_DEFAULT_WIDTHS[key]
+      return widths
+    }, { ...TABLE_COLUMN_DEFAULT_WIDTHS })
+  } catch {
+    return { ...TABLE_COLUMN_DEFAULT_WIDTHS }
+  }
+}
+
+const persistTableColumnWidths = (widths: TableColumnWidths) => {
+  try {
+    window.localStorage.setItem(TABLE_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(widths))
+  } catch {
+    // 浏览器禁用本地存储时，当前页面内的列宽调整仍然有效。
+  }
+}
+
 const formRef = ref<FormInstance>()
 const importFileInputRef = ref<HTMLInputElement>()
 const importDirectoryInputRef = ref<HTMLInputElement>()
@@ -597,9 +775,13 @@ const launcherTokenInput = ref('')
 const launcherConnectionState = ref<LauncherConnectionState>('checking')
 const launcherStatus = ref<AiLauncherStatus>()
 const launchingTaskId = ref<number>()
+const inspectingSession = ref(false)
+const optimizingMetadata = ref(false)
+const projectOptions = ref<string[]>([])
 const workspaceOptions = ref<string[]>([])
 const modelProviderOptions = ref<string[]>([])
 const tasks = ref<AiSessionTask[]>([])
+const tableColumnWidths = reactive<TableColumnWidths>(readTableColumnWidths())
 const importTool = ref<ImportTool>('claude')
 const importSourceLabel = ref('未选择')
 const importNotice = ref('')
@@ -666,6 +848,22 @@ const importEmptyDescription = computed(() => '当前未检测到可导入的会
 const importSourceTagType = computed(() => {
   return importSourceMode.value === 'directory' || importSourceMode.value === 'files' ? 'success' : 'info'
 })
+
+const handleColumnResize = (
+  newWidth: number,
+  _oldWidth: number,
+  column: { columnKey?: string }
+) => {
+  const columnKey = column.columnKey as TableColumnKey | undefined
+  if (!columnKey || !TABLE_COLUMN_KEYS.includes(columnKey)) {
+    return
+  }
+  tableColumnWidths[columnKey] = Math.max(
+    TABLE_COLUMN_MIN_WIDTHS[columnKey],
+    Math.round(newWidth)
+  )
+  persistTableColumnWidths(tableColumnWidths)
+}
 
 const launcherStatusText = computed(() => {
   const statusTextMap: Record<LauncherConnectionState, string> = {
@@ -761,16 +959,27 @@ const buildResumeCommand = (toolType: ToolType, sessionKey: string, modelProvide
   return `codex resume ${sessionKey}${providerConfig}`
 }
 
-const prefillResumeCommand = () => {
-  if (!formState.sessionKey.trim()) {
-    ElMessage.warning('请先输入 sessionKey')
-    return
+const shellQuote = (value: string) => `'${value.split("'").join("'\"'\"'")}'`
+
+const buildRunnableCommand = (task: AiSessionTask) => {
+  const workspacePath = task.workspacePath.trim()
+  const sessionKey = task.sessionKey.trim()
+  if (!workspacePath || !sessionKey) {
+    return ''
   }
-  formState.resumeCommand = buildResumeCommand(
-    formState.toolType,
-    formState.sessionKey,
-    formState.modelProvider
-  )
+
+  let resumeCommand: string
+  if (task.toolType === 'Claude Code') {
+    resumeCommand = `claude --resume ${shellQuote(sessionKey)}`
+  } else if (task.toolType === 'Gemini CLI') {
+    resumeCommand = `gemini session resume ${shellQuote(sessionKey)}`
+  } else {
+    const providerConfig = task.modelProvider.trim()
+      ? ` -c model_provider=${shellQuote(task.modelProvider.trim())}`
+      : ''
+    resumeCommand = `codex resume ${shellQuote(sessionKey)}${providerConfig}`
+  }
+  return `cd -- ${shellQuote(workspacePath)} && ${resumeCommand}`
 }
 
 const mapTaskVo = (task: AiTaskType.AiTaskPageVo | AiTaskType.AiTaskDetailVo): AiSessionTask => {
@@ -888,6 +1097,7 @@ const submitForm = async () => {
     ElMessage.success('会话任务已更新')
   }
 
+  projectOptions.value = rememberAiTaskLocalOption('project', formState.projectName)
   workspaceOptions.value = rememberAiTaskLocalOption('workspace', formState.workspacePath)
   modelProviderOptions.value = rememberAiTaskLocalOption('modelProvider', formState.modelProvider)
   formDialogVisible.value = false
@@ -907,9 +1117,15 @@ const copyText = async (text: string, label: string) => {
   }
 }
 
+const copyTaskCommand = (task: AiSessionTask) => {
+  return copyText(buildRunnableCommand(task), '会话命令')
+}
+
 const removeLocalOption = (type: AiTaskLocalOptionType, value: string) => {
   const nextOptions = removeAiTaskLocalOption(type, value)
-  if (type === 'workspace') {
+  if (type === 'project') {
+    projectOptions.value = nextOptions
+  } else if (type === 'workspace') {
     workspaceOptions.value = nextOptions
   } else {
     modelProviderOptions.value = nextOptions
@@ -995,6 +1211,98 @@ const saveLauncherPairing = async () => {
   }
 }
 
+const inspectResumeCommand = async () => {
+  const resumeCommand = formState.resumeCommand.trim()
+  if (!resumeCommand) {
+    ElMessage.warning('请先输入会话命令')
+    return
+  }
+  if (launcherConnectionState.value !== 'ready') {
+    const connected = await refreshLauncherStatus()
+    if (!connected) {
+      openLauncherDialog()
+      return
+    }
+  }
+
+  inspectingSession.value = true
+  try {
+    const draft = await inspectAiSession(resumeCommand)
+    if (!formState.title.trim()) {
+      formState.title = draft.title
+    }
+    if (!formState.description.trim()) {
+      formState.description = draft.description
+    }
+    if (!formState.projectName.trim()) {
+      formState.projectName = draft.projectName
+    }
+    formState.toolType = 'Codex'
+    formState.sessionKey = draft.sessionKey
+    formState.modelName = draft.modelName
+    formState.modelProvider = draft.modelProvider
+    formState.workspacePath = draft.workspacePath
+    formState.gitBranch = draft.gitBranch
+    formState.transcriptPath = draft.transcriptPath
+    formState.resumeCommand = draft.resumeCommand
+    formRef.value?.clearValidate(['title', 'toolType', 'sessionKey', 'workspacePath'])
+
+    if (draft.warnings.length) {
+      ElMessage.warning(`已识别本地会话；${draft.warnings.join('；')}`)
+    } else {
+      ElMessage.success('已从本机 Codex 会话填充任务信息')
+    }
+  } catch (error) {
+    if (error instanceof AiLauncherError && error.status === 401) {
+      launcherConnectionState.value = 'unpaired'
+      openLauncherDialog()
+    }
+    ElMessage.error(error instanceof Error ? error.message : '识别本地会话失败')
+  } finally {
+    inspectingSession.value = false
+  }
+}
+
+const optimizeTaskMetadata = async () => {
+  const resumeCommand = formState.resumeCommand.trim() || buildResumeCommand(
+    formState.toolType,
+    formState.sessionKey,
+    formState.modelProvider
+  )
+  if (!resumeCommand) {
+    ElMessage.warning('请先输入会话命令')
+    return
+  }
+  if (launcherConnectionState.value !== 'ready') {
+    const connected = await refreshLauncherStatus()
+    if (!connected) {
+      openLauncherDialog()
+      return
+    }
+  }
+
+  optimizingMetadata.value = true
+  try {
+    const result = await optimizeAiSessionMetadata({
+      resumeCommand,
+      currentTitle: formState.title,
+      currentDescription: formState.description
+    })
+    formState.title = result.title
+    formState.description = result.description
+    formRef.value?.clearValidate('title')
+    ElMessage.success('任务名称和描述已优化')
+  } catch (error) {
+    if (error instanceof AiLauncherError && error.status === 401) {
+      launcherConnectionState.value = 'unpaired'
+      openLauncherDialog()
+    }
+    ElMessage.error(error instanceof Error ? error.message : 'AI 优化失败')
+  } finally {
+    optimizingMetadata.value = false
+  }
+}
+
 const quickLaunchTask = async (task: AiSessionTask) => {
   if (!task.workspacePath.trim()) {
     ElMessage.warning('请先编辑并补充工作区')
@@ -1055,6 +1363,10 @@ const openImportDialog = (tool: ImportTool) => {
   selectedImportFiles.value = []
   detectedSessionDrafts.value = []
   importDialogVisible.value = true
+}
+
+const handleImportCommand = (command: ImportTool) => {
+  openImportDialog(command)
 }
 
 const getImportContext = (tool: ImportTool): ImportContext => {
@@ -1569,6 +1881,7 @@ watch(
 )
 
 onMounted(() => {
+  projectOptions.value = getAiTaskLocalOptions('project')
   workspaceOptions.value = getAiTaskLocalOptions('workspace')
   modelProviderOptions.value = getAiTaskLocalOptions('modelProvider')
   launcherTokenInput.value = getAiLauncherToken()
@@ -1583,7 +1896,6 @@ onMounted(() => {
   --panel-border: rgba(198, 210, 224, 0.9);
   --soft-text: #667085;
   --strong-text: #1f2937;
-  --accent: #1266d4;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1594,7 +1906,6 @@ onMounted(() => {
   min-height: 100%;
 }
 
-.hero-panel,
 .filter-panel,
 .table-panel {
   padding: 20px 24px;
@@ -1602,45 +1913,6 @@ onMounted(() => {
   border-radius: 18px;
   background: var(--panel-bg);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
-}
-
-.hero-panel {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  background:
-    linear-gradient(135deg, rgba(18, 102, 212, 0.12), rgba(255, 255, 255, 0.96)),
-    #ffffff;
-}
-
-.hero-eyebrow {
-  display: inline-flex;
-  margin-bottom: 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(18, 102, 212, 0.1);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.hero-copy h2 {
-  margin: 0 0 10px;
-  color: #10233b;
-  font-size: 28px;
-}
-
-.hero-copy p {
-  margin: 0;
-  color: var(--soft-text);
-  line-height: 1.7;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  flex-wrap: wrap;
 }
 
 .panel-head {
@@ -1651,11 +1923,39 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
-.launcher-summary,
+.panel-actions,
 .launcher-command {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.panel-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.row-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.row-action-item {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+}
+
+.row-action-item :deep(.el-button) {
+  margin: 0;
 }
 
 .launcher-pair-form {
@@ -1714,12 +2014,14 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.task-name-field,
 .manual-command-field {
   display: flex;
   gap: 10px;
   width: 100%;
 }
 
+.task-name-field :deep(.el-input),
 .manual-command-field :deep(.el-input) {
   flex: 1;
 }
@@ -1840,7 +2142,6 @@ onMounted(() => {
 }
 
 @media (max-width: 900px) {
-  .hero-panel,
   .panel-head,
   .import-toolbar {
     flex-direction: column;
@@ -1853,6 +2154,7 @@ onMounted(() => {
     padding: 12px;
   }
 
+  .task-name-field,
   .manual-command-field,
   .import-picker-actions,
   .import-draft-head,

@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 
-export const LAUNCHER_VERSION = '1.0.0'
+export const LAUNCHER_VERSION = '1.2.1'
 export const LAUNCHER_HOST = '127.0.0.1'
 export const LAUNCHER_PORT = 17321
 export const LAUNCHER_ORIGINS = [
