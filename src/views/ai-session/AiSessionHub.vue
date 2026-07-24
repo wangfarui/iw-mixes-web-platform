@@ -136,9 +136,20 @@
           resizable
         >
           <template #default="{ row }">
-            <el-tag :type="getTaskStatusType(row.taskStatus)" effect="light">
-              {{ row.taskStatus }}
-            </el-tag>
+            <el-select
+              class="status-select"
+              :model-value="row.taskStatus"
+              :loading="updatingStatusTaskIds.includes(row.id)"
+              :disabled="updatingStatusTaskIds.includes(row.id)"
+              @change="updateTaskStatus(row, $event)"
+            >
+              <el-option
+                v-for="item in taskStatusOptions"
+                :key="item"
+                :label="item"
+                :value="item"
+              />
+            </el-select>
           </template>
         </el-table-column>
 
@@ -413,7 +424,6 @@
                   placeholder="例如 codex resume <session-id>"
                 />
                 <el-button
-                  v-if="formDialogMode === 'create'"
                   type="primary"
                   plain
                   :loading="inspectingSession"
@@ -775,6 +785,7 @@ const launcherTokenInput = ref('')
 const launcherConnectionState = ref<LauncherConnectionState>('checking')
 const launcherStatus = ref<AiLauncherStatus>()
 const launchingTaskId = ref<number>()
+const updatingStatusTaskIds = ref<number[]>([])
 const inspectingSession = ref(false)
 const optimizingMetadata = ref(false)
 const projectOptions = ref<string[]>([])
@@ -899,15 +910,6 @@ const resetForm = () => {
   formState.gitBranch = ''
   formState.transcriptPath = ''
   formState.resumeCommand = ''
-}
-
-const getTaskStatusType = (status: TaskStatus) => {
-  const map: Record<TaskStatus, string> = {
-    '进行中': 'success',
-    '已完成': 'info',
-    '暂停': 'warning'
-  }
-  return map[status]
 }
 
 const getToolTagType = (tool: ToolType) => {
@@ -1037,6 +1039,32 @@ const buildSaveDto = (): AiTaskType.AiTaskAddDto => {
   }
 }
 
+const buildTaskUpdateDto = (
+  task: AiSessionTask,
+  taskStatus: TaskStatus
+): AiTaskType.AiTaskUpdateDto => {
+  const resumeCommand = task.resumeCommand.trim() || buildResumeCommand(
+    task.toolType,
+    task.sessionKey,
+    task.modelProvider
+  )
+  return {
+    id: task.id,
+    title: task.title.trim(),
+    description: normalizeOptionalText(task.description),
+    toolType: getToolTypeCode(task.toolType),
+    sessionKey: task.sessionKey.trim(),
+    taskStatus: getTaskStatusCode(taskStatus),
+    projectName: normalizeOptionalText(task.projectName),
+    workspacePath: task.workspacePath.trim(),
+    modelName: normalizeOptionalText(task.modelName),
+    modelProvider: normalizeOptionalText(task.modelProvider),
+    gitBranch: normalizeOptionalText(task.gitBranch),
+    transcriptPath: normalizeOptionalText(task.transcriptPath),
+    resumeCommand: normalizeOptionalText(resumeCommand)
+  }
+}
+
 const loadTaskPage = async () => {
   listLoading.value = true
   try {
@@ -1045,6 +1073,25 @@ const loadTaskPage = async () => {
     tasks.value = (pageData.records || []).map(mapTaskVo)
   } finally {
     listLoading.value = false
+  }
+}
+
+const updateTaskStatus = async (task: AiSessionTask, nextStatus: TaskStatus) => {
+  if (
+    task.taskStatus === nextStatus
+    || updatingStatusTaskIds.value.includes(task.id)
+  ) {
+    return
+  }
+
+  updatingStatusTaskIds.value = [...updatingStatusTaskIds.value, task.id]
+  try {
+    await updateAiTask(buildTaskUpdateDto(task, nextStatus))
+    task.taskStatus = nextStatus
+    ElMessage.success('任务状态已更新')
+    await loadTaskPage()
+  } finally {
+    updatingStatusTaskIds.value = updatingStatusTaskIds.value.filter((id) => id !== task.id)
   }
 }
 
@@ -1956,6 +2003,10 @@ onMounted(() => {
 
 .row-action-item :deep(.el-button) {
   margin: 0;
+}
+
+.status-select {
+  width: 100%;
 }
 
 .launcher-pair-form {
