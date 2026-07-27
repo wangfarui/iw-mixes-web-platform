@@ -48,7 +48,10 @@ router.beforeEach((to, from, next) => {
     }
 })
 
-router.afterEach((to) => {
+router.afterEach((to, _from, failure) => {
+    if (failure) {
+        return;
+    }
     const toolKey = to.meta.toolKey
     if (typeof toolKey === 'string') {
         void reportToolUsage(toolKey)

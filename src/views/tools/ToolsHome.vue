@@ -54,7 +54,7 @@
     </section>
 
     <section class="tools-home-shell tools-content">
-      <main class="tools-dashboard">
+      <div class="tools-dashboard">
         <aside class="overview-column" aria-label="工具使用概览">
           <section class="overview-card">
             <div class="overview-title-row">
@@ -169,7 +169,7 @@
             </ol>
           </section>
         </aside>
-      </main>
+      </div>
     </section>
   </main>
 </template>
