@@ -71,24 +71,24 @@
             </template>
           </section>
 
-          <section class="overview-note">
-            <el-icon><TrendCharts /></el-icon>
-            <div>
-              <strong>{{ toolCatalog.length }} 个实用工具</strong>
-              <p>进入工具页才会计数，内容仍在浏览器本地处理。</p>
+          <section class="new-tools-card" aria-label="新工具上架">
+            <div class="new-tools-heading">
+              <h2>新工具上架</h2>
+              <span>最近上线</span>
             </div>
+            <ol>
+              <li v-for="tool in newestTools" :key="tool.toolKey">
+                <button type="button" @click="router.push(tool.routePath)">
+                  <span class="new-tool-icon"><el-icon :size="17"><component :is="tool.icon" /></el-icon></span>
+                  <span>{{ tool.menuTitle }}</span>
+                  <small>{{ getToolCategoryTitle(tool) }}</small>
+                </button>
+              </li>
+            </ol>
           </section>
         </aside>
 
         <section class="catalog-column" aria-label="工具列表">
-          <div class="catalog-heading">
-            <div>
-              <span class="section-kicker">工具导航</span>
-              <h2>{{ activeCategory === 'all' ? '全部工具' : categoryTitle(activeCategory) }}</h2>
-            </div>
-            <span class="result-count">{{ filteredTools.length }} 个结果</span>
-          </div>
-
           <el-empty
             v-if="!filteredTools.length"
             class="empty-state"
@@ -125,7 +125,6 @@
                   </span>
                 </div>
               </div>
-              <el-icon class="tool-entry"><ArrowRight /></el-icon>
             </button>
           </div>
         </section>
@@ -133,10 +132,7 @@
         <aside class="popular-column" aria-label="热门工具排行">
           <section class="popular-card">
             <div class="popular-heading">
-              <div>
-                <span class="section-kicker">热门发现</span>
-                <h2>热门工具</h2>
-              </div>
+              <h2>热门工具</h2>
               <span class="popular-fire" aria-label="最近三十天排行">♨</span>
             </div>
             <p v-if="!statsLoading && !statsUnavailable" class="popular-period">近 {{ summary?.rankingPeriodDays ?? 30 }} 天使用次数</p>
@@ -161,7 +157,7 @@
                   <span class="popular-tool-icon"><el-icon :size="20"><component :is="item.tool.icon" /></el-icon></span>
                   <span class="popular-copy">
                     <strong>{{ item.tool.menuTitle }}</strong>
-                    <small>{{ item.tool.tags[0] }}</small>
+                    <small>{{ getToolCategoryTitle(item.tool) }}</small>
                   </span>
                   <span class="popular-count">{{ formatCount(item.stat.periodUsageCount) }}</span>
                 </button>
@@ -177,7 +173,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Back, DataAnalysis, Search, TrendCharts } from '@element-plus/icons-vue'
+import { Back, DataAnalysis, Search, TrendCharts } from '@element-plus/icons-vue'
 import { getToolUsageSummary } from '@/api/toolUsage'
 import {
   toolCatalog,
@@ -217,6 +213,10 @@ const visibleCategorySummaries = computed<CategorySummary[]>(() => toolCategorie
   }))
   .filter((item) => item.count > 0))
 
+const newestTools = computed(() => [...toolCatalog]
+  .sort((left, right) => right.releasedAt.localeCompare(left.releasedAt))
+  .slice(0, 10))
+
 const normalizedKeyword = computed(() => searchKeyword.value.trim().toLowerCase())
 
 const filteredTools = computed(() => toolCatalog.filter((tool) => {
@@ -250,7 +250,6 @@ const popularTools = computed<PopularTool[]>(() => (summary.value?.popularTools 
 
 const getToolCategory = (tool: ToolCatalogItem): ToolCategoryItem | undefined => categoryMap.get(tool.category)
 const getToolCategoryTitle = (tool: ToolCatalogItem): string => getToolCategory(tool)?.title || '未分类'
-const categoryTitle = (key: ToolCategoryKey): string => categoryMap.get(key)?.title || '工具'
 const usageCountFor = (toolKey: string): number => usageCountByToolKey.value.get(toolKey) ?? 0
 
 const formatCount = (value: number): string => new Intl.NumberFormat('zh-CN', {
@@ -306,7 +305,7 @@ onMounted(() => {
 .tools-content { padding: 30px 0 48px; }
 .tools-dashboard { display: grid; grid-template-columns: 240px minmax(0, 1fr) 278px; gap: 22px; align-items: start; }
 .overview-column, .popular-column { position: sticky; top: 18px; }
-.overview-card, .overview-note, .catalog-column, .popular-card { background: #fff; border: 1px solid #edf0f7; border-radius: 16px; box-shadow: 0 10px 28px rgba(37, 70, 124, .055); }
+.overview-card, .new-tools-card, .catalog-column, .popular-card { background: #fff; border: 1px solid #edf0f7; border-radius: 16px; box-shadow: 0 10px 28px rgba(37, 70, 124, .055); }
 .overview-card { padding: 22px; }
 .overview-title-row, .popular-heading, .catalog-heading, .tool-card-title-row, .tool-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .overview-title-row h2, .popular-heading h2, .catalog-heading h2 { margin: 5px 0 0; font-size: 20px; letter-spacing: -.02em; }
@@ -315,13 +314,17 @@ onMounted(() => {
 .overview-today { margin: 15px 0 0; color: #7b8ca8; font-size: 13px; font-weight: 600; }
 .overview-today span { margin-right: 4px; color: #10b981; font-size: 18px; vertical-align: -1px; }
 .overview-skeleton { margin-top: 26px; }
-.overview-note { display: flex; gap: 10px; margin-top: 14px; padding: 15px; color: #356de0; }
-.overview-note > .el-icon { margin-top: 2px; font-size: 19px; }
-.overview-note strong { color: #314361; font-size: 13px; }
-.overview-note p { margin: 5px 0 0; color: #8491a8; font-size: 12px; line-height: 1.55; }
+.new-tools-card { margin-top: 14px; padding: 18px 14px 12px; }
+.new-tools-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 5px 10px; }
+.new-tools-heading h2 { margin: 0; color: #253754; font-size: 16px; }
+.new-tools-heading span { color: #94a0b4; font-size: 11px; }
+.new-tools-card ol { display: grid; padding: 0; margin: 0; gap: 3px; list-style: none; }
+.new-tools-card button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 7px 5px; color: #41516a; font: inherit; font-size: 12px; font-weight: 650; text-align: left; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
+.new-tools-card button:hover, .new-tools-card button:focus-visible { background: #f4f8ff; outline: none; }
+.new-tool-icon { display: grid; flex: 0 0 27px; height: 27px; place-items: center; color: #3675e7; background: #edf4ff; border-radius: 8px; }
+.new-tools-card button > span:nth-child(2) { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
+.new-tools-card small { color: #4b87e9; font-size: 11px; font-weight: 600; }
 .catalog-column { min-height: 620px; padding: 24px; }
-.catalog-heading { margin-bottom: 18px; }
-.result-count { padding: 5px 9px; color: #6d7e98; font-size: 12px; background: #f4f7fc; border-radius: 999px; }
 .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
 .tool-card { position: relative; display: flex; min-width: 0; min-height: 142px; padding: 16px; gap: 12px; color: inherit; text-align: left; background: #fff; border: 1px solid #edf0f6; border-radius: 12px; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
 .tool-card:hover, .tool-card:focus-visible { border-color: #8eb6ff; outline: none; box-shadow: 0 11px 20px rgba(46, 103, 199, .13); transform: translateY(-2px); }
@@ -334,7 +337,6 @@ onMounted(() => {
 .tool-tag { max-width: 95px; overflow: hidden; padding: 3px 6px; color: #31a673; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; background: #edfaf4; border-radius: 5px; }
 .tool-usage { display: inline-flex; align-items: center; gap: 3px; color: #f28b36; font-size: 12px; font-weight: 650; }
 .usage-skeleton { width: 25px; }
-.tool-entry { position: absolute; right: 9px; top: 9px; color: #b6c0d2; font-size: 14px; }
 .empty-state { padding: 80px 0; }
 .popular-card { padding: 21px 17px; }
 .popular-fire { color: #ff7a23; font-size: 25px; }
@@ -351,6 +353,6 @@ onMounted(() => {
 .popular-count { color: #f28632; font-size: 12px; font-weight: 700; }
 .popular-empty { min-height: 190px; }
 @media (max-width: 1260px) { .tools-dashboard { grid-template-columns: 218px minmax(0, 1fr); } .popular-column { grid-column: 1 / -1; position: static; } .popular-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 940px) { .tool-filter { grid-template-columns: 1fr; } .category-filter { justify-content: flex-start; } .tools-dashboard { grid-template-columns: 1fr; } .overview-column { position: static; display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; } .overview-note { margin-top: 0; } .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .tools-home-shell { width: min(100% - 28px, 1480px); } .tools-hero { padding-top: 22px; } .tools-home-header { flex-direction: column; } .tools-home-header h1 { font-size: 31px; } .return-button { align-self: stretch; } .tool-filter { gap: 10px; } .category-filter { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; } .category-filter-button { flex: 0 0 auto; } .tools-content { padding-top: 18px; } .overview-column { display: block; } .overview-note { margin-top: 12px; } .catalog-column { padding: 17px; } .tool-grid, .popular-list { grid-template-columns: 1fr; } .tool-card { min-height: 126px; } .popular-column { position: static; } }
+@media (max-width: 940px) { .tool-filter { grid-template-columns: 1fr; } .category-filter { justify-content: flex-start; } .tools-dashboard { grid-template-columns: 1fr; } .overview-column { position: static; display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; } .new-tools-card { margin-top: 0; } .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .tools-home-shell { width: min(100% - 28px, 1480px); } .tools-hero { padding-top: 22px; } .tools-home-header { flex-direction: column; } .tools-home-header h1 { font-size: 31px; } .return-button { align-self: stretch; } .tool-filter { gap: 10px; } .category-filter { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; } .category-filter-button { flex: 0 0 auto; } .tools-content { padding-top: 18px; } .overview-column { display: block; } .new-tools-card { margin-top: 12px; } .catalog-column { padding: 17px; } .tool-grid, .popular-list { grid-template-columns: 1fr; } .tool-card { min-height: 126px; } .popular-column { position: static; } }
 </style>
