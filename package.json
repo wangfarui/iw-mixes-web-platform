@@ -22,6 +22,7 @@
     "test:stock-tracker": "node scripts/testStockTracker.mjs",
     "test:address-generator": "node scripts/testAddressGenerator.mjs",
     "test:ai-launcher": "node scripts/testAiLauncher.mjs",
+    "test:tool-usage": "node scripts/testToolUsage.mjs",
     "ai-launcher:install": "node scripts/aiLauncher.mjs install",
     "ai-launcher:uninstall": "node scripts/aiLauncher.mjs uninstall",
     "ai-launcher:status": "node scripts/aiLauncher.mjs status",

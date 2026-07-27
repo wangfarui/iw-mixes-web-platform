@@ -17,6 +17,7 @@ export interface ToolCategoryItem {
 
 export interface ToolCatalogItem {
     path: string
+    toolKey: string
     routePath: string
     routeName: string
     title: string
@@ -52,6 +53,7 @@ export const toolCategories: ToolCategoryItem[] = [
 export const toolCatalog: ToolCatalogItem[] = [
     {
         path: 'bmi-calculator',
+        toolKey: 'bmi-calculator',
         routePath: '/tools/bmi-calculator',
         routeName: 'BMI 计算器',
         title: 'BMI 计算器',
@@ -66,6 +68,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'text-diff',
+        toolKey: 'text-diff',
         routePath: '/tools/text-diff',
         routeName: '文本比对',
         title: '文本比对 / Diff 工具',
@@ -80,6 +83,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'number-generator',
+        toolKey: 'number-generator',
         routePath: '/tools/number-generator',
         routeName: '编号生成器',
         title: '编号生成器',
@@ -94,6 +98,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'address-generator',
+        toolKey: 'address-generator',
         routePath: '/tools/address-generator',
         routeName: '地址生成器',
         title: '地址生成器',
@@ -108,6 +113,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'calculator',
+        toolKey: 'calculator',
         routePath: '/tools/calculator',
         routeName: '全能计算器',
         title: '全能计算器',
@@ -122,6 +128,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'stock-tracker',
+        toolKey: 'stock-tracker',
         routePath: '/tools/stock-tracker',
         routeName: '股票跟踪',
         title: '股票跟踪',
@@ -136,6 +143,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'formatter',
+        toolKey: 'formatter',
         routePath: '/tools/formatter',
         routeName: '格式化工具',
         title: '格式化工具',
@@ -150,6 +158,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'encoding-converter',
+        toolKey: 'encoding-converter',
         routePath: '/tools/encoding-converter',
         routeName: '编码转换工具',
         title: '编码转换工具',
@@ -164,6 +173,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'image-processor',
+        toolKey: 'image-processor',
         routePath: '/tools/image-processor',
         routeName: '图片处理工具',
         title: '图片处理工具',
@@ -178,6 +188,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'document-converter',
+        toolKey: 'document-converter',
         routePath: '/tools/document-converter',
         routeName: '文档转换工具',
         title: '文档转换工具',
@@ -192,6 +203,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'color-picker',
+        toolKey: 'color-picker',
         routePath: '/tools/color-picker',
         routeName: '颜色选择工具',
         title: '颜色选择工具',
@@ -206,6 +218,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'text-playground',
+        toolKey: 'text-playground',
         routePath: '/tools/text-playground',
         routeName: '文字游戏工坊',
         title: '文字游戏工坊',
@@ -220,6 +233,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'ip-lookup',
+        toolKey: 'ip-lookup',
         routePath: '/tools/ip-lookup',
         routeName: 'IP地址解析',
         title: 'IP 地址解析',
@@ -234,6 +248,7 @@ export const toolCatalog: ToolCatalogItem[] = [
     },
     {
         path: 'network-diagnostics',
+        toolKey: 'network-diagnostics',
         routePath: '/tools/network-diagnostics',
         routeName: '网络诊断',
         title: '网络诊断',

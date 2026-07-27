@@ -10,6 +10,7 @@ import App from './App.vue'
 import router from './router'
 import versionPollingService from '@/services/versionPollingService'
 import { refreshDictCache } from '@/api/login'
+import { reportToolUsage } from '@/services/toolUsageReporter'
 // @ts-ignore
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
@@ -44,5 +45,12 @@ router.beforeEach((to, from, next) => {
     } else {
         //说明用户未登录，去登录
         next({path: '/login'});
+    }
+})
+
+router.afterEach((to) => {
+    const toolKey = to.meta.toolKey
+    if (typeof toolKey === 'string') {
+        void reportToolUsage(toolKey)
     }
 })

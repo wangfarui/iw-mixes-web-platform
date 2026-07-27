@@ -1,11 +1,23 @@
 /*在这个文件中我们对请求和响应进行封装*/
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import {ElMessage} from "element-plus";
 import router from "@/router";
 
 axios.defaults.headers['Content-Type'] = 'application/json;charset=utf-8'
 
 const VITE_BUILD_ENV = import.meta.env.VITE_BUILD_ENV;
+
+declare module 'axios' {
+    interface AxiosRequestConfig {
+        silent?: boolean
+    }
+}
+
+const showError = (config: AxiosRequestConfig | undefined, message: string): void => {
+    if (!config?.silent) {
+        ElMessage.error(message)
+    }
+}
 
 const service = axios.create({
     timeout: 30000,
@@ -35,29 +47,29 @@ service.interceptors.response.use(success => {
         // 未授权
         if (success.data.code == 401) {
             window.sessionStorage.removeItem('iwtoken')
-            ElMessage.error("登录状态失效，请重新登录");
+            showError(success.config, "登录状态失效，请重新登录")
             router.replace('/login');
             return Promise.reject(success.data.message);
         }
         //说明请求成功
         if (success.data.code != 200) {
-            ElMessage.error(success.data.message)
+            showError(success.config, success.data.message)
             return Promise.reject(success.data.message);
         }
         //返回服务端返回的 JSON
         return success.data;
     } else {
-        ElMessage.error(success.data.message)
+        showError(success.config, success.data.message)
         return Promise.reject(success.data.message);
     }
 }, error => {
-    if (error.response.status == 401) {
+    if (error.response?.status == 401) {
         window.sessionStorage.removeItem('iwtoken')
         //说明未登录
         router.replace('/login');
     }
     //HTTP 状态码不是 200，就会进入到这个回调中
-    ElMessage.error("请求失败");
+    showError(error.config, "请求失败")
     return Promise.reject(error);
 })
 

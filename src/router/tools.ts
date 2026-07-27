@@ -27,6 +27,7 @@ export const toolRoutes: RouteRecordRaw = {
             meta: {
                 public: true,
                 tool: true,
+                toolKey: tool.toolKey,
                 title: tool.title
             }
         }))
