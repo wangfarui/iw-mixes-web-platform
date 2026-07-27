@@ -13,6 +13,10 @@ export const updateAiTask = (updateDto: AiTaskType.AiTaskUpdateDto) => {
   return request.put('/auth-service/ai/task/update', updateDto)
 }
 
+export const updateAiTaskTop = (updateDto: AiTaskType.AiTaskTopUpdateDto) => {
+  return request.put('/auth-service/ai/task/top', updateDto)
+}
+
 export const deleteAiTask = (id: number) => {
   return request.delete('/auth-service/ai/task/delete?id=' + id)
 }

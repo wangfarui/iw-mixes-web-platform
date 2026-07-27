@@ -1,5 +1,6 @@
 export type ToolTypeCode = 1 | 2 | 3
 export type TaskStatusCode = 1 | 2 | 3
+export type TopState = 0 | 1
 
 export type AiTaskPageDto = {
   currentPage: number
@@ -14,7 +15,7 @@ export type AiTaskPageDto = {
 
 export type AiTaskAddDto = {
   title: string
-  description?: string
+  description: string
   toolType: ToolTypeCode
   sessionKey: string
   taskStatus: TaskStatusCode
@@ -31,6 +32,11 @@ export type AiTaskUpdateDto = AiTaskAddDto & {
   id: number
 }
 
+export type AiTaskTopUpdateDto = {
+  id: number
+  isTop: TopState
+}
+
 export type AiTaskPageVo = {
   id: number
   title?: string
@@ -38,6 +44,8 @@ export type AiTaskPageVo = {
   toolType?: ToolTypeCode
   sessionKey?: string
   taskStatus?: TaskStatusCode
+  isTop?: TopState
+  topTime?: string
   projectName?: string
   workspacePath?: string
   modelName?: string

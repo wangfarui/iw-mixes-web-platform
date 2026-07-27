@@ -108,6 +108,15 @@
             <div class="task-cell">
               <div class="task-title-row">
                 <span class="task-title">{{ row.title }}</span>
+                <el-tag
+                  v-if="row.isTop === 1"
+                  class="task-top-tag"
+                  type="warning"
+                  effect="plain"
+                  size="small"
+                >
+                  置顶
+                </el-tag>
               </div>
               <div v-if="row.description.trim()" class="task-description">
                 {{ row.description }}
@@ -236,16 +245,49 @@
                 <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
               </span>
               <span class="row-action-item">
-                <el-button link type="primary" @click="copyTaskCommand(row)">复制命令</el-button>
-              </span>
-              <span class="row-action-item">
-                <el-button link type="danger" @click="removeTask(row)">删除</el-button>
+                <el-dropdown
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="handleTaskMoreCommand($event, row)"
+                >
+                  <el-button link type="primary">
+                    更多
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        command="toggleTop"
+                        :disabled="updatingTopTaskIds.includes(row.id)"
+                      >
+                        <el-icon><Top /></el-icon>
+                        {{ row.isTop === 1 ? '取消置顶' : '置顶' }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="copyCommand">
+                        <el-icon><CopyDocument /></el-icon>
+                        复制命令
+                      </el-dropdown-item>
+                      <el-dropdown-item command="delete" divided class="task-more-danger">
+                        <el-icon><Delete /></el-icon>
+                        删除
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </span>
             </div>
           </template>
         </el-table-column>
       </el-table>
     </section>
+
+    <div ref="actionColumnProbeRef" class="action-column-probe" aria-hidden="true">
+      <el-button link type="success">
+        <el-icon><VideoPlay /></el-icon>
+        开启
+      </el-button>
+      <el-button link type="primary">编辑</el-button>
+      <el-button link type="primary">更多</el-button>
+    </div>
 
     <el-dialog
       v-model="formDialogVisible"
@@ -589,8 +631,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ArrowDown, Close, Connection, FolderOpened, MagicStick, Plus, Search, VideoPlay } from '@element-plus/icons-vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ArrowDown, Close, Connection, CopyDocument, Delete, FolderOpened, MagicStick, Plus, Search, Top, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
@@ -598,7 +640,8 @@ import {
   deleteAiTask,
   queryAiTaskDetail,
   queryAiTaskPage,
-  updateAiTask
+  updateAiTask,
+  updateAiTaskTop
 } from '@/api/aiTask'
 import {
   AiLauncherError,
@@ -624,6 +667,7 @@ type ImportTool = 'claude' | 'codex'
 type ImportSourceMode = 'none' | 'files' | 'directory'
 type NoticeType = 'success' | 'warning' | 'info' | 'error'
 type LauncherConnectionState = 'checking' | 'offline' | 'unpaired' | 'ready'
+type TaskMoreCommand = 'toggleTop' | 'copyCommand' | 'delete'
 
 interface AiSessionTask {
   id: number
@@ -632,6 +676,8 @@ interface AiSessionTask {
   toolType: ToolType
   sessionKey: string
   taskStatus: TaskStatus
+  isTop: AiTaskType.TopState
+  topTime: string
   projectName: string
   workspacePath: string
   modelName: string
@@ -730,7 +776,7 @@ const TABLE_COLUMN_DEFAULT_WIDTHS: TableColumnWidths = {
   workspace: 280,
   session: 240,
   lastActive: 160,
-  actions: 240
+  actions: 156
 }
 
 const TABLE_COLUMN_MIN_WIDTHS: TableColumnWidths = {
@@ -741,8 +787,10 @@ const TABLE_COLUMN_MIN_WIDTHS: TableColumnWidths = {
   workspace: 180,
   session: 180,
   lastActive: 140,
-  actions: 240
+  actions: 152
 }
+
+const ACTION_COLUMN_CELL_HORIZONTAL_SPACE = 25
 
 const readTableColumnWidths = (): TableColumnWidths => {
   try {
@@ -750,12 +798,13 @@ const readTableColumnWidths = (): TableColumnWidths => {
       window.localStorage.getItem(TABLE_COLUMN_WIDTH_STORAGE_KEY) || '{}'
     ) as Partial<Record<TableColumnKey, unknown>>
     return TABLE_COLUMN_KEYS.reduce<TableColumnWidths>((widths, key) => {
+      if (key === 'actions') {
+        widths[key] = TABLE_COLUMN_DEFAULT_WIDTHS[key]
+        return widths
+      }
       const storedWidth = Number(storedWidths[key])
-      const normalizedStoredWidth = key === 'actions' && storedWidth === 300
-        ? TABLE_COLUMN_DEFAULT_WIDTHS.actions
-        : storedWidth
-      widths[key] = Number.isFinite(normalizedStoredWidth)
-        ? Math.max(TABLE_COLUMN_MIN_WIDTHS[key], Math.round(normalizedStoredWidth))
+      widths[key] = Number.isFinite(storedWidth)
+        ? Math.max(TABLE_COLUMN_MIN_WIDTHS[key], Math.round(storedWidth))
         : TABLE_COLUMN_DEFAULT_WIDTHS[key]
       return widths
     }, { ...TABLE_COLUMN_DEFAULT_WIDTHS })
@@ -773,6 +822,7 @@ const persistTableColumnWidths = (widths: TableColumnWidths) => {
 }
 
 const formRef = ref<FormInstance>()
+const actionColumnProbeRef = ref<HTMLElement>()
 const importFileInputRef = ref<HTMLInputElement>()
 const importDirectoryInputRef = ref<HTMLInputElement>()
 const listLoading = ref(false)
@@ -785,6 +835,7 @@ const launcherTokenInput = ref('')
 const launcherConnectionState = ref<LauncherConnectionState>('checking')
 const launcherStatus = ref<AiLauncherStatus>()
 const launchingTaskId = ref<number>()
+const updatingTopTaskIds = ref<number[]>([])
 const updatingStatusTaskIds = ref<number[]>([])
 const inspectingSession = ref(false)
 const optimizingMetadata = ref(false)
@@ -801,6 +852,7 @@ const importSourceMode = ref<ImportSourceMode>('none')
 const selectedImportFiles = ref<File[]>([])
 const detectedSessionDrafts = ref<DetectedSessionDraft[]>([])
 let importRefreshSeq = 0
+let actionColumnResizeObserver: ResizeObserver | undefined
 
 const filters = reactive({
   keyword: '',
@@ -874,6 +926,17 @@ const handleColumnResize = (
     Math.round(newWidth)
   )
   persistTableColumnWidths(tableColumnWidths)
+}
+
+const syncActionColumnWidth = () => {
+  const probe = actionColumnProbeRef.value
+  if (!probe) {
+    return
+  }
+  tableColumnWidths.actions = Math.max(
+    TABLE_COLUMN_MIN_WIDTHS.actions,
+    Math.ceil(probe.getBoundingClientRect().width) + ACTION_COLUMN_CELL_HORIZONTAL_SPACE
+  )
 }
 
 const launcherStatusText = computed(() => {
@@ -992,6 +1055,8 @@ const mapTaskVo = (task: AiTaskType.AiTaskPageVo | AiTaskType.AiTaskDetailVo): A
     toolType: getToolTypeLabel(task.toolType),
     sessionKey: task.sessionKey || '',
     taskStatus: getTaskStatusLabel(task.taskStatus),
+    isTop: task.isTop === 1 ? 1 : 0,
+    topTime: task.topTime || '',
     projectName: task.projectName || '',
     workspacePath: task.workspacePath || '',
     modelName: task.modelName || '',
@@ -1025,7 +1090,7 @@ const buildSaveDto = (): AiTaskType.AiTaskAddDto => {
   )
   return {
     title: formState.title.trim(),
-    description: normalizeOptionalText(formState.description),
+    description: formState.description.trim(),
     toolType: getToolTypeCode(formState.toolType),
     sessionKey: formState.sessionKey.trim(),
     taskStatus: getTaskStatusCode(formState.taskStatus),
@@ -1051,7 +1116,7 @@ const buildTaskUpdateDto = (
   return {
     id: task.id,
     title: task.title.trim(),
-    description: normalizeOptionalText(task.description),
+    description: task.description.trim(),
     toolType: getToolTypeCode(task.toolType),
     sessionKey: task.sessionKey.trim(),
     taskStatus: getTaskStatusCode(taskStatus),
@@ -1092,6 +1157,23 @@ const updateTaskStatus = async (task: AiSessionTask, nextStatus: TaskStatus) => 
     await loadTaskPage()
   } finally {
     updatingStatusTaskIds.value = updatingStatusTaskIds.value.filter((id) => id !== task.id)
+  }
+}
+
+const toggleTaskTop = async (task: AiSessionTask) => {
+  if (updatingTopTaskIds.value.includes(task.id)) {
+    return
+  }
+
+  const nextIsTop: AiTaskType.TopState = task.isTop === 1 ? 0 : 1
+  updatingTopTaskIds.value = [...updatingTopTaskIds.value, task.id]
+  try {
+    await updateAiTaskTop({ id: task.id, isTop: nextIsTop })
+    task.isTop = nextIsTop
+    ElMessage.success(nextIsTop === 1 ? '任务已置顶' : '已取消置顶')
+    await loadTaskPage()
+  } finally {
+    updatingTopTaskIds.value = updatingTopTaskIds.value.filter((id) => id !== task.id)
   }
 }
 
@@ -1166,6 +1248,18 @@ const copyText = async (text: string, label: string) => {
 
 const copyTaskCommand = (task: AiSessionTask) => {
   return copyText(buildRunnableCommand(task), '会话命令')
+}
+
+const handleTaskMoreCommand = (command: TaskMoreCommand, task: AiSessionTask) => {
+  if (command === 'toggleTop') {
+    void toggleTaskTop(task)
+    return
+  }
+  if (command === 'copyCommand') {
+    void copyTaskCommand(task)
+    return
+  }
+  void removeTask(task)
 }
 
 const removeLocalOption = (type: AiTaskLocalOptionType, value: string) => {
@@ -1934,6 +2028,17 @@ onMounted(() => {
   launcherTokenInput.value = getAiLauncherToken()
   void loadTaskPage()
   void refreshLauncherStatus()
+  void nextTick(() => {
+    syncActionColumnWidth()
+    actionColumnResizeObserver = new ResizeObserver(syncActionColumnWidth)
+    if (actionColumnProbeRef.value) {
+      actionColumnResizeObserver.observe(actionColumnProbeRef.value)
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  actionColumnResizeObserver?.disconnect()
 })
 </script>
 
@@ -1995,6 +2100,22 @@ onMounted(() => {
   margin-left: 0;
 }
 
+.action-column-probe {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  display: inline-flex;
+  gap: 12px;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.action-column-probe :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
 .row-action-item {
   display: inline-flex;
   align-items: center;
@@ -2047,7 +2168,12 @@ onMounted(() => {
   gap: 8px;
 }
 
+.task-top-tag {
+  flex: 0 0 auto;
+}
+
 .task-title {
+  min-width: 0;
   color: var(--strong-text);
   font-weight: 700;
 }
@@ -2063,6 +2189,10 @@ onMounted(() => {
   color: var(--strong-text);
   font-size: 13px;
   font-weight: 600;
+}
+
+:global(.task-more-danger) {
+  color: var(--el-color-danger);
 }
 
 .task-name-field,
