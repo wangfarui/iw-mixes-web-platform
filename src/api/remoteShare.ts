@@ -1,25 +1,10 @@
 import type { RemoteShareMaterial } from '@/utils/remote-share/remoteShareProtocol'
+import type { PendingRemoteShareBinary, PendingRemoteShareText, RemoteShareDevice, RemoteShareSessionState } from '@/types/remoteShare'
+
+export type { PendingRemoteShareBinary, PendingRemoteShareText, RemoteShareDevice, RemoteShareSessionState } from '@/types/remoteShare'
 
 const API_ROOT = '/external-service/api/remote-share'
 
-export interface RemoteShareDevice {
-  slot: 'A' | 'B'
-  capability: string
-  expiresAt: string
-}
-
-export interface RemoteShareSessionState {
-  slot: 'A' | 'B'
-  paired: boolean
-  expiresAt: string
-}
-
-export interface PendingRemoteShareText {
-  id: string
-  sender: 'A' | 'B'
-  ciphertext: string
-  expiresAt: string
-}
 
 const request = async <T>(path: string, init: RequestInit = {}) => {
   const response = await fetch(`${API_ROOT}${path}`, {
@@ -48,7 +33,7 @@ export const joinRemoteShareSession = (material: RemoteShareMaterial) => request
 })
 
 export const getRemoteShareState = (roomId: string, capability: string) => request<RemoteShareSessionState>(
-  `/sessions/${encodeURIComponent(roomId)}?capability=${encodeURIComponent(capability)}`
+  `/sessions/${encodeURIComponent(roomId)}`, { headers: { 'X-Remote-Share-Capability': capability } }
 )
 
 export const closeRemoteShareSession = (roomId: string, capability: string) => request<void>(`/sessions/${encodeURIComponent(roomId)}/close`, {
@@ -64,20 +49,19 @@ export const sendRemoteShareText = (roomId: string, capability: string, cipherte
 )
 
 export const claimRemoteShareTexts = (roomId: string, capability: string) => request<PendingRemoteShareText[]>(
-  `/sessions/${encodeURIComponent(roomId)}/texts?capability=${encodeURIComponent(capability)}`
+  `/sessions/${encodeURIComponent(roomId)}/texts`, { headers: { 'X-Remote-Share-Capability': capability } }
 )
 
 export const beginRemoteShareBinary = (roomId: string, capability: string, itemId: string, totalBytes: number, chunks: number, encryptedManifest: string) => request<void>(`/sessions/${encodeURIComponent(roomId)}/binaries`, { method: 'POST', body: JSON.stringify({ capability, itemId, totalBytes, chunks, encryptedManifest }) })
 export const uploadRemoteShareChunk = async (roomId: string, capability: string, itemId: string, index: number, chunk: Uint8Array) => {
-  const response = await fetch(`${API_ROOT}/sessions/${encodeURIComponent(roomId)}/binaries/${encodeURIComponent(itemId)}/chunks/${index}?capability=${encodeURIComponent(capability)}`, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: chunk })
+  const response = await fetch(`${API_ROOT}/sessions/${encodeURIComponent(roomId)}/binaries/${encodeURIComponent(itemId)}/chunks/${index}`, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream', 'X-Remote-Share-Capability': capability }, body: chunk })
   const payload = await response.json() as { code: number; message: string }
   if (!response.ok || payload.code !== 200) throw new Error(payload.message || '临时存储上传失败')
 }
 export const completeRemoteShareBinary = (roomId: string, capability: string, itemId: string) => request<void>(`/sessions/${encodeURIComponent(roomId)}/binaries/${encodeURIComponent(itemId)}/complete`, { method: 'POST', body: JSON.stringify({ capability }) })
-export interface PendingRemoteShareBinary { itemId: string; totalBytes: number; chunks: number; encryptedManifest: string }
-export const pendingRemoteShareBinaries = (roomId: string, capability: string) => request<PendingRemoteShareBinary[]>(`/sessions/${encodeURIComponent(roomId)}/binaries?capability=${encodeURIComponent(capability)}`)
+export const pendingRemoteShareBinaries = (roomId: string, capability: string) => request<PendingRemoteShareBinary[]>(`/sessions/${encodeURIComponent(roomId)}/binaries`, { headers: { 'X-Remote-Share-Capability': capability } })
 export const downloadRemoteShareChunk = async (roomId: string, capability: string, itemId: string, index: number) => {
-  const response = await fetch(`${API_ROOT}/sessions/${encodeURIComponent(roomId)}/binaries/${encodeURIComponent(itemId)}/chunks/${index}?capability=${encodeURIComponent(capability)}`)
+  const response = await fetch(`${API_ROOT}/sessions/${encodeURIComponent(roomId)}/binaries/${encodeURIComponent(itemId)}/chunks/${index}`, { headers: { 'X-Remote-Share-Capability': capability } })
   if (!response.ok) throw new Error('临时文件已不可用')
   return new Uint8Array(await response.arrayBuffer())
 }

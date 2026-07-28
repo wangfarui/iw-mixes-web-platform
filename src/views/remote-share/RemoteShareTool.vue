@@ -37,7 +37,7 @@
             <el-button type="primary" class="wide-button" :disabled="!device || !textDraft.trim()" :loading="sending" @click="sendText">发送文本</el-button>
           </el-tab-pane>
           <el-tab-pane label="图片 / 文件" name="file">
-            <el-upload drag :auto-upload="false" :show-file-list="false" :on-change="selectFile" accept="image/*,.txt,.md,.json,.csv,.log,.xml">
+            <el-upload drag :auto-upload="false" :show-file-list="false" :on-change="selectFile">
               <el-icon class="upload-icon"><UploadFilled /></el-icon>
               <div class="el-upload__text">拖入或选择图片、文件</div>
               <template #tip><div class="el-upload__tip">单项最大 10 MB；浏览器会先尝试局域网直连。</div></template>
@@ -71,10 +71,10 @@ import { ElMessage, ElMessageBox, type UploadFile } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import ToolHomeButton from '@/views/tools/components/ToolHomeButton.vue'
 import { beginRemoteShareBinary, claimRemoteShareTexts, closeRemoteShareSession, completeRemoteShareBinary, createRemoteShareSession, downloadRemoteShareChunk, getRemoteShareState, joinRemoteShareSession, pendingRemoteShareBinaries, receiptRemoteShareBinary, sendRemoteShareText, uploadRemoteShareChunk, type RemoteShareDevice } from '@/api/remoteShare'
-import { createSessionSecret, decryptBytes, decryptText, deriveSessionMaterial, encryptBytes, encryptText, readSessionSecret, shareLink, utf8ByteLength, type RemoteShareMaterial } from '@/utils/remote-share/remoteShareProtocol'
+import { SMALL_TEXT_BYTES, createSessionSecret, decryptBytes, decryptText, deriveSessionMaterial, encryptBytes, encryptText, readSessionSecret, shareLink, utf8ByteLength, type RemoteShareMaterial } from '@/utils/remote-share/remoteShareProtocol'
 import { RemoteSharePeer } from '@/utils/remote-share/remoteSharePeer'
 
-interface PendingFile { itemId: string; chunks: number; name: string; type: string }
+interface PendingFile { itemId: string; chunks: number; name: string; type: string; kind: 'file' | 'text' }
 interface RecordItem { id: string; direction: 'sent' | 'received'; text: string; at: string; file?: PendingFile }
 
 const loading = ref(false)
@@ -138,9 +138,10 @@ const refresh = async () => {
   const binaries = await pendingRemoteShareBinaries(material.value.roomId, device.value.capability)
   for (const item of binaries) {
     if (knownPendingFiles.has(item.itemId)) continue
-    const manifest = JSON.parse(await decryptText(material.value.contentKey, item.encryptedManifest)) as { name: string; type: string }
+    const manifest = JSON.parse(await decryptText(material.value.contentKey, item.encryptedManifest)) as { name: string; type: string; kind?: 'file' | 'text' }
     knownPendingFiles.add(item.itemId)
-    records.value.unshift({ id: item.itemId, direction: 'received', text: `收到文件：${manifest.name}`, at: new Date().toLocaleTimeString(), file: { itemId: item.itemId, chunks: item.chunks, name: manifest.name, type: manifest.type } })
+    const kind = manifest.kind || 'file'
+    records.value.unshift({ id: item.itemId, direction: 'received', text: kind === 'text' ? '收到长文本，点击领取后可复制。' : `收到文件：${manifest.name}`, at: new Date().toLocaleTimeString(), file: { itemId: item.itemId, chunks: item.chunks, name: manifest.name, type: manifest.type, kind } })
   }
 }
 
@@ -151,7 +152,21 @@ const startPeer = () => {
       const text = await decryptText(material.value!.contentKey, ciphertext)
       records.value.unshift({ id: crypto.randomUUID(), direction: 'received', text, at: new Date().toLocaleTimeString() })
     } catch { ElMessage.warning('收到的内容校验失败') }
-  }, () => ElMessage.success('已建立局域网直连'))
+  }, () => ElMessage.success('已建立局域网直连'), async (encryptedManifest, encryptedChunks) => {
+    try {
+      const manifest = JSON.parse(await decryptText(material.value!.contentKey, encryptedManifest)) as { name: string; type: string; kind?: 'file' | 'text' }
+      const parts = await Promise.all(encryptedChunks.map(part => decryptBytes(material.value!.contentKey, part)))
+      if (manifest.kind === 'text') {
+        const text = await new Blob(parts, { type: manifest.type }).text()
+        records.value.unshift({ id: crypto.randomUUID(), direction: 'received', text, at: new Date().toLocaleTimeString() })
+        return
+      }
+      const blob = new Blob(parts, { type: manifest.type })
+      const url = URL.createObjectURL(blob)
+      records.value.unshift({ id: crypto.randomUUID(), direction: 'received', text: `已通过局域网直连收到文件：${manifest.name}`, at: new Date().toLocaleTimeString() })
+      const link = document.createElement('a'); link.href = url; link.download = manifest.name; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch { ElMessage.warning('直连文件校验失败') }
+  })
   directPeer.connect()
   window.setTimeout(() => { if (!directPeer?.isOpen()) ElMessage.info('当前无法与对方设备建立直连，可在发送时选择临时存储') }, 5000)
 }
@@ -166,10 +181,14 @@ const sendText = async () => {
   sending.value = true
   try {
     const plaintext = textDraft.value.trim()
-    const ciphertext = await encryptText(material.value.contentKey, plaintext)
-    if (directPeer?.isOpen()) directPeer.send(ciphertext)
-    else {
+    if (utf8ByteLength(plaintext) <= SMALL_TEXT_BYTES && directPeer?.isRelayOpen()) {
+      const ciphertext = await encryptText(material.value.contentKey, plaintext)
+      directPeer.sendRelay(ciphertext)
+    } else if (utf8ByteLength(plaintext) > SMALL_TEXT_BYTES) {
+      await sendBinary(new File([plaintext], 'shared-text.txt', { type: 'text/plain;charset=utf-8' }), 'text')
+    } else {
       await ElMessageBox.confirm('当前无法与对方设备建立直连，是否需要临时存储？', '无法直连', { confirmButtonText: '临时存储', cancelButtonText: '取消' })
+      const ciphertext = await encryptText(material.value.contentKey, plaintext)
       await sendRemoteShareText(material.value.roomId, device.value.capability, ciphertext)
     }
     records.value.unshift({ id: crypto.randomUUID(), direction: 'sent', text: plaintext, at: new Date().toLocaleTimeString() })
@@ -190,27 +209,36 @@ const selectFile = (uploadFile: UploadFile) => {
 }
 const sendFile = async () => {
   if (!material.value || !device.value || !selectedFile.value) return
-  try {
-    await ElMessageBox.confirm('当前尚无法与对方设备建立直连，是否需要临时存储？', '无法直连', { confirmButtonText: '临时存储', cancelButtonText: '取消' })
-  } catch { return }
   fileSending.value = true
   try {
-    const file = selectedFile.value
-    const chunkSize = 1024 * 1024
-    const chunks = Math.ceil(file.size / chunkSize)
-    const totalBytes = file.size + chunks * 28
-    const itemId = crypto.randomUUID().replace(/-/g, '')
-    const manifest = await encryptText(material.value.contentKey, JSON.stringify({ name: file.name, type: file.type || 'application/octet-stream', size: file.size }))
-    await beginRemoteShareBinary(material.value.roomId, device.value.capability, itemId, totalBytes, chunks, manifest)
-    for (let index = 0; index < chunks; index += 1) {
-      const source = new Uint8Array(await file.slice(index * chunkSize, Math.min(file.size, (index + 1) * chunkSize)).arrayBuffer())
-      const encrypted = await encryptBytes(material.value.contentKey, source)
-      await uploadRemoteShareChunk(material.value.roomId, device.value.capability, itemId, index, encrypted)
-    }
-    await completeRemoteShareBinary(material.value.roomId, device.value.capability, itemId)
-    ElMessage.success('文件已加密临时存储，等待对方领取')
+    await sendBinary(selectedFile.value, 'file')
     selectedFile.value = undefined
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '文件发送失败') } finally { fileSending.value = false }
+}
+const sendBinary = async (file: File, kind: 'file' | 'text') => {
+  if (!material.value || !device.value) return
+  const chunkSize = 1024 * 1024
+  const chunks = Math.ceil(file.size / chunkSize)
+  const totalBytes = file.size + chunks * 28
+  const itemId = crypto.randomUUID().replace(/-/g, '')
+  const manifest = await encryptText(material.value.contentKey, JSON.stringify({ name: file.name, type: file.type || 'application/octet-stream', size: file.size, kind }))
+  const encryptedChunks: Uint8Array[] = []
+  for (let index = 0; index < chunks; index += 1) {
+    const source = new Uint8Array(await file.slice(index * chunkSize, Math.min(file.size, (index + 1) * chunkSize)).arrayBuffer())
+    encryptedChunks.push(await encryptBytes(material.value.contentKey, source))
+  }
+  if (await waitForDirectPath()) {
+    await directPeer!.sendFile(manifest, encryptedChunks)
+    if (kind === 'file') records.value.unshift({ id: itemId, direction: 'sent', text: `已通过局域网直连发送文件：${file.name}`, at: new Date().toLocaleTimeString() })
+    return
+  }
+  await ElMessageBox.confirm('当前无法与对方设备建立直连，是否需要临时存储？', '无法直连', { confirmButtonText: '临时存储', cancelButtonText: '取消' })
+  await beginRemoteShareBinary(material.value.roomId, device.value.capability, itemId, totalBytes, chunks, manifest)
+  for (let index = 0; index < chunks; index += 1) {
+    await uploadRemoteShareChunk(material.value.roomId, device.value.capability, itemId, index, encryptedChunks[index])
+  }
+  await completeRemoteShareBinary(material.value.roomId, device.value.capability, itemId)
+  ElMessage.success(kind === 'text' ? '长文本已加密临时存储，等待对方领取' : '文件已加密临时存储，等待对方领取')
 }
 const downloadFile = async (record: RecordItem) => {
   if (!record.file || !material.value || !device.value) return
@@ -220,12 +248,19 @@ const downloadFile = async (record: RecordItem) => {
       chunks.push(await decryptBytes(material.value.contentKey, await downloadRemoteShareChunk(material.value.roomId, device.value.capability, record.file.itemId, index)))
     }
     const blob = new Blob(chunks, { type: record.file.type })
+    if (record.file.kind === 'text') {
+      record.text = await blob.text()
+      await receiptRemoteShareBinary(material.value.roomId, device.value.capability, record.file.itemId)
+      record.file = undefined
+      ElMessage.success('长文本已领取')
+      return
+    }
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = record.file.name
     link.click()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     await receiptRemoteShareBinary(material.value.roomId, device.value.capability, record.file.itemId)
     record.file = undefined
     record.text = `已领取文件：${record.text.replace('收到文件：', '')}`
@@ -233,6 +268,13 @@ const downloadFile = async (record: RecordItem) => {
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '文件下载失败') }
 }
 const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(2)} MB`
+const waitForDirectPath = async () => {
+  if (directPeer?.isOpen()) return true
+  if (!directPeer && paired.value) startPeer()
+  if (directPeer) return directPeer.waitForReady(5000)
+  await new Promise(resolve => window.setTimeout(resolve, 5000))
+  return false
+}
 const copyText = async (value: string) => { await navigator.clipboard.writeText(value); ElMessage.success('已复制') }
 const copyShareUrl = () => copyText(shareUrl.value)
 const endSession = async () => {
