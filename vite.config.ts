@@ -108,6 +108,16 @@ export default ({ command, mode }: any) => {
           target: 'http://localhost:18000',
           changeOrigin: true
         },
+        // Remote sharing bypasses iw-core locally so streamed ciphertext never reaches its compatibility proxy.
+        '/external-service/api/remote-share': {
+          target: 'http://localhost:18006',
+          changeOrigin: true
+        },
+        '/external-service/wb/remote-share': {
+          target: 'ws://localhost:18006',
+          changeOrigin: true,
+          ws: true
+        },
         '/external-service': {
           target: 'http://localhost:18000',
           changeOrigin: true

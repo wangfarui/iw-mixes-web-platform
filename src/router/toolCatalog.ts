@@ -245,6 +245,22 @@ export const toolCatalog: ToolCatalogItem[] = [
         component: () => import('@/views/text-playground/TextPlaygroundTool.vue')
     },
     {
+        path: 'remote-share',
+        toolKey: 'remote-share',
+        routePath: '/tools/remote-share',
+        routeName: '远程共享',
+        title: '远程共享',
+        menuTitle: '远程共享',
+        description: '在两台设备之间端到端加密共享文本、图片和文件；同一 Wi-Fi 优先直连。',
+        category: 'work',
+        releasedAt: '2026-07-28',
+        scenarios: ['远程剪贴板', '图片传递', '文件临时共享'],
+        tags: ['端到端加密', '两台设备', '临时存储'],
+        keywords: ['remote', 'share', 'clipboard', 'file', 'image', '远程共享', '剪贴板', '文件传输', '图片传输'],
+        icon: Connection,
+        component: () => import('@/views/remote-share/RemoteShareTool.vue')
+    },
+    {
         path: 'ip-lookup',
         toolKey: 'ip-lookup',
         routePath: '/tools/ip-lookup',
