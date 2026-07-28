@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">端到端加密 · 两台设备</p>
         <h1>远程共享</h1>
-        <p>同一 Wi-Fi 下优先直连；无法直连时才可选择临时存储。</p>
+        <p>同一 Wi-Fi 下优先直连；无法直连时自动临时存储。</p>
       </div>
       <ToolHomeButton />
     </header>
@@ -33,7 +33,7 @@
         <el-tabs v-model="activeTab" stretch>
           <el-tab-pane label="文本" name="text">
             <el-input v-model="textDraft" type="textarea" :rows="10" maxlength="600000" show-word-limit placeholder="输入要共享的文本…" />
-            <p class="hint">{{ textBytes }} B · 64 KB 以下在线即时转发；离线时会询问是否临时存储。</p>
+            <p class="hint">{{ textBytes }} B · 64 KB 以下在线即时转发；无法直连时自动临时存储。</p>
             <el-button type="primary" class="wide-button" :disabled="!device || !textDraft.trim()" :loading="sending" @click="sendText">发送文本</el-button>
           </el-tab-pane>
           <el-tab-pane label="图片 / 文件" name="file">
@@ -44,7 +44,7 @@
             </el-upload>
             <div v-if="selectedFile" class="file-summary">{{ selectedFile.name }} · {{ formatBytes(selectedFile.size) }}</div>
             <el-button type="primary" class="wide-button" :disabled="!device || !selectedFile" :loading="fileSending" @click="sendFile">发送文件</el-button>
-            <el-alert type="info" :closable="false" show-icon title="会先尝试局域网直连；当前网络无法直连时会询问是否临时存储。" />
+            <el-alert type="info" :closable="false" show-icon title="会先尝试局域网直连；无法直连时自动临时存储。" />
           </el-tab-pane>
         </el-tabs>
       </section>
@@ -67,7 +67,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox, type UploadFile } from 'element-plus'
+import { ElMessage, type UploadFile } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import ToolHomeButton from '@/views/tools/components/ToolHomeButton.vue'
 import { beginRemoteShareBinary, claimRemoteShareTexts, closeRemoteShareSession, completeRemoteShareBinary, createRemoteShareSession, downloadRemoteShareChunk, getRemoteShareState, joinRemoteShareSession, pendingRemoteShareBinaries, receiptRemoteShareBinary, sendRemoteShareText, uploadRemoteShareChunk, type RemoteShareDevice } from '@/api/remoteShare'
@@ -187,9 +187,9 @@ const sendText = async () => {
     } else if (utf8ByteLength(plaintext) > SMALL_TEXT_BYTES) {
       await sendBinary(new File([plaintext], 'shared-text.txt', { type: 'text/plain;charset=utf-8' }), 'text')
     } else {
-      await ElMessageBox.confirm('当前无法与对方设备建立直连，是否需要临时存储？', '无法直连', { confirmButtonText: '临时存储', cancelButtonText: '取消' })
       const ciphertext = await encryptText(material.value.contentKey, plaintext)
       await sendRemoteShareText(material.value.roomId, device.value.capability, ciphertext)
+      ElMessage.success('文本已加密临时存储，等待对方领取')
     }
     records.value.unshift({ id: crypto.randomUUID(), direction: 'sent', text: plaintext, at: new Date().toLocaleTimeString() })
     textDraft.value = ''
@@ -232,7 +232,6 @@ const sendBinary = async (file: File, kind: 'file' | 'text') => {
     if (kind === 'file') records.value.unshift({ id: itemId, direction: 'sent', text: `已通过局域网直连发送文件：${file.name}`, at: new Date().toLocaleTimeString() })
     return
   }
-  await ElMessageBox.confirm('当前无法与对方设备建立直连，是否需要临时存储？', '无法直连', { confirmButtonText: '临时存储', cancelButtonText: '取消' })
   await beginRemoteShareBinary(material.value.roomId, device.value.capability, itemId, totalBytes, chunks, manifest)
   for (let index = 0; index < chunks; index += 1) {
     await uploadRemoteShareChunk(material.value.roomId, device.value.capability, itemId, index, encryptedChunks[index])
