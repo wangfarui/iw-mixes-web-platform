@@ -18,7 +18,7 @@ export class RemoteSharePeer {
   }
 
   connect() {
-    const base = new URL(window.location.href)
+    const base = new URL(import.meta.env.VITE_BUILD_ENV === 'prod' ? 'https://api.itwray.com' : window.location.origin)
     base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
     base.pathname = '/external-service/wb/remote-share'
     base.search = new URLSearchParams({ room: this.roomId, capability: this.capability }).toString()

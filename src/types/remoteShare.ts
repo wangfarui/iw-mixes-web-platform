@@ -2,6 +2,15 @@ export interface RemoteShareDevice {
   slot: 'A' | 'B'
   capability: string
   expiresAt: string
+  joinCode?: string
+}
+
+export interface RemoteShareCodeJoin {
+  slot: 'A' | 'B'
+  capability: string
+  expiresAt: string
+  sessionSecret: string
+  joinCode: string
 }
 
 export interface RemoteShareSessionState {
