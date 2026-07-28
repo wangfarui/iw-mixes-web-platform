@@ -37,6 +37,10 @@ export type AiTaskTopUpdateDto = {
   isTop: TopState
 }
 
+export type AiTaskActiveUpdateDto = {
+  id: number
+}
+
 export type AiTaskPageVo = {
   id: number
   title?: string

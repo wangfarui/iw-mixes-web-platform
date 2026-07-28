@@ -641,6 +641,7 @@ import {
   queryAiTaskDetail,
   queryAiTaskPage,
   updateAiTask,
+  updateAiTaskActive,
   updateAiTaskTop
 } from '@/api/aiTask'
 import {
@@ -1467,7 +1468,13 @@ const quickLaunchTask = async (task: AiSessionTask) => {
     })
     workspaceOptions.value = rememberAiTaskLocalOption('workspace', task.workspacePath)
     modelProviderOptions.value = rememberAiTaskLocalOption('modelProvider', task.modelProvider)
-    ElMessage.success('已在 Terminal 中打开会话')
+    try {
+      await updateAiTaskActive({ id: task.id })
+      await loadTaskPage()
+      ElMessage.success('已在 Terminal 中打开会话')
+    } catch {
+      ElMessage.warning('Terminal 已打开，但最近活跃时间更新失败')
+    }
   } catch (error) {
     if (error instanceof AiLauncherError && error.status === 401) {
       launcherConnectionState.value = 'unpaired'
