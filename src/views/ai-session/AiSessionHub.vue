@@ -177,6 +177,18 @@
         </el-table-column>
 
         <el-table-column
+          column-key="lastActive"
+          label="最近活跃"
+          :width="tableColumnWidths.lastActive"
+          :min-width="TABLE_COLUMN_MIN_WIDTHS.lastActive"
+          resizable
+        >
+          <template #default="{ row }">
+            {{ formatDateTime(row.lastActiveAt) }}
+          </template>
+        </el-table-column>
+
+        <el-table-column
           column-key="workspace"
           label="工作区"
           :width="tableColumnWidths.workspace"
@@ -200,18 +212,6 @@
               <span class="session-main">{{ row.sessionKey }}</span>
               <span v-if="row.modelName.trim()" class="session-sub">{{ row.modelName }}</span>
             </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column
-          column-key="lastActive"
-          label="最近活跃"
-          :width="tableColumnWidths.lastActive"
-          :min-width="TABLE_COLUMN_MIN_WIDTHS.lastActive"
-          resizable
-        >
-          <template #default="{ row }">
-            {{ formatDateTime(row.lastActiveAt) }}
           </template>
         </el-table-column>
 
