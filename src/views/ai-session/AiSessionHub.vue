@@ -1370,12 +1370,6 @@ const inspectResumeCommand = async () => {
   inspectingSession.value = true
   try {
     const draft = await inspectAiSession(resumeCommand)
-    if (!formState.title.trim()) {
-      formState.title = draft.title
-    }
-    if (!formState.description.trim()) {
-      formState.description = draft.description
-    }
     if (!formState.projectName.trim()) {
       formState.projectName = draft.projectName
     }
@@ -1392,7 +1386,7 @@ const inspectResumeCommand = async () => {
     if (draft.warnings.length) {
       ElMessage.warning(`已识别本地会话；${draft.warnings.join('；')}`)
     } else {
-      ElMessage.success('已从本机 Codex 会话填充任务信息')
+      ElMessage.success('已从本机 Codex 会话填充连接信息')
     }
   } catch (error) {
     if (error instanceof AiLauncherError && error.status === 401) {
