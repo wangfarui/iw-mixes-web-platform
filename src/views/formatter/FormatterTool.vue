@@ -184,6 +184,20 @@
             title="文本规模很大，格式化会在 Web Worker 中执行；建议分段查看输出。"
           />
           <el-alert
+            v-if="expandableJsonStringCount > 0"
+            class="result-alert json-string-alert"
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #title>
+              <span class="json-string-alert-title">
+                检测到 {{ expandableJsonStringCount }} 处可展开的 JSON 字符串
+                <el-button link type="primary" @click="expandJsonStrings">递归展开并格式化</el-button>
+              </span>
+            </template>
+          </el-alert>
+          <el-alert
             v-for="warning in result?.warnings || []"
             :key="warning"
             class="result-alert"
@@ -312,6 +326,16 @@
           <el-switch v-model="settings.ensureFinalNewline" active-text="补齐" />
         </el-form-item>
         <el-divider content-position="left">格式</el-divider>
+        <el-form-item label="JSON 字符串">
+          <div class="drawer-field">
+            <el-select v-model="settings.jsonStringHandling">
+              <el-option label="保留字符串" value="preserve" />
+              <el-option label="仅展开最外层" value="outer" />
+              <el-option label="递归展开对象/数组" value="recursive" />
+            </el-select>
+            <small>仅处理完整、合法且结果为对象或数组的 JSON 字符串。</small>
+          </div>
+        </el-form-item>
         <el-form-item label="JSON / Properties">
           <el-switch v-model="settings.sortKeys" active-text="Key 排序" />
         </el-form-item>
@@ -366,7 +390,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowDown,
@@ -491,6 +515,13 @@ const canConvert = computed(() => {
     && result.value!.language !== conversionTarget.value
     && !errorCount.value
 })
+const expandableJsonStringCount = computed(() => {
+  if (result.value?.language !== 'json' || result.value.mode === 'validate') {
+    return 0
+  }
+  const info = result.value.jsonStringInfo
+  return info ? Math.max(0, info.detectedCount - info.expandedCount) : 0
+})
 const settingsSignature = computed(() => JSON.stringify(settings))
 
 watch([inputText, settingsSignature], () => {
@@ -595,6 +626,12 @@ const cancelFormat = () => {
   terminateWorker()
   status.value = 'cancelled'
   ElMessage.info('已取消本次格式化')
+}
+
+const expandJsonStrings = async () => {
+  settings.jsonStringHandling = 'recursive'
+  await nextTick()
+  runFormat('manual')
 }
 
 const triggerFilePick = () => {
@@ -853,7 +890,7 @@ const restoreHistory = (record: FormatterHistoryRecord) => {
     durationMs: 0,
     formattedAt: record.createdAt
   }
-  Object.assign(settings, record.settings)
+  Object.assign(settings, createDefaultFormatterSettings(), record.settings)
   fileInfo.value = record.fileName
     ? {
       name: record.fileName,
@@ -1005,6 +1042,25 @@ onBeforeUnmount(() => {
 
 .convert-row {
   width: 100%;
+}
+
+.drawer-field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawer-field small {
+  color: #667085;
+  line-height: 1.45;
+}
+
+.json-string-alert-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .convert-row .el-select {

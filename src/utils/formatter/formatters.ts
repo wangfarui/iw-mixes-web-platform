@@ -1,5 +1,6 @@
 import type {
   FormatterIssue,
+  FormatterJsonStringInfo,
   FormatterResult,
   FormatterSettings,
   ResolvedFormatterLanguage
@@ -20,11 +21,13 @@ import {
   normalizeNewlines,
   trimLineEndings
 } from './metrics'
+import { normalizeJsonStrings, parseJsonInput } from './jsonStringNormalizer'
 
 interface FormatPayload {
   output: string
   issues?: FormatterIssue[]
   warnings?: string[]
+  jsonStringInfo?: FormatterJsonStringInfo
 }
 
 interface CodeToken {
@@ -327,6 +330,20 @@ export const detectFormatterLanguage = (input: string, fileName?: string): Resol
     }
   }
 
+  if (text.startsWith('"') && text.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(text)
+      if (typeof parsed === 'string') {
+        const inspection = normalizeJsonStrings(parsed, { mode: 'preserve' })
+        if (inspection.candidatePaths.length) {
+          return 'json'
+        }
+      }
+    } catch {
+      // 继续使用其它语言的识别规则。
+    }
+  }
+
   if (/^<!doctype\s+html/i.test(text) || /<\/?(html|head|body|div|span|section|article|main|script|style)\b/i.test(text)) {
     return 'html'
   }
@@ -394,16 +411,62 @@ const sortJsonKeys = (value: unknown): unknown => {
 
 const formatJson = (input: string, settings: FormatterSettings): FormatPayload => {
   try {
-    const parsed = JSON.parse(input)
-    const normalized = settings.sortKeys ? sortJsonKeys(parsed) : parsed
+    const parsedInput = parseJsonInput(input)
+    const parsed = parsedInput.value
+    const handlingMode = settings.mode === 'validate'
+      ? 'preserve'
+      : settings.jsonStringHandling || 'preserve'
+    const normalization = normalizeJsonStrings(parsed, { mode: handlingMode })
+    const normalized = settings.sortKeys ? sortJsonKeys(normalization.value) : normalization.value
+    const detectedCount = normalization.candidatePaths.length
+    const expandedCount = normalization.transformations.length
+    const samplePaths = (expandedCount
+      ? normalization.transformations.map((item) => item.path)
+      : normalization.candidatePaths
+    ).slice(0, 5)
+    const jsonStringInfo: FormatterJsonStringInfo | undefined = detectedCount
+      ? {
+          detectedCount,
+          expandedCount,
+          samplePaths,
+          limitReached: normalization.limitReached
+        }
+      : undefined
+    const warnings: string[] = []
+
+    if (parsedInput.recoveredEscapedContainer) {
+      warnings.push('输入是缺少外层引号的转义 JSON，已安全还原一层转义后格式化。')
+    }
+
+    if (expandedCount) {
+      const remainingCount = detectedCount - expandedCount
+      warnings.push(
+        `已展开 ${expandedCount} 处 JSON 字符串：${samplePaths.join('、')}${expandedCount > samplePaths.length ? ' 等' : ''}；对应值已由字符串转换为对象或数组。`
+      )
+      if (remainingCount > 0) {
+        warnings.push(`另有 ${remainingCount} 处内嵌 JSON 字符串未按当前模式展开。`)
+      }
+    } else if (detectedCount && settings.mode === 'validate') {
+      warnings.push(
+        `检测到 ${detectedCount} 处可展开的 JSON 字符串；校验模式不会改变输入。`
+      )
+    }
+    if (normalization.limitReached) {
+      warnings.push('JSON 字符串检查已达到安全限额，部分深层或超大内容保持原值。')
+    }
+
     if (settings.mode === 'validate') {
       return {
         output: input,
-        issues: [{ level: 'info', message: 'JSON 语法校验通过' }]
+        issues: [{ level: 'info', message: 'JSON 语法校验通过' }],
+        warnings,
+        jsonStringInfo
       }
     }
     return {
-      output: JSON.stringify(normalized, null, settings.mode === 'compact' ? 0 : settings.indentSize)
+      output: JSON.stringify(normalized, null, settings.mode === 'compact' ? 0 : settings.indentSize),
+      warnings,
+      jsonStringInfo
     }
   } catch (error: any) {
     const message = error?.message || 'JSON 解析失败'
@@ -2061,6 +2124,7 @@ export const formatText = async (
     outputMetrics: calculateFormatterMetrics(output),
     issues: payload.issues || [],
     warnings: payload.warnings || [],
+    jsonStringInfo: payload.jsonStringInfo,
     durationMs: Math.round(performance.now() - startedAt),
     formattedAt: new Date().toISOString()
   }

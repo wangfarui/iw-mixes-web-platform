@@ -16,6 +16,8 @@ export type FormatterMode = 'format' | 'compact' | 'validate'
 
 export type SqlKeywordCase = 'preserve' | 'upper' | 'lower'
 
+export type JsonStringHandling = 'preserve' | 'outer' | 'recursive'
+
 export type FormatterIssueLevel = 'error' | 'warning' | 'info'
 
 export interface FormatterSettings {
@@ -23,6 +25,7 @@ export interface FormatterSettings {
   mode: FormatterMode
   indentSize: number
   sortKeys: boolean
+  jsonStringHandling: JsonStringHandling
   sqlKeywordCase: SqlKeywordCase
   trimTrailingWhitespace: boolean
   normalizeLineEndings: boolean
@@ -43,6 +46,13 @@ export interface FormatterIssue {
   column?: number
 }
 
+export interface FormatterJsonStringInfo {
+  detectedCount: number
+  expandedCount: number
+  samplePaths: string[]
+  limitReached: boolean
+}
+
 export interface FormatterResult {
   language: ResolvedFormatterLanguage
   mode: FormatterMode
@@ -51,6 +61,7 @@ export interface FormatterResult {
   outputMetrics: FormatterMetrics
   issues: FormatterIssue[]
   warnings: string[]
+  jsonStringInfo?: FormatterJsonStringInfo
   durationMs: number
   formattedAt: string
 }

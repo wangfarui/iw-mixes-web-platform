@@ -10,6 +10,13 @@ export const FORMATTER_LIMITS = {
   maxTextFileBytes: 8 * 1024 * 1024
 } as const
 
+export const JSON_STRING_NORMALIZATION_LIMITS = {
+  maxDecodeLayers: 5,
+  maxTraversalDepth: 50,
+  maxCandidates: 2_000,
+  maxDecodedCharacters: 2_000_000
+} as const
+
 export const FORMATTER_HISTORY_ENABLED_KEY = 'iw:formatter:history-enabled'
 
 export const FORMATTER_HISTORY_STORAGE_KEY = 'iw:formatter:history-records'
@@ -58,6 +65,7 @@ export const createDefaultFormatterSettings = (): FormatterSettings => ({
   mode: 'format',
   indentSize: 2,
   sortKeys: false,
+  jsonStringHandling: 'preserve',
   sqlKeywordCase: 'upper',
   trimTrailingWhitespace: true,
   normalizeLineEndings: true,

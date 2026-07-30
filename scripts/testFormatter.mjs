@@ -79,6 +79,115 @@ const invalidJson = await formatters.formatText('{"a":}', { ...settings, languag
 assert.equal(invalidJson.issues[0].level, 'error')
 assert.match(invalidJson.issues[0].message, /JSON|Expected|Unexpected/i)
 
+const escapedContainerJson = String.raw`[{\"itemId\":1977142,\"itemTitle\":\"中厚板\",\"empty\":\"\",\"nullable\":null}]`
+const recoveredEscapedContainerJson = await formatters.formatText(escapedContainerJson, {
+  ...settings,
+  language: 'auto'
+})
+assert.equal(recoveredEscapedContainerJson.language, 'json')
+assert.deepEqual(JSON.parse(recoveredEscapedContainerJson.output), [{
+  itemId: 1977142,
+  itemTitle: '中厚板',
+  empty: '',
+  nullable: null
+}])
+assert.ok(recoveredEscapedContainerJson.warnings.some((warning) => warning.includes('转义 JSON')))
+
+const escapedContainerWithStringEscapes = String.raw`[{\"text\":\"line\\nquote: \\\"ok\\\"\",\"path\":\"C:\\\\temp\",\"payload\":\"{\\\"a\\\":1}\"}]`
+const recoveredContainerWithStringEscapes = await formatters.formatText(escapedContainerWithStringEscapes, {
+  ...settings,
+  language: 'json',
+  jsonStringHandling: 'recursive'
+})
+assert.deepEqual(JSON.parse(recoveredContainerWithStringEscapes.output), [{
+  text: 'line\nquote: "ok"',
+  path: 'C:\\temp',
+  payload: { a: 1 }
+}])
+
+const encodedJsonObject = JSON.stringify(JSON.stringify({ name: 'Tom', profile: { age: 18 } }))
+assert.equal(formatters.detectFormatterLanguage(encodedJsonObject), 'json')
+
+const preservedEncodedJson = await formatters.formatText(encodedJsonObject, {
+  ...settings,
+  language: 'auto'
+})
+assert.equal(preservedEncodedJson.language, 'json')
+assert.equal(preservedEncodedJson.output, encodedJsonObject)
+assert.equal(preservedEncodedJson.jsonStringInfo.detectedCount, 1)
+assert.equal(preservedEncodedJson.jsonStringInfo.expandedCount, 0)
+
+const expandedEncodedJson = await formatters.formatText(encodedJsonObject, {
+  ...settings,
+  language: 'auto',
+  jsonStringHandling: 'outer'
+})
+assert.deepEqual(JSON.parse(expandedEncodedJson.output), {
+  name: 'Tom',
+  profile: { age: 18 }
+})
+assert.equal(expandedEncodedJson.jsonStringInfo.expandedCount, 1)
+assert.ok(expandedEncodedJson.warnings.some((warning) => warning.includes('已展开 1 处')))
+
+const nestedJsonStringInput = JSON.stringify({
+  payload: JSON.stringify({ b: 2, a: 1 }),
+  items: [JSON.stringify([{ id: 1 }])],
+  count: '123',
+  enabled: 'true',
+  invalid: '{"missing":'
+})
+const expandedNestedJson = await formatters.formatText(nestedJsonStringInput, {
+  ...settings,
+  language: 'json',
+  sortKeys: true,
+  jsonStringHandling: 'recursive'
+})
+assert.deepEqual(JSON.parse(expandedNestedJson.output), {
+  count: '123',
+  enabled: 'true',
+  invalid: '{"missing":',
+  items: [[{ id: 1 }]],
+  payload: { a: 1, b: 2 }
+})
+assert.equal(expandedNestedJson.jsonStringInfo.detectedCount, 2)
+assert.equal(expandedNestedJson.jsonStringInfo.expandedCount, 2)
+assert.deepEqual(expandedNestedJson.jsonStringInfo.samplePaths, ['$.payload', '$.items[0]'])
+
+const multiplyEncodedJson = JSON.stringify(JSON.stringify(JSON.stringify({ deep: true })))
+const expandedMultiplyEncodedJson = await formatters.formatText(multiplyEncodedJson, {
+  ...settings,
+  language: 'auto',
+  jsonStringHandling: 'outer'
+})
+assert.deepEqual(JSON.parse(expandedMultiplyEncodedJson.output), { deep: true })
+
+const outerOnlyNestedJson = await formatters.formatText(nestedJsonStringInput, {
+  ...settings,
+  language: 'json',
+  jsonStringHandling: 'outer'
+})
+assert.equal(typeof JSON.parse(outerOnlyNestedJson.output).payload, 'string')
+assert.equal(outerOnlyNestedJson.jsonStringInfo.detectedCount, 2)
+assert.equal(outerOnlyNestedJson.jsonStringInfo.expandedCount, 0)
+
+const validatedNestedJson = await formatters.formatText(nestedJsonStringInput, {
+  ...settings,
+  language: 'json',
+  mode: 'validate',
+  jsonStringHandling: 'recursive'
+})
+assert.equal(validatedNestedJson.output, nestedJsonStringInput)
+assert.equal(validatedNestedJson.jsonStringInfo.expandedCount, 0)
+assert.ok(validatedNestedJson.warnings.some((warning) => warning.includes('校验模式不会改变输入')))
+
+const explicitMarkdown = await formatters.formatText(encodedJsonObject, {
+  ...settings,
+  language: 'markdown'
+})
+assert.equal(explicitMarkdown.language, 'markdown')
+assert.equal(explicitMarkdown.jsonStringInfo, undefined)
+assert.equal(formatters.detectFormatterLanguage('<html><body>demo</body></html>'), 'html')
+
 const xml = await formatters.formatText('<root><item id="1">A</item><empty/></root>', {
   ...settings,
   language: 'xml'
