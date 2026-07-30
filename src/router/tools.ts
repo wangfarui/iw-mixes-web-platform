@@ -17,7 +17,7 @@ export const toolRoutes: RouteRecordRaw = {
             component: () => import('@/views/tools/ToolsHome.vue'),
             meta: {
                 public: true,
-                title: '工具箱'
+                title: '首页'
             }
         },
         ...toolCatalog.map((tool): RouteRecordRaw => ({

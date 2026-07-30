@@ -16,13 +16,6 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 const app = createApp(App)
 
-app.use(createPinia())
-app.use(router)
-app.use(ElementPlus, {locale: zhCn})
-app.component('SvgIcon', SvgIcon)
-
-app.mount('#app')
-
 router.beforeEach((to, from, next) => {
     if (to.path == '/login') {
         //说明要去登录页面，登录页面可以直接去
@@ -52,8 +45,20 @@ router.afterEach((to, _from, failure) => {
     if (failure) {
         return;
     }
+
+    const pageTitle = typeof to.meta.title === 'string' ? to.meta.title.trim() : ''
+    const titleSuffix = to.matched.some((route) => route.meta.toolRoot === true) ? '工具箱' : 'IW'
+    document.title = pageTitle ? `${pageTitle} | ${titleSuffix}` : titleSuffix
+
     const toolKey = to.meta.toolKey
     if (typeof toolKey === 'string') {
         void reportToolUsage(toolKey)
     }
 })
+
+app.use(createPinia())
+app.use(router)
+app.use(ElementPlus, {locale: zhCn})
+app.component('SvgIcon', SvgIcon)
+
+app.mount('#app')
