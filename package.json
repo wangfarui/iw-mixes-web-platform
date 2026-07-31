@@ -13,6 +13,7 @@
     "test:number-generator": "node scripts/testNumberGenerator.mjs",
     "test:calculator": "node scripts/testCalculator.mjs",
     "test:bmi-calculator": "node scripts/testBmiCalculator.mjs",
+    "test:typing-practice": "node scripts/testTypingPractice.mjs",
     "test:formatter": "node scripts/testFormatter.mjs",
     "test:encoding-converter": "node scripts/testEncodingConverter.mjs",
     "test:color-picker": "node scripts/testColorPicker.mjs",

@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { Brush, ChatDotRound, Connection, DataAnalysis, DataLine, DocumentCopy, Location, MagicStick, MapLocation, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
+import { Brush, ChatDotRound, Connection, DataAnalysis, DataLine, DocumentCopy, EditPen, Location, MagicStick, MapLocation, Memo, Operation, Picture, Switch, TrendCharts } from '@element-plus/icons-vue'
 
 type ToolRouteComponent = NonNullable<RouteRecordRaw['component']>
 
@@ -52,6 +52,22 @@ export const toolCategories: ToolCategoryItem[] = [
 ]
 
 export const toolCatalog: ToolCatalogItem[] = [
+    {
+        path: 'typing-practice',
+        toolKey: 'typing-practice',
+        routePath: '/tools/typing-practice',
+        routeName: '打字练习',
+        title: '打字练习',
+        menuTitle: '打字练习',
+        description: '随机生成中文、英文、代码和数字练习，支持自定义长度与无限挑战。',
+        category: 'learning',
+        releasedAt: '2026-07-31',
+        scenarios: ['中文打字练习', '英文速度训练', '代码输入', '无限挑战'],
+        tags: ['随机生成', '无限挑战', '不上传'],
+        keywords: ['typing', 'wpm', 'cpm', '打字', '速度', '准确率', '随机文本', '无限挑战'],
+        icon: EditPen,
+        component: () => import('@/views/typing-practice/TypingPracticeTool.vue')
+    },
     {
         path: 'bmi-calculator',
         toolKey: 'bmi-calculator',
