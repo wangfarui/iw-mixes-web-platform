@@ -1310,7 +1310,7 @@ const getQuickLaunchTip = (task: AiSessionTask) => {
   if (launcherConnectionState.value !== 'ready') {
     return '点击连接本机启动器'
   }
-  return '在本机 Terminal 中继续会话'
+  return '在本机 iTerm2 中继续会话'
 }
 
 const refreshLauncherStatus = async (notify = false) => {
@@ -1420,9 +1420,7 @@ const optimizeTaskMetadata = async () => {
   optimizingMetadata.value = true
   try {
     const result = await optimizeAiSessionMetadata({
-      resumeCommand,
-      currentTitle: formState.title,
-      currentDescription: formState.description
+      resumeCommand
     })
     formState.title = result.title
     formState.description = result.description
@@ -1454,20 +1452,21 @@ const quickLaunchTask = async (task: AiSessionTask) => {
 
   launchingTaskId.value = task.id
   try {
-    await launchAiSession({
+    const launchResult = await launchAiSession({
       toolType: getToolTypeCode(task.toolType),
       sessionKey: task.sessionKey,
       workspacePath: task.workspacePath,
       modelProvider: normalizeOptionalText(task.modelProvider)
     })
+    const terminalName = launchResult.terminalName || 'iTerm2'
     workspaceOptions.value = rememberAiTaskLocalOption('workspace', task.workspacePath)
     modelProviderOptions.value = rememberAiTaskLocalOption('modelProvider', task.modelProvider)
     try {
       await updateAiTaskActive({ id: task.id })
       await loadTaskPage()
-      ElMessage.success('已在 Terminal 中打开会话')
+      ElMessage.success(`已在 ${terminalName} 中打开会话`)
     } catch {
-      ElMessage.warning('Terminal 已打开，但最近活跃时间更新失败')
+      ElMessage.warning(`${terminalName} 已打开，但最近活跃时间更新失败`)
     }
   } catch (error) {
     if (error instanceof AiLauncherError && error.status === 401) {

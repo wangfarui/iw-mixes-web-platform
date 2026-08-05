@@ -8,7 +8,7 @@ Iw Mixes项目-Web管理平台
 
 ## AI 会话本地启动器
 
-线上 AI 会话任务页通过本机启动器打开 macOS Terminal。启动器只监听
+线上 AI 会话任务页通过本机启动器在 iTerm2 中打开会话。启动器只监听
 `127.0.0.1:17321`，只接受以下浏览器来源：
 
 - `https://web.itwray.com`
@@ -16,6 +16,9 @@ Iw Mixes项目-Web管理平台
 - `http://localhost:5173`
 
 首次使用：
+
+请先安装并确保可以正常启动 iTerm2。启动器通过 iTerm2 的 Bundle ID
+`com.googlecode.iterm2` 打开临时 `.command` 文件，不依赖应用显示名称。
 
 ```bash
 npm run ai-launcher:install

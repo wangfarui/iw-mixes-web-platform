@@ -103,6 +103,7 @@ export const queryAiLauncherStatus = () => requestLauncher<AiLauncherStatus>('/s
 export const launchAiSession = (request: AiLauncherRequest) => requestLauncher<{
   message: string
   toolType: string
+  terminalName: string
   commandPreview: string
   workspacePath: string
 }>('/launch', {
@@ -136,8 +137,6 @@ export const inspectAiSession = async (resumeCommand: string) => {
 
 export const optimizeAiSessionMetadata = async (request: {
   resumeCommand: string
-  currentTitle: string
-  currentDescription: string
 }) => {
   try {
     return await requestLauncher<AiLauncherOptimizedMetadata>('/session/optimize-metadata', {

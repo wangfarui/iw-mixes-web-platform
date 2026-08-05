@@ -123,7 +123,7 @@ export const createLauncherServer = ({
         const request = await readJsonBody(req)
         const result = await sessionLauncher.launch(request)
         sendJson(res, 202, {
-          message: '已请求 Terminal 打开会话',
+          message: `已请求 ${result.terminalName || '终端'} 打开会话`,
           ...result
         })
       } catch (error) {

@@ -46,9 +46,8 @@ const recordMessageText = (target, text) => {
     target.firstText = normalized
   }
   target.lastText = normalized
-  target.recentTexts.push(normalized)
-  if (target.recentTexts.length > 20) {
-    target.recentTexts.shift()
+  if (target.initialTexts.length < 3) {
+    target.initialTexts.push(normalized)
   }
 }
 
@@ -139,15 +138,13 @@ const findSessionFile = async (rootDir, sessionKey) => {
 const parseSessionFile = async (filePath) => {
   const input = createReadStream(filePath, { encoding: 'utf8' })
   const lines = readline.createInterface({ input, crlfDelay: Infinity })
-  const userMessages = { firstText: '', lastText: '', recentTexts: [] }
-  const assistantMessages = { firstText: '', lastText: '', recentTexts: [] }
+  const userMessages = { firstText: '', lastText: '', initialTexts: [] }
   const metadata = {
     workspacePath: '',
     modelName: '',
     modelProvider: '',
     gitBranch: '',
-    lastActiveAt: '',
-    taskCompleteMessage: ''
+    lastActiveAt: ''
   }
 
   try {
@@ -190,21 +187,12 @@ const parseSessionFile = async (filePath) => {
         if (entry.payload?.type === 'user_message' && typeof entry.payload?.message === 'string') {
           recordMessageText(userMessages, entry.payload.message)
         }
-        if (entry.payload?.type === 'agent_message' && typeof entry.payload?.message === 'string') {
-          recordMessageText(assistantMessages, entry.payload.message)
-        }
-        if (entry.payload?.type === 'task_complete' && typeof entry.payload?.last_agent_message === 'string') {
-          metadata.taskCompleteMessage = clampText(entry.payload.last_agent_message, 1000)
-        }
         continue
       }
       if (entry.type === 'response_item' && entry.payload?.type === 'message') {
         const messageText = extractTextContent(entry.payload.content)
         if (entry.payload.role === 'user') {
           recordMessageText(userMessages, messageText)
-        }
-        if (entry.payload.role === 'assistant') {
-          recordMessageText(assistantMessages, messageText)
         }
       }
     }
@@ -217,8 +205,7 @@ const parseSessionFile = async (filePath) => {
     ...metadata,
     firstUserMessage: userMessages.firstText,
     lastUserMessage: userMessages.lastText,
-    recentUserMessages: userMessages.recentTexts.slice(-3),
-    lastAssistantMessage: assistantMessages.lastText
+    initialUserMessages: userMessages.initialTexts
   }
 }
 
@@ -248,11 +235,9 @@ const readSessionContext = async (codexHomeDir, request) => {
         modelProvider: '',
         gitBranch: '',
         lastActiveAt: '',
-        taskCompleteMessage: '',
         firstUserMessage: '',
         lastUserMessage: '',
-        recentUserMessages: [],
-        lastAssistantMessage: ''
+        initialUserMessages: []
       }
   const workspacePath = sessionData.workspacePath.trim()
   const warnings = []
@@ -303,15 +288,11 @@ export const createSessionInspector = ({
     inspect,
     async collectEvidence(request) {
       const context = await readSessionContext(codexHomeDir, request)
-      const { command, indexEntry, sessionData } = context
+      const { command, sessionData } = context
       return {
-        sessionKey: command.sessionKey,
         modelName: sessionData.modelName.trim(),
         modelProvider: command.modelProvider || sessionData.modelProvider.trim(),
-        threadName: clampText(indexEntry?.thread_name || '', 160),
-        firstUserMessage: sessionData.firstUserMessage,
-        recentUserMessages: sessionData.recentUserMessages,
-        taskCompleteMessage: sessionData.taskCompleteMessage || sessionData.lastAssistantMessage
+        initialUserMessages: sessionData.initialUserMessages
       }
     }
   }

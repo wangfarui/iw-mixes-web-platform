@@ -12,7 +12,10 @@ import {
 } from '../local-ai-launcher/metadataOptimizer.mjs'
 import { createSessionInspector, parseResumeCommand } from '../local-ai-launcher/sessionInspector.mjs'
 import { createSessionLauncher } from '../local-ai-launcher/sessionLauncher.mjs'
-import { buildTerminalScript } from '../local-ai-launcher/terminalAdapter.mjs'
+import {
+  buildTerminalScript,
+  createTerminalAdapter
+} from '../local-ai-launcher/terminalAdapter.mjs'
 
 const tempDir = await mkdtemp(path.join(os.tmpdir(), 'iw-ai-launcher-test-'))
 const workspacePath = path.join(tempDir, "workspace with 'quote'")
@@ -103,6 +106,22 @@ await writeFile(codexTranscriptPath, [
     }
   }),
   JSON.stringify({
+    timestamp: '2026-07-23T09:04:20.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'user_message',
+      message: '第三条要求：保留已有的安全校验。'
+    }
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-23T09:04:40.000Z',
+    type: 'event_msg',
+    payload: {
+      type: 'user_message',
+      message: '后续要求：这条消息不应进入 AI 优化证据。'
+    }
+  }),
+  JSON.stringify({
     timestamp: '2026-07-23T09:05:00.000Z',
     type: 'event_msg',
     payload: {
@@ -148,7 +167,7 @@ try {
   assert.deepEqual(inspectedSession, {
     toolType: 'codex',
     title: '实现本地会话识别',
-    description: '请实现本地会话识别功能；补充：补充要求：识别过程必须使用本地启动器。',
+    description: '请实现本地会话识别功能；补充：后续要求：这条消息不应进入 AI 优化证据。',
     modelName: 'gpt-test-model',
     modelProvider: 'command-provider',
     sessionKey: codexSessionId,
@@ -159,6 +178,17 @@ try {
     resumeCommand: `codex resume ${codexSessionId} -c model_provider=command-provider`,
     lastActiveAt: '2026-07-23T09:05:00.000Z',
     warnings: []
+  })
+  assert.deepEqual(await sessionInspector.collectEvidence({
+    resumeCommand: `codex resume ${codexSessionId}`
+  }), {
+    modelName: 'gpt-test-model',
+    modelProvider: 'local-provider',
+    initialUserMessages: [
+      '请实现本地会话识别功能',
+      '补充要求：识别过程必须使用本地启动器。',
+      '第三条要求：保留已有的安全校验。'
+    ]
   })
   await assert.rejects(
     () => sessionInspector.inspect({
@@ -193,12 +223,40 @@ try {
   assert.ok(optimizerArgs.includes('model_provider=local-provider'))
   assert.ok(optimizerArgs.includes('gpt-test-model'))
 
+  let optimizerPrompt = ''
+  const promptCapturingOptimizer = createMetadataOptimizer({
+    sessionInspector,
+    codexExecutable: optimizerExecutablePath,
+    executeOptimization: async ({ prompt }) => {
+      optimizerPrompt = prompt
+      return {
+        title: '基于开场消息生成名称',
+        description: '只使用最开始三条用户消息。'
+      }
+    }
+  })
+  await promptCapturingOptimizer.optimize({
+    resumeCommand: `codex resume ${codexSessionId}`,
+    currentTitle: '当前名称不应进入提示词',
+    currentDescription: '当前描述不应进入提示词'
+  })
+  assert.match(optimizerPrompt, /请实现本地会话识别功能/)
+  assert.match(optimizerPrompt, /第三条要求：保留已有的安全校验/)
+  assert.doesNotMatch(optimizerPrompt, /后续要求：这条消息不应进入 AI 优化证据/)
+  assert.doesNotMatch(optimizerPrompt, /功能和测试均已完成/)
+  assert.doesNotMatch(optimizerPrompt, /当前名称不应进入提示词/)
+  assert.doesNotMatch(optimizerPrompt, /当前描述不应进入提示词/)
+  assert.doesNotMatch(optimizerPrompt, new RegExp(codexSessionId))
+  assert.doesNotMatch(optimizerPrompt, /gpt-test-model/)
+  assert.doesNotMatch(optimizerPrompt, /local-provider/)
+
   let openedSpec
   const sessionLauncher = createSessionLauncher({
     terminalAdapter: {
       async open(spec) {
         openedSpec = spec
         return {
+          terminalName: 'iTerm2',
           commandPreview: 'preview',
           workspacePath: spec.workspacePath
         }
@@ -267,6 +325,42 @@ try {
     '-c',
     'model_provider=a b'
   ])
+
+  let openedExecutable
+  let openedArgs
+  const terminalAdapter = createTerminalAdapter({
+    tempRoot: path.join(tempDir, 'terminal-adapter'),
+    executeFile: async (file, args) => {
+      openedExecutable = file
+      openedArgs = args
+    }
+  })
+  const terminalResult = await terminalAdapter.open({
+    executable: executablePath,
+    args: ['resume', 'session-123'],
+    workspacePath
+  })
+  assert.equal(openedExecutable, '/usr/bin/open')
+  assert.equal(openedArgs[0], '-b')
+  assert.equal(openedArgs[1], 'com.googlecode.iterm2')
+  assert.equal(path.basename(openedArgs[2]), 'launch.command')
+  assert.equal(terminalResult.terminalName, 'iTerm2')
+  assert.match(await readFile(openedArgs[2], 'utf8'), /exec .*codex.*'resume' 'session-123'/)
+
+  const unavailableTerminalAdapter = createTerminalAdapter({
+    tempRoot: path.join(tempDir, 'unavailable-terminal-adapter'),
+    executeFile: async () => {
+      throw new Error('application not found')
+    }
+  })
+  await assert.rejects(
+    () => unavailableTerminalAdapter.open({
+      executable: executablePath,
+      args: ['resume', 'session-123'],
+      workspacePath
+    }),
+    (error) => error.code === 'ITERM2_OPEN_FAILED' && /iTerm2/.test(error.message)
+  )
 
   const config = {
     allowedOrigins: [
@@ -362,7 +456,10 @@ try {
     })
   })
   assert.equal(launchResponse.status, 202)
-  assert.equal((await launchResponse.json()).toolType, 'codex')
+  const launchBody = await launchResponse.json()
+  assert.equal(launchBody.toolType, 'codex')
+  assert.equal(launchBody.terminalName, 'iTerm2')
+  assert.equal(launchBody.message, '已请求 iTerm2 打开会话')
 
   const inspectResponse = await fetch(`${baseUrl}/v1/session/inspect`, {
     method: 'POST',

@@ -73,7 +73,7 @@ export const createSessionLauncher = ({
   readStat = stat
 }) => {
   if (!terminalAdapter?.open) {
-    throw new Error('缺少 Terminal adapter')
+    throw new Error('缺少终端 adapter')
   }
 
   return {

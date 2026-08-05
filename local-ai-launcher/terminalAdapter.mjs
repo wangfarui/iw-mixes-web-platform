@@ -5,6 +5,8 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
+const ITERM2_BUNDLE_ID = 'com.googlecode.iterm2'
+const ITERM2_NAME = 'iTerm2'
 
 const shellQuote = (value) => `'${String(value).replaceAll("'", "'\"'\"'")}'`
 
@@ -22,7 +24,7 @@ export const buildTerminalScript = ({ executable, args, workspacePath, commandPa
 
 export const createTerminalAdapter = ({
   tempRoot = path.join(os.tmpdir(), 'iw-ai-launcher'),
-  openTerminal = (commandPath) => execFileAsync('/usr/bin/open', ['-a', 'Terminal', commandPath])
+  executeFile = execFileAsync
 } = {}) => ({
   async open(spec) {
     const tempDir = path.join(
@@ -38,8 +40,16 @@ export const createTerminalAdapter = ({
     })
     await writeFile(commandPath, script, { encoding: 'utf8', mode: 0o700 })
     await chmod(commandPath, 0o700)
-    await openTerminal(commandPath)
+    try {
+      await executeFile('/usr/bin/open', ['-b', ITERM2_BUNDLE_ID, commandPath])
+    } catch (error) {
+      throw Object.assign(
+        new Error('无法通过 iTerm2 打开会话，请确认 iTerm2 已安装且可以正常启动'),
+        { code: 'ITERM2_OPEN_FAILED', cause: error }
+      )
+    }
     return {
+      terminalName: ITERM2_NAME,
       commandPreview: [spec.executable, ...spec.args].join(' '),
       workspacePath: spec.workspacePath
     }
