@@ -1,4030 +1,1364 @@
 <template>
-  <div class="task-list-container">
-    <!-- 左侧任务清单分组 -->
-    <div class="task-groups" :style="{ width: leftWidth + 'px' }">
-      <!-- 固定分组 -->
-      <div class="fixed-groups">
-        <div class="group-item" 
-          v-for="item in fixedGroups" 
-          :key="item.id"
-          :class="{ active: currentGroup?.id === item.id }"
-          @click="switchGroup(item)">
-          <el-icon><SvgIcon dir="task-list" :name="item.icon" /></el-icon>
-          <span class="group-name">{{ item.name }}</span>
-          <span class="task-count" v-if="item.count">{{ item.count }}</span>
-        </div>
-      </div>
-      
-      <!-- 用户自定义分组 -->
-      <div class="custom-groups">
-        <div class="custom-groups-header">
-          <span class="section-title">清单</span>
-          <el-icon class="add-icon" @click="openAddGroupDialog"><Plus /></el-icon>
-        </div>
-        <div class="group-item" 
-          v-for="item in customGroups" 
-          :key="item.id"
-          :class="{ active: currentGroup?.id === item.id }"
-          @click="switchGroup(item)">
-          <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
-          <span class="group-name">{{ item.name }}</span>
-          <span class="task-count" v-if="item.count">{{ item.count }}</span>
-          <el-dropdown trigger="click" @click.stop>
-            <el-icon class="more-icon" @click.stop><MoreFilled /></el-icon>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="renameGroup(item)">
-                  <el-icon><Edit /></el-icon>重命名
-                </el-dropdown-item>
-                <el-dropdown-item @click="deleteGroup(item)">
-                  <el-icon><Delete /></el-icon>删除
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </div>
+  <div class="task-workspace">
+    <div v-if="sidebarOpen" class="workspace-backdrop sidebar-backdrop" @click="sidebarOpen = false" />
 
-      <!-- 底部固定分组 -->
-      <div class="bottom-groups">
-        <div class="group-item" 
-          v-for="item in bottomGroups" 
-          :key="item.id"
-          :class="{ active: currentGroup?.id === item.id }"
-          @click="switchGroup(item)">
-          <el-icon><SvgIcon dir="task-list" :name="item.icon" /></el-icon>
-          <span class="group-name">{{ item.name }}</span>
-          <span class="task-count" v-if="item.count">{{ item.count }}</span>
-        </div>
-      </div>
-    </div>
+    <TaskSidebar
+      :smart-groups="smartGroups"
+      :custom-groups="customGroups"
+      :system-groups="systemGroups"
+      :current-group-id="currentGroupId"
+      :loading="navigationLoading"
+      :open="sidebarOpen"
+      @select="selectGroup"
+      @close="sidebarOpen = false"
+      @add-list="openGroupDialog('add-list')"
+      @rename="openRenameList"
+      @delete="deleteList"
+    />
 
-    <!-- 左侧拖动条 -->
-    <div class="resize-bar left-resize" 
-      @mousedown="startResize($event, 'left')"
-      :style="{ left: leftWidth + 'px' }">
-    </div>
+    <main class="task-list-panel">
+      <header class="list-header">
+        <div class="list-heading">
+          <button type="button" class="header-icon-button sidebar-toggle" aria-label="打开清单导航" @click="sidebarOpen = true">
+            <el-icon><Menu /></el-icon>
+          </button>
+          <div>
+            <div class="list-title-line">
+              <h1>{{ currentGroup?.name ?? '任务清单' }}</h1>
+              <span class="list-count">{{ visibleTaskCount }}</span>
+            </div>
+            <p>{{ groupDescription }}</p>
+          </div>
+        </div>
 
-    <!-- 中间任务列表 -->
-    <div class="tasks-content" :style="{ 
-      left: (leftWidth + 10) + 'px',
-      width: middleWidth + 'px'
-    }">
-      <!-- 头部 -->
-      <div class="content-header">
-        <div class="header-left">
-          <el-icon class="collapse-icon" @click="toggleLeftPanel">
-            <component :is="isLeftCollapsed ? 'Expand' : 'Fold'" />
-          </el-icon>
-          <span class="group-title">{{ currentGroup?.name }}</span>
+        <div class="header-actions">
+          <el-button v-if="isCustomGroup" plain @click="openGroupDialog('add-section')">
+            <el-icon><FolderAdd /></el-icon>添加分组
+          </el-button>
+          <el-button v-if="currentGroupId === 'trash'" type="danger" plain @click="clearTrash">
+            <el-icon><Delete /></el-icon>清空垃圾箱
+          </el-button>
+          <el-button circle plain aria-label="刷新任务" title="刷新任务" :loading="pageLoading" @click="refreshCurrent(true)">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
         </div>
-        <div class="header-right">
-          <el-dropdown trigger="click">
-            <el-icon class="more-icon"><MoreFilled /></el-icon>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item 
-                  v-if="!['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')"
-                  @click="addGroup">
-                  <el-icon><Plus /></el-icon>添加分组
-                </el-dropdown-item>
-                <el-dropdown-item @click="toggleHideCompleted">
-                  <el-icon><View /></el-icon>{{ isHideCompleted ? '显示已完成' : '隐藏已完成' }}
-                </el-dropdown-item>
-                <el-dropdown-item 
-                  v-if="currentGroup?.id === 'trash'"
-                  @click="clearTrash">
-                  <el-icon><Delete /></el-icon>清空垃圾箱
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
+      </header>
+
+      <div class="list-toolbar">
+        <el-input v-model="searchText" clearable placeholder="搜索任务名称、备注或分组" class="search-input">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select v-model="sortMode" class="sort-filter" aria-label="任务排序">
+          <el-option label="默认排序" value="default" />
+          <el-option label="截止日期" value="deadline" />
+          <el-option label="优先级" value="priority" />
+          <el-option label="创建时间" value="created" />
+        </el-select>
       </div>
 
-      <!-- 添加任务输入框 -->
-      <div class="add-task" v-if="currentGroup?.id !== 'completed' && currentGroup?.id !== 'trash'">
+      <div v-if="canAddTask" class="quick-add-card">
         <el-input
-          v-model="newTaskName"
-          placeholder="添加任务"
-          @keyup.enter="addTask"
-        />
+          ref="quickTaskInput"
+          v-model="quickTaskName"
+          maxlength="100"
+          clearable
+          placeholder="输入任务名称，按 Enter 快速创建"
+          :disabled="addingTask"
+          @keyup.enter="createQuickTask"
+        >
+          <template #prefix><el-icon><Plus /></el-icon></template>
+          <template #suffix>
+            <span v-if="isCustomGroup" class="quick-target-indicator" :title="`将添加到 ${quickTargetName}`">→ {{ quickTargetDisplayName }}</span>
+          </template>
+        </el-input>
+        <el-button type="primary" :loading="addingTask" :disabled="!canSubmitQuickTask" @click="createQuickTask">
+          创建任务
+        </el-button>
       </div>
 
-      <!-- 任务列表 -->
-      <div class="tasks-list">
-        <!-- 固定清单（今天、最近7天、收集箱、截止任务）和已完成清单、垃圾箱的任务列表 -->
-        <template v-if="['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')">
-          <draggable
-            v-if="subGroups[0]"
-            v-model="subGroups[0].tasks"
-            :disabled="currentGroup?.id === 'completed' || currentGroup?.id === 'trash'"
-            @end="(evt) => handleDragEnd(evt, subGroups[0].id)"
-            item-key="id"
-            handle=".task-item"
-            ghost-class="ghost"
-          >
-            <template #item="{ element: task }">
-              <div class="task-item" 
-                :data-task-id="task.id"
-                @click="selectTask(task)"
-                @contextmenu.prevent="showTaskContextMenu($event, task)"
-                :class="{ 'active': activeTask?.id === task.id }">
-                <el-checkbox 
-                  v-model="task.completed"
-                  @change="toggleTaskStatus(task)"
-                  @click.stop
-                />
-                <span class="task-name" :class="{ 
-                  completed: task.completed && currentGroup?.id === 'completed',
-                  'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
-                }">
-                  {{ task.taskName }}
-                  <span v-if="task.taskGroupName && !['inbox', 'deadline'].includes(currentGroup?.id || '')" class="task-group-name">
-                    ({{ task.taskGroupName }})
-                  </span>
-                </span>
-                <span v-if="task.deadlineDate" class="deadline-date" :class="{
-                  'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
-                  'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus || 0)
-                }">
-                  {{ formatDeadlineDisplay(task.deadlineDate) }}
-                </span>
-                <el-dropdown trigger="click" @click.stop>
-                  <el-icon class="more-icon" @click.stop="activeTask = task"><MoreFilled /></el-icon>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item class="submenu-item">
-                        <div class="context-menu-item">
-                          <el-icon><Calendar /></el-icon>
-                          <span>截止日期</span>
-                          <div class="quick-actions">
-                            <el-icon 
-                              class="quick-action-icon" 
-                              @click.stop="setTaskDeadline(task, 'today')"
-                              title="今天"
-                            ><SvgIcon dir="task-list" name="today" /></el-icon>
-                            <el-icon 
-                              class="quick-action-icon" 
-                              @click.stop="setTaskDeadline(task, 'tomorrow')"
-                              title="明天"
-                            ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
-                            <el-icon 
-                              class="quick-action-icon" 
-                              @click.stop="setTaskDeadline(task, 'nextWeek')"
-                              title="下周"
-                            ><SvgIcon dir="task-list" name="last-week" /></el-icon>
-                            <el-icon 
-                              class="quick-action-icon" 
-                              @click.stop="showDatePicker($event, task)"
-                              title="自定义"
-                            ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
-                          </div>
-                        </div>
-                      </el-dropdown-item>
-                      <el-dropdown-item class="submenu-item">
-                        <div class="context-menu-item">
-                          <el-icon><Flag /></el-icon>
-                          <span>优先级</span>
-                          <div class="quick-actions">
-                            <el-icon 
-                              class="quick-action-icon priority-high" 
-                              @click.stop="setTaskPriority(task, 30)"
-                              title="高"
-                            ><Flag /></el-icon>
-                            <el-icon 
-                              class="quick-action-icon priority-medium" 
-                              @click.stop="setTaskPriority(task, 20)"
-                              title="中"
-                            ><Flag /></el-icon>
-                            <el-icon 
-                              class="quick-action-icon priority-low" 
-                              @click.stop="setTaskPriority(task, 10)"
-                              title="低"
-                            ><Flag /></el-icon>
-                            <el-icon 
-                              class="quick-action-icon priority-none" 
-                              @click.stop="setTaskPriority(task, 0)"
-                              title="无"
-                            ><Flag /></el-icon>
-                          </div>
-                        </div>
-                      </el-dropdown-item>
-                      <el-dropdown-item class="submenu-item move-to-wrapper" 
-                        @mouseenter="showMoveToMenu = true" 
-                        @mouseleave="handleMoveToMenuLeave"
-                      >
-                        <div class="context-menu-item">
-                          <el-icon><FolderOpened /></el-icon>
-                          <span>移动到</span>
-                          <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-                          <!-- 移动到菜单 -->
-                          <div v-show="showMoveToMenu" class="move-to-menu">
-                            <div class="search-box">
-                              <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
-                            </div>
-                            <!-- 收集箱选项 -->
-                            <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
-                              <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
-                              <span>收集箱</span>
-                            </div>
-                            <!-- 自定义清单列表 -->
-                            <template v-for="list in filteredMoveList" :key="list.id">
-                              <div class="menu-item">
-                                <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
-                                <span>{{ list.groupName }}</span>
-                                <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-                                <!-- 分组子菜单 -->
-                                <div class="move-to-submenu">
-                                  <div 
-                                    v-for="subGroup in list.subGroupList" 
-                                    :key="subGroup.id" 
-                                    class="menu-item"
-                                    @click="moveTask(contextMenuTask!, subGroup.id)"
-                                  >
-                                    <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
-                                    <span>{{ subGroup.groupName }}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </template>
-                          </div>
-                        </div>
-                      </el-dropdown-item>
-                      <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
-                        <el-icon><Top /></el-icon>
-                        <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
-                      </el-dropdown-item>
-                      <el-dropdown-item  v-if="currentGroup?.id !== 'trash'" class="normal-item" @click="openPointsDialog(task)">
-                            <el-icon><Coin /></el-icon>
-                            <span>积分</span>
-                          </el-dropdown-item>
-                      <el-dropdown-item 
-                        v-if="currentGroup?.id === 'trash'"
-                        class="normal-item" 
-                        @click="restoreTask(task)">
-                        <el-icon><Refresh /></el-icon>
-                        <span>恢复</span>
-                      </el-dropdown-item>
-                      <el-dropdown-item class="normal-item" @click="deleteTask(task)">
-                        <el-icon><Delete /></el-icon>
-                        <span>删除任务</span>
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </div>
-            </template>
-          </draggable>
-          <div v-if="!loadingSubGroups && (!subGroups[0]?.tasks || subGroups[0].tasks.length === 0)" class="no-tasks">
-            {{ currentGroup?.id === 'completed' ? '暂无已完成任务' : 
-               currentGroup?.id === 'trash' ? '暂无已删除任务' : '暂无任务' }}
-          </div>
-          <!-- 添加查看更多按钮 -->
-          <div v-if="currentGroup?.id === 'completed'" class="view-more">
-            <template v-if="hasMore">
-              <el-button type="primary" link @click="loadMoreCompletedTasks">
-                查看更多
-              </el-button>
-            </template>
-            <template v-else-if="subGroups[0]?.tasks?.length > 0">
-              <span class="no-more">到底了~</span>
-            </template>
-          </div>
-        </template>
+      <section class="task-list-scroll" aria-live="polite">
+        <div v-if="pageError" class="page-error-state">
+          <el-result icon="error" title="任务加载失败" :sub-title="pageError">
+            <template #extra><el-button type="primary" @click="refreshCurrent(false)">重新加载</el-button></template>
+          </el-result>
+        </div>
 
-        <!-- 其他清单的任务列表 -->
+        <div v-else-if="pageLoading" class="page-skeleton">
+          <el-skeleton v-for="index in 7" :key="index" animated>
+            <template #template>
+              <div class="skeleton-row"><el-skeleton-item variant="circle" /><el-skeleton-item variant="text" /></div>
+            </template>
+          </el-skeleton>
+        </div>
+
         <template v-else>
-          <template v-if="subGroups.length === 1 && subGroups[0].name === '未分组'">
-            <draggable
-              v-model="subGroups[0].tasks"
-              @end="(evt) => handleDragEnd(evt, subGroups[0].id)"
-              item-key="id"
-              handle=".task-item"
-              ghost-class="ghost"
-            >
-              <template #item="{ element: task }">
-                <div class="task-item" 
-                  :data-task-id="task.id"
-                  @click="selectTask(task)"
-                  @contextmenu.prevent="showTaskContextMenu($event, task)"
-                  :class="{ 'active': activeTask?.id === task.id }">
-                  <el-checkbox 
-                    v-model="task.completed"
-                    @change="toggleTaskStatus(task)"
-                    @click.stop
-                  />
-                  <span class="task-name" :class="{ 
-                    completed: task.completed && currentGroup?.id === 'completed',
-                    'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
-                  }">
-                    {{ task.taskName }}
-                  </span>
-                  <span v-if="task.deadlineDate" class="deadline-date" :class="{
-                    'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
-                    'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus || 0)
-                  }">
-                    {{ formatDeadlineDisplay(task.deadlineDate) }}
-                  </span>
-                  <el-dropdown trigger="click" @click.stop>
-                    <el-icon class="more-icon" @click.stop="activeTask = task"><MoreFilled /></el-icon>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item class="submenu-item">
-                          <div class="context-menu-item">
-                            <el-icon><Calendar /></el-icon>
-                            <span>截止日期</span>
-                            <div class="quick-actions">
-                              <el-icon 
-                                class="quick-action-icon" 
-                                @click.stop="setTaskDeadline(task, 'today')"
-                                title="今天"
-                              ><SvgIcon dir="task-list" name="today" /></el-icon>
-                              <el-icon 
-                                class="quick-action-icon" 
-                                @click.stop="setTaskDeadline(task, 'tomorrow')"
-                                title="明天"
-                              ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
-                              <el-icon 
-                                class="quick-action-icon" 
-                                @click.stop="setTaskDeadline(task, 'nextWeek')"
-                                title="下周"
-                              ><SvgIcon dir="task-list" name="last-week" /></el-icon>
-                              <el-icon 
-                                class="quick-action-icon" 
-                                @click.stop="showDatePicker($event, task)"
-                                title="自定义"
-                              ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
-                            </div>
-                          </div>
-                        </el-dropdown-item>
-                        <el-dropdown-item class="submenu-item">
-                          <div class="context-menu-item">
-                            <el-icon><Flag /></el-icon>
-                            <span>优先级</span>
-                            <div class="quick-actions">
-                              <el-icon 
-                                class="quick-action-icon priority-high" 
-                                @click.stop="setTaskPriority(task, 30)"
-                                title="高"
-                              ><Flag /></el-icon>
-                              <el-icon 
-                                class="quick-action-icon priority-medium" 
-                                @click.stop="setTaskPriority(task, 20)"
-                                title="中"
-                              ><Flag /></el-icon>
-                              <el-icon 
-                                class="quick-action-icon priority-low" 
-                                @click.stop="setTaskPriority(task, 10)"
-                                title="低"
-                              ><Flag /></el-icon>
-                              <el-icon 
-                                class="quick-action-icon priority-none" 
-                                @click.stop="setTaskPriority(task, 0)"
-                                title="无"
-                              ><Flag /></el-icon>
-                            </div>
-                          </div>
-                        </el-dropdown-item>
-                        <el-dropdown-item class="submenu-item move-to-wrapper" 
-                          @mouseenter="showMoveToMenu = true" 
-                          @mouseleave="handleMoveToMenuLeave"
-                        >
-                          <div class="context-menu-item">
-                            <el-icon><FolderOpened /></el-icon>
-                            <span>移动到</span>
-                            <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-                            <!-- 移动到菜单 -->
-                            <div v-show="showMoveToMenu" class="move-to-menu">
-                              <div class="search-box">
-                                <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
-                              </div>
-                              <!-- 收集箱选项 -->
-                              <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
-                                <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
-                                <span>收集箱</span>
-                              </div>
-                              <!-- 自定义清单列表 -->
-                              <template v-for="list in filteredMoveList" :key="list.id">
-                                <div class="menu-item">
-                                  <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
-                                  <span>{{ list.groupName }}</span>
-                                  <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-                                  <!-- 分组子菜单 -->
-                                  <div class="move-to-submenu">
-                                    <div 
-                                      v-for="subGroup in list.subGroupList" 
-                                      :key="subGroup.id" 
-                                      class="menu-item"
-                                      @click="moveTask(contextMenuTask!, subGroup.id)"
-                                    >
-                                      <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
-                                      <span>{{ subGroup.groupName }}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </template>
-                            </div>
-                          </div>
-                        </el-dropdown-item>
-                        <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
-                          <el-icon><Top /></el-icon>
-                          <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
-                        </el-dropdown-item>
-                        <el-dropdown-item class="normal-item" @click="openPointsDialog(task)">
-                            <el-icon><Coin /></el-icon>
-                            <span>积分</span>
-                          </el-dropdown-item>
-                        <el-dropdown-item class="normal-item" @click="deleteTask(task)">
-                          <el-icon><Delete /></el-icon>
-                          <span>删除任务</span>
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-              </template>
-            </draggable>
-            <div v-if="!loadingSubGroups && subGroups[0].tasks.length === 0" class="no-tasks">
-              暂无任务
-            </div>
-          </template>
-          <el-collapse v-else v-model="activeCollapse" @change="handleCollapseChange">
-            <el-collapse-item 
-              v-for="group in subGroups" 
-              :key="group.id" 
-              :title="group.name"
-              :name="group.id">
-              <template #title>
-                <div style="display: flex; align-items: center; width: 100%;">
-                  <span style="flex: 1; text-align: left; padding-left: 8px;">
-                    <span style="font-weight: bold;">{{ group.name }}</span>
-                    <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ group.taskNum || 0 }}</span>
-                  </span>
-                  <el-icon 
-                    class="add-task-icon" 
-                    @click.stop="showNewTaskInput(group.id)"
-                    style="margin-right: 8px;"
-                  >
-                    <Plus />
-                  </el-icon>
-                  <el-dropdown trigger="click" @click.stop>
-                    <el-icon 
-                      class="more-icon"
-                      style="margin-right: 16px;"
-                      @click.stop
-                    >
-                      <MoreFilled />
-                    </el-icon>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item @click="renameGroup(group)">
-                          <el-icon><Edit /></el-icon>重命名
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="deleteGroup(group)">
-                          <el-icon><Delete /></el-icon>删除
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-              </template>
-              <template #extra>
-                <el-icon v-if="group.loading" class="is-loading"><Loading /></el-icon>
-              </template>
-              <!-- 新任务输入框 -->
-              <div v-if="group.showNewTaskInput" class="task-item new-task-input">
-                <el-checkbox disabled />
-                <el-input
-                  v-model="group.newTaskName"
-                  placeholder="请输入任务名称"
-                  @keyup.enter="saveNewTask(group.id)"
-                  @blur="saveNewTask(group.id)"
-                  ref="newTaskInput"
-                  v-focus
-                />
-              </div>
-              <draggable
-                v-model="group.tasks"
-                @end="(evt) => handleDragEnd(evt, group.id)"
-                item-key="id"
-                handle=".task-item"
-                ghost-class="ghost"
-              >
-                <template #item="{ element: task }">
-                  <div class="task-item" 
-                    :data-task-id="task.id"
-                    @click="selectTask(task)"
-                    @contextmenu.prevent="showTaskContextMenu($event, task)"
-                    :class="{ 'active': activeTask?.id === task.id }">
-                    <el-checkbox 
-                      v-model="task.completed"
-                      @change="toggleTaskStatus(task)"
-                      @click.stop
-                    />
-                    <span class="task-name" :class="{ 
-                      completed: task.completed && currentGroup?.id === 'completed',
-                      'fixed-list': ['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup?.id || '')
-                    }">
-                      {{ task.taskName }}
-                    </span>
-                    <span v-if="task.deadlineDate" class="deadline-date" :class="{
-                      'deadline-urgent': isUrgentDeadline(task.deadlineDate, task.taskStatus || 0),
-                      'deadline-warning': isWarningDeadline(task.deadlineDate, task.taskStatus || 0)
-                    }">
-                      {{ formatDeadlineDisplay(task.deadlineDate) }}
-                    </span>
-                    <el-dropdown trigger="click" @click.stop>
-                      <el-icon class="more-icon" @click.stop="activeTask = task"><MoreFilled /></el-icon>
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item class="submenu-item">
-                            <div class="context-menu-item">
-                              <el-icon><Calendar /></el-icon>
-                              <span>截止日期</span>
-                              <div class="quick-actions">
-                                <el-icon 
-                                  class="quick-action-icon" 
-                                  @click.stop="setTaskDeadline(task, 'today')"
-                                  title="今天"
-                                ><SvgIcon dir="task-list" name="today" /></el-icon>
-                                <el-icon 
-                                  class="quick-action-icon" 
-                                  @click.stop="setTaskDeadline(task, 'tomorrow')"
-                                  title="明天"
-                                ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
-                                <el-icon 
-                                  class="quick-action-icon" 
-                                  @click.stop="setTaskDeadline(task, 'nextWeek')"
-                                  title="下周"
-                                ><SvgIcon dir="task-list" name="last-week" /></el-icon>
-                                <el-icon 
-                                  class="quick-action-icon" 
-                                  @click.stop="showDatePicker($event, task)"
-                                  title="自定义"
-                                ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
-                              </div>
-                            </div>
-                          </el-dropdown-item>
-                          <el-dropdown-item class="submenu-item">
-                            <div class="context-menu-item">
-                              <el-icon><Flag /></el-icon>
-                              <span>优先级</span>
-                              <div class="quick-actions">
-                                <el-icon 
-                                  class="quick-action-icon priority-high" 
-                                  @click.stop="setTaskPriority(task, 30)"
-                                  title="高"
-                                ><Flag /></el-icon>
-                                <el-icon 
-                                  class="quick-action-icon priority-medium" 
-                                  @click.stop="setTaskPriority(task, 20)"
-                                  title="中"
-                                ><Flag /></el-icon>
-                                <el-icon 
-                                  class="quick-action-icon priority-low" 
-                                  @click.stop="setTaskPriority(task, 10)"
-                                  title="低"
-                                ><Flag /></el-icon>
-                                <el-icon 
-                                  class="quick-action-icon priority-none" 
-                                  @click.stop="setTaskPriority(task, 0)"
-                                  title="无"
-                                ><Flag /></el-icon>
-                              </div>
-                            </div>
-                          </el-dropdown-item>
-                          <el-dropdown-item class="submenu-item move-to-wrapper" 
-                            @mouseenter="showMoveToMenu = true" 
-                            @mouseleave="handleMoveToMenuLeave"
-                          >
-                            <div class="context-menu-item">
-                              <el-icon><FolderOpened /></el-icon>
-                              <span>移动到</span>
-                              <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-                              <!-- 移动到菜单 -->
-                              <div v-show="showMoveToMenu" class="move-to-menu">
-                                <div class="search-box">
-                                  <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
-                                </div>
-                                <!-- 收集箱选项 -->
-                                <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
-                                  <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
-                                  <span>收集箱</span>
-                                </div>
-                                <!-- 自定义清单列表 -->
-                                <template v-for="list in filteredMoveList" :key="list.id">
-                                  <div class="menu-item">
-                                    <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
-                                    <span>{{ list.groupName }}</span>
-                                    <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-                                    <!-- 分组子菜单 -->
-                                    <div class="move-to-submenu">
-                                      <div 
-                                        v-for="subGroup in list.subGroupList" 
-                                        :key="subGroup.id" 
-                                        class="menu-item"
-                                        @click="moveTask(contextMenuTask!, subGroup.id)"
-                                      >
-                                        <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
-                                        <span>{{ subGroup.groupName }}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </template>
-                              </div>
-                            </div>
-                          </el-dropdown-item>
-                          <el-dropdown-item class="normal-item" @click="toggleTaskTop(task)">
-                            <el-icon><Top /></el-icon>
-                            <span>{{ task.isTop ? '取消置顶' : '置顶' }}</span>
-                          </el-dropdown-item>
-                          <el-dropdown-item  v-if="currentGroup?.id !== 'trash'" class="normal-item" @click="openPointsDialog(task)">
-                            <el-icon><Coin /></el-icon>
-                            <span>积分</span>
-                          </el-dropdown-item>
-                          <el-dropdown-item 
-                            v-if="currentGroup?.id === 'trash'"
-                            class="normal-item" 
-                            @click="restoreTask(task)">
-                            <el-icon><Refresh /></el-icon>
-                            <span>恢复</span>
-                          </el-dropdown-item>
-                          <el-dropdown-item class="normal-item" @click="deleteTask(task)">
-                            <el-icon><Delete /></el-icon>
-                            <span>删除任务</span>
-                          </el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </div>
-                </template>
-              </draggable>
-              <div v-if="!group.loading && !group.showNewTaskInput && group.tasks.length === 0" class="no-tasks">
-                暂无任务
-              </div>
-            </el-collapse-item>
-          </el-collapse>
-        </template>
-
-        <div v-if="loadingSubGroups" class="loading-groups">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span>加载中...</span>
-        </div>
-
-        <div v-if="!loadingSubGroups && subGroups.length === 0 && currentGroup?.id !== 'completed'" class="no-groups">
-          暂无分组
-        </div>
-      </div>
-    </div>
-
-    <!-- 右侧拖动条 -->
-    <div class="resize-bar right-resize" 
-      @mousedown="startResize($event, 'right')"
-      :style="{ left: (leftWidth + middleWidth + 10) + 'px' }">
-    </div>
-
-    <!-- 右侧任务详情 -->
-    <div class="task-detail" :style="{ 
-      left: (leftWidth + middleWidth + 20) + 'px',
-      width: (rightWidth - 20) + 'px'
-    }">
-      <div v-if="selectedTask" class="detail-content">
-        <!-- 任务名称 -->
-        <el-input
-          v-model="selectedTask.taskName"
-          class="task-name-input"
-          @blur="updateTaskDetail('taskName')"
-        />
-        <!-- 添加积分显示 -->
-        <div class="task-points" v-if="selectedTask.rewardPoints || selectedTask.punishPoints">
-          <span v-if="selectedTask.rewardPoints" class="reward-points">
-            <el-icon><Coin /></el-icon>
-            奖励积分：{{ selectedTask.rewardPoints }}
-          </span>
-          <span v-if="selectedTask.punishPoints" class="punish-points">
-            <el-icon><Coin /></el-icon>
-            惩罚积分：{{ selectedTask.punishPoints }}
-          </span>
-        </div>
-        <!-- 任务详情 -->
-        <el-input
-          type="textarea"
-          v-model="selectedTask.taskRemark"
-          class="task-notes-input"
-          placeholder="添加备注..."
-          :autosize="{ minRows: 4 }"
-          @blur="updateTaskDetail('taskRemark')"
-        />
-        
-        <!-- 添加图片上传区域 -->
-        <div class="task-images">
-          <div class="images-header">
-            <h3>任务图片</h3>
-            <el-upload
-              class="image-uploader"
-              action="/auth-service/file/upload"
-              name="file"
-              :show-file-list="false"
-              :before-upload="beforeImageUpload"
-            >
-              <el-button type="primary" :loading="isUploading">
-                <el-icon><Upload /></el-icon>
-                上传图片
-              </el-button>
-            </el-upload>
-          </div>
-          
-          <div 
-            class="images-container"
-            @paste="handlePaste"
-            @drop="handleDrop"
-            @dragover="handleDragOver"
-          >
-            <div v-if="!selectedTask.fileList?.length" class="empty-tip">
-              <el-icon><Picture /></el-icon>
-              <p>支持拖拽图片、粘贴图片或点击上传</p>
-              <el-upload
-                class="image-uploader"
-                action="/auth-service/file/upload"
-                name="file"
-                :show-file-list="false"
-                :before-upload="beforeImageUpload"
-              >
-              </el-upload>
-            </div>
-            
-            <div v-else class="image-list">
-              <div v-for="(file, index) in selectedTask.fileList" :key="index" class="image-item">
-                <el-image 
-                  :src="file.fileUrl" 
-                  :preview-src-list="selectedTask.fileList.map(f => f.fileUrl)"
-                  :initial-index="index"
-                  fit="cover"
-                />
-                <div class="image-actions">
-                  <el-button 
-                    type="danger" 
-                    size="small" 
-                    circle
-                    @click="handleDeleteFile(file)"
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div v-else class="no-task-selected">
-        请选择一个任务查看详情
-      </div>
-    </div>
-
-    <!-- 添加清单/分组弹框 -->
-    <el-dialog
-      v-model="addGroupDialogVisible"
-      :title="addGroupForm.parentId ? '添加分组' : '添加清单'"
-      width="400px"
-      :close-on-click-modal="false"
-      @close="resetAddGroupForm"
-      @opened="handleDialogOpened"
-      class="add-group-dialog"
-    >
-      <el-form
-        ref="addGroupFormRef"
-        :model="addGroupForm"
-        :rules="addGroupRules"
-        label-width="80px"
-        @submit.prevent="submitAddGroup"
-      >
-        <el-form-item :label="addGroupForm.parentId ? '分组名称' : '清单名称'" prop="groupName">
-          <el-input 
-            v-model="addGroupForm.groupName"
-            :placeholder="addGroupForm.parentId ? '请输入分组名称' : '请输入清单名称'"
-            maxlength="20"
-            show-word-limit
-            ref="groupNameInput"
-            @keyup.enter.prevent="submitAddGroup"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="addGroupDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitAddGroup">添加</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 重命名分组对话框 -->
-    <el-dialog
-      v-model="renameDialogVisible"
-      title="重命名分组"
-      width="400px"
-      :close-on-click-modal="false"
-    >
-      <el-form
-        ref="renameFormRef"
-        :model="renameForm"
-        :rules="addGroupRules"
-        label-width="80px"
-      >
-        <el-form-item label="分组名称" prop="groupName">
-          <el-input 
-            v-model="renameForm.groupName"
-            placeholder="请输入分组名称"
-            maxlength="20"
-            show-word-limit
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="renameDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitRename">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 右键菜单 -->
-    <div 
-      v-if="contextMenuVisible"
-      class="context-menu"
-      :class="{ 'menu-top': contextMenuDirection === 'top' }"
-      :style="{ 
-        left: contextMenuX + 'px', 
-        top: contextMenuY + 'px'
-      }"
-      @click="closeContextMenu"
-    >
-      <!-- 截止日期快捷选项 -->
-      <div class="context-menu-item">
-        <el-icon><Calendar /></el-icon>
-        <span>截止日期</span>
-        <div class="quick-actions">
-          <el-icon 
-            class="quick-action-icon" 
-            @click.stop="contextMenuTask && setTaskDeadline(contextMenuTask, 'today')"
-            title="今天"
-          ><SvgIcon dir="task-list" name="today" /></el-icon>
-          <el-icon 
-            class="quick-action-icon" 
-            @click.stop="contextMenuTask && setTaskDeadline(contextMenuTask, 'tomorrow')"
-            title="明天"
-          ><SvgIcon dir="task-list" name="tomorrow" /></el-icon>
-          <el-icon 
-            class="quick-action-icon" 
-            @click.stop="contextMenuTask && setTaskDeadline(contextMenuTask, 'nextWeek')"
-            title="下周"
-          ><SvgIcon dir="task-list" name="last-week" /></el-icon>
-          <el-icon 
-            class="quick-action-icon" 
-            @click.stop="showDatePicker($event, contextMenuTask)"
-            title="自定义"
-          ><SvgIcon dir="task-list" name="custom-date" /></el-icon>
-        </div>
-      </div>
-      <!-- 优先级快捷选项 -->
-      <div class="context-menu-item">
-        <el-icon><Flag /></el-icon>
-        <span>优先级</span>
-        <div class="quick-actions">
-          <el-icon 
-            class="quick-action-icon priority-high" 
-            @click.stop="contextMenuTask && setTaskPriority(contextMenuTask, 30)"
-            title="高"
-          ><Flag /></el-icon>
-          <el-icon 
-            class="quick-action-icon priority-medium" 
-            @click.stop="contextMenuTask && setTaskPriority(contextMenuTask, 20)"
-            title="中"
-          ><Flag /></el-icon>
-          <el-icon 
-            class="quick-action-icon priority-low" 
-            @click.stop="contextMenuTask && setTaskPriority(contextMenuTask, 10)"
-            title="低"
-          ><Flag /></el-icon>
-          <el-icon 
-            class="quick-action-icon priority-none" 
-            @click.stop="contextMenuTask && setTaskPriority(contextMenuTask, 0)"
-            title="无"
-          ><Flag /></el-icon>
-        </div>
-      </div>
-      <!-- 移动到选项 -->
-      <div class="context-menu-item move-to-wrapper" 
-        @mouseenter="showMoveToMenu = true" 
-        @mouseleave="handleMoveToMenuLeave"
-      >
-        <el-icon><FolderOpened /></el-icon>
-        <span>移动到</span>
-        <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-        <!-- 移动到菜单 -->
-        <div v-show="showMoveToMenu" class="move-to-menu">
-          <div class="search-box">
-            <el-input v-model="moveToSearchText" placeholder="搜索" clearable />
-          </div>
-          <!-- 收集箱选项 -->
-          <div class="menu-item" @click="moveTask(contextMenuTask!, 0)">
-            <el-icon><SvgIcon dir="task-list" name="inbox" /></el-icon>
-            <span>收集箱</span>
-          </div>
-          <!-- 自定义清单列表 -->
-          <template v-for="list in filteredMoveList" :key="list.id">
-            <div class="menu-item">
-              <el-icon><SvgIcon dir="task-list" name="list" /></el-icon>
-              <span>{{ list.groupName }}</span>
-              <el-icon class="arrow-icon"><ArrowRight /></el-icon>
-              <!-- 分组子菜单 -->
-              <div class="move-to-submenu">
-                <div 
-                  v-for="subGroup in list.subGroupList" 
-                  :key="subGroup.id" 
-                  class="menu-item"
-                  @click="moveTask(contextMenuTask!, subGroup.id)"
+          <section v-for="section in sections" :key="section.id" class="task-section">
+            <header v-if="showSectionHeader" class="section-header" :class="{ 'is-quick-target': quickGroupId === Number(section.id) }">
+              <div class="section-heading-main">
+                <button
+                  type="button"
+                  class="section-collapse"
+                  :aria-label="`${section.expanded ? '收起' : '展开'}${section.name}`"
+                  :aria-expanded="section.expanded"
+                  @click="toggleSection(section)"
                 >
-                  <el-icon><SvgIcon dir="task-list" name="folder" /></el-icon>
-                  <span>{{ subGroup.groupName }}</span>
-                </div>
+                  <el-icon :class="{ 'is-expanded': section.expanded }"><ArrowRight /></el-icon>
+                </button>
+                <button
+                  type="button"
+                  class="section-target"
+                  :aria-pressed="quickGroupId === Number(section.id)"
+                  :title="`选中后，新任务将添加到${section.name}`"
+                  @click="selectQuickTarget(section)"
+                >
+                  <span>{{ section.name }}</span>
+                  <small>{{ visibleTasks(section).length }}</small>
+                </button>
+              </div>
+              <el-dropdown trigger="click" placement="bottom-end" @command="(command: 'add-task' | 'rename' | 'delete') => handleSectionCommand(command, section)">
+                <button type="button" class="section-more" :aria-label="`${section.name}分组操作`">
+                  <el-icon><MoreFilled /></el-icon>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="add-task"><Plus />新增任务</el-dropdown-item>
+                    <el-dropdown-item command="rename"><Edit />重命名</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided class="danger-item"><Delete />删除分组</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </header>
+
+            <div v-show="section.expanded || !showSectionHeader" class="section-body">
+              <div v-if="section.loading" class="section-loading"><el-icon class="is-loading"><Loading /></el-icon>加载中…</div>
+
+              <template v-else-if="visibleTasks(section).length">
+                <draggable
+                  v-if="canDragTasks"
+                  v-model="section.tasks"
+                  item-key="id"
+                  handle=".task-drag-handle"
+                  ghost-class="task-ghost"
+                  @end="(event) => handleDragEnd(event, section)"
+                >
+                  <template #item="{ element: task }">
+                    <TaskRow
+                      :task="task"
+                      :selected="selectedTask?.id === task.id"
+                      :busy="busyTaskIds.has(task.id)"
+                      :trash="currentGroupId === 'trash'"
+                      :show-group="showTaskGroupName"
+                      draggable
+                      @select="selectTask"
+                      @toggle="toggleTask"
+                      @action="handleTaskAction"
+                      @contextmenu="openContextMenu"
+                    />
+                  </template>
+                </draggable>
+
+                <TaskRow
+                  v-for="task in canDragTasks ? [] : visibleTasks(section)"
+                  :key="task.id"
+                  :task="task"
+                  :selected="selectedTask?.id === task.id"
+                  :busy="busyTaskIds.has(task.id)"
+                  :trash="currentGroupId === 'trash'"
+                  :show-group="showTaskGroupName"
+                  @select="selectTask"
+                  @toggle="toggleTask"
+                  @action="handleTaskAction"
+                  @contextmenu="openContextMenu"
+                />
+              </template>
+
+              <div v-else class="section-empty">
+                <el-icon><Document /></el-icon>
+                <span>{{ section.tasks.length ? emptyStateText : '这个分组还没有任务' }}</span>
               </div>
             </div>
-          </template>
-        </div>
-      </div>
-      <div class="context-menu-divider"></div>
-      <div class="context-menu-item" @click="contextMenuTask && toggleTaskTop(contextMenuTask)">
-        <el-icon><Top /></el-icon>
-        <span>{{ contextMenuTask?.isTop ? '取消置顶' : '置顶' }}</span>
-      </div>
-      <div class="context-menu-item"  v-if="currentGroup?.id !== 'trash'" @click="contextMenuTask && openPointsDialog(contextMenuTask)">
-        <el-icon><Coin /></el-icon>
-        <span>积分</span>
-      </div>
-      <div 
-        v-if="currentGroup?.id === 'trash'"
-        class="context-menu-item" 
-        @click="contextMenuTask && restoreTask(contextMenuTask)">
-        <el-icon><Refresh /></el-icon>
-        <span>恢复</span>
-      </div>
-      <div class="context-menu-item" @click="contextMenuTask && deleteTask(contextMenuTask)">
-        <el-icon><Delete /></el-icon>
-        <span>删除任务</span>
-      </div>
-    </div>
+          </section>
 
-    <!-- 修改日期选择器弹窗 -->
-    <div 
-      v-if="datePickerVisible" 
-      class="date-picker-popup"
-      :style="{ 
-        left: datePickerPosition.x + 'px', 
-        top: datePickerPosition.y + 'px' 
-      }"
-      @click.stop
-    >
-      <div class="date-picker-header">
-        <el-icon class="arrow-icon" @click="prevMonth"><ArrowLeft /></el-icon>
-        <span class="current-date">{{ currentYear }}年 {{ currentMonth + 1 }}月</span>
-        <el-icon class="arrow-icon" @click="nextMonth"><ArrowRight /></el-icon>
-      </div>
-      <div class="date-picker-content">
-        <div class="weekdays">
-          <span v-for="day in weekDays" :key="day">{{ day }}</span>
-        </div>
-        <div class="days">
-          <div 
-            v-for="day in calendarDays" 
-            :key="day.key"
-            class="day"
-            :class="{
-              'other-month': !day.currentMonth,
-              'today': isToday(day.date),
-              'selected': isSelected(day.date)
-            }"
-            @click="selectDate(day.date)"
-          >
-            {{ day.dayOfMonth }}
+          <div v-if="!sections.length" class="workspace-empty">
+            <el-empty :description="emptyStateText" :image-size="110">
+              <el-button v-if="isCustomGroup" type="primary" plain @click="openGroupDialog('add-section')">添加第一个分组</el-button>
+            </el-empty>
           </div>
-        </div>
-      </div>
-      <div class="date-picker-footer">
-        <el-button size="small" @click="selectToday">今天</el-button>
-        <el-button size="small" @click="selectTomorrow">明天</el-button>
-        <el-button size="small" @click="selectNextWeek">一周后</el-button>
-      </div>
+
+          <div v-if="currentGroupId === 'completed' && sections[0]?.tasks.length" class="load-more">
+            <el-button v-if="hasMoreCompleted" link type="primary" :loading="loadingMore" @click="loadMoreCompleted">加载更多</el-button>
+            <span v-else>已显示全部已完成任务</span>
+          </div>
+        </template>
+      </section>
+    </main>
+
+    <div v-if="detailOpen" class="workspace-backdrop detail-backdrop" @click="closeDetail" />
+    <div class="task-detail-panel" :class="{ 'is-open': detailOpen }">
+      <TaskDetailPane
+        :task="selectedTask"
+        :loading="detailLoading"
+        :busy="selectedTask ? busyTaskIds.has(selectedTask.id) : false"
+        :uploading="uploadingImage"
+        @close="closeDetail"
+        @save="saveTaskPatch"
+        @toggle="toggleTask"
+        @upload="uploadImage"
+        @delete-file="removeTaskFile"
+      />
     </div>
 
-    <!-- 积分弹框 -->
-    <el-dialog
-      v-model="pointsDialogVisible"
-      title="设置积分"
-      width="400px"
-      :close-on-click-modal="false">
-      <el-form :model="pointsForm" :rules="pointsRules" label-width="80px">
-        <el-form-item label="奖励积分" prop="rewardPoints">
-          <el-input-number 
-            v-model="pointsForm.rewardPoints"
-            :min="0"
-            :precision="0"
-            placeholder="请输入奖励积分"/>
+    <TaskContextMenu
+      :visible="contextMenu.visible"
+      :task="contextMenu.task"
+      :x="contextMenu.x"
+      :y="contextMenu.y"
+      :trash="currentGroupId === 'trash'"
+      @action="handleTaskAction"
+      @close="closeContextMenu"
+    />
+
+    <el-dialog v-model="groupDialog.visible" :title="groupDialogTitle" width="420px" :close-on-click-modal="false">
+      <el-form @submit.prevent="submitGroupDialog">
+        <el-form-item :label="groupDialog.mode === 'add-list' ? '清单名称' : '分组名称'" required>
+          <el-input
+            v-model="groupDialog.name"
+            maxlength="20"
+            show-word-limit
+            autofocus
+            :placeholder="groupDialog.mode === 'add-list' ? '例如：工作计划' : '例如：本周重点'"
+            @keydown.enter.stop.prevent="submitGroupDialog"
+          />
         </el-form-item>
-        <el-form-item label="处罚积分" prop="punishPoints">
-          <el-input-number 
-            v-model="pointsForm.punishPoints"
-            :min="0"
-            :precision="0"
-            placeholder="请输入处罚积分"/>
-        </el-form-item>
+        <div class="group-dialog-actions">
+          <el-button native-type="button" @click="groupDialog.visible = false">取消</el-button>
+          <el-button native-type="submit" type="primary" :loading="groupDialog.submitting">确定</el-button>
+        </div>
+      </el-form>
+    </el-dialog>
+
+    <el-dialog v-model="deadlineDialog.visible" title="设置截止日期" width="400px" :close-on-click-modal="false">
+      <el-date-picker
+        v-model="deadlineDialog.date"
+        type="date"
+        value-format="YYYY-MM-DD"
+        placeholder="选择截止日期"
+        clearable
+        style="width: 100%"
+      />
+      <template #footer>
+        <el-button @click="deadlineDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="deadlineDialog.submitting" @click="submitDeadline">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="moveDialog.visible" title="移动任务" width="420px" :close-on-click-modal="false">
+      <el-select v-model="moveDialog.targetGroupId" filterable placeholder="选择目标分组" style="width: 100%">
+        <el-option label="收集箱" :value="0" />
+        <el-option-group v-for="group in detailGroupOptions" :key="group.label" :label="group.label">
+          <el-option v-for="option in group.options" :key="option.value" :label="option.label" :value="option.value" />
+        </el-option-group>
+      </el-select>
+      <template #footer>
+        <el-button @click="moveDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="moveDialog.submitting" :disabled="moveDialog.targetGroupId === null" @click="submitMove">移动</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="pointsDialog.visible" title="设置任务积分" width="420px" :close-on-click-modal="false">
+      <el-skeleton v-if="pointsDialog.loading" :rows="2" animated />
+      <el-form v-else label-position="top">
+        <div class="points-form-grid">
+          <el-form-item label="完成奖励">
+            <el-input-number v-model="pointsDialog.rewardPoints" :min="0" :precision="0" controls-position="right" />
+          </el-form-item>
+          <el-form-item label="未完成处罚">
+            <el-input-number v-model="pointsDialog.punishPoints" :min="0" :precision="0" controls-position="right" />
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="pointsDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="savePoints">确定</el-button>
-        </span>
+        <el-button @click="pointsDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="pointsDialog.submitting" :disabled="pointsDialog.loading" @click="savePoints">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, onUnmounted, computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
-  Calendar,
-  ArrowDown,
-  Plus,
-  View,
-  MoreFilled,
-  Fold,
-  Expand,
-  FolderOpened,
-  Clock,
-  Collection,
-  Check,
-  Delete,
-  Loading,
-  Edit,
   ArrowRight,
-  Flag,
-  Top,
-  Position,
-  ArrowLeft,
+  Delete,
+  Document,
+  Edit,
+  FolderAdd,
+  Loading,
+  Menu,
+  MoreFilled,
+  Plus,
   Refresh,
-  Coin,
-  Bottom,
-  Upload,
-  Picture
+  Search
 } from '@element-plus/icons-vue'
-import type { TaskGroup } from '@/types/types'
-import type { FormInstance, FormRules, UploadRawFile } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import request from '@/api/request'
-import { 
-  addTaskGroup, 
-  getTaskGroupList, 
-  getTaskGroupStatistics, 
-  getTaskList,
-  addTask as addTaskApi,
-  updateTask,
-  renameTaskGroup,
+import draggable from 'vuedraggable'
+import {
+  addTask,
+  addTaskFile,
+  addTaskGroup,
+  clearDeletedTasks,
+  deleteTaskFile,
   deleteTaskGroup,
+  getCompletedTasks,
+  getDeletedTasks,
+  getTaskDetail,
+  getTaskGroupList,
   getTaskGroupMoveList,
-  type GeneralResponse,
-  type TaskGroupListVo, 
-  type StatisticsLatestTaskNumVo, 
+  getTaskGroupStatistics,
+  getTaskList,
+  getTaskPoints,
+  permanentlyDeleteTask,
+  renameTaskGroup,
+  saveTaskPoints,
+  updateTask,
+  updateTaskStatus,
+  uploadTaskImage,
   type TaskBasicsVo,
   type TaskFileVo,
-  type TaskGroupMoveListVo 
+  type TaskGroupMoveListVo
 } from '@/api/taskList'
-import SvgIcon from '@/components/SvgIcon.vue'
-import draggable from 'vuedraggable'
+import TaskContextMenu from '@/views/task/components/TaskContextMenu.vue'
+import TaskDetailPane from '@/views/task/components/TaskDetailPane.vue'
+import TaskRow from '@/views/task/components/TaskRow.vue'
+import TaskSidebar from '@/views/task/components/TaskSidebar.vue'
+import {
+  defaultDeadlineForGroup,
+  filterAndSortTasks,
+  isSpecialGroup,
+  offsetDate,
+  taskIsCompleted,
+  toTaskUpdate,
+  withCompletionState,
+  type TaskActionCommand,
+  type TaskSection,
+  type TaskSortMode,
+  type TaskStatusFilter,
+  type WorkspaceGroup
+} from '@/views/task/taskWorkspace'
 
-// 面板宽度控制
-const leftWidth = ref(250)
-const middleWidth = ref(400)
-const rightWidth = ref(650)
-const isLeftCollapsed = ref(false)
+interface DragEvent {
+  oldIndex?: number
+  newIndex?: number
+}
 
-// 分组数据
-const fixedGroups = ref<TaskGroup[]>([
-  { id: 'today', name: '今天', icon: 'today', count: 0 },
-  { id: 'week', name: '最近7天', icon: 'last-7day', count: 0 },
-  { id: 'deadline', name: '截止任务', icon: 'deadline', count: 0 },
-  { id: 'inbox', name: '收集箱', icon: 'box', count: 0 }
+interface DetailGroupOption {
+  label: string
+  options: Array<{ label: string; value: number }>
+}
+
+type GroupDialogMode = 'add-list' | 'add-section' | 'rename-list' | 'rename-section'
+
+const smartGroups = ref<WorkspaceGroup[]>([
+  { id: 'today', name: '今天', icon: 'today', count: 0, kind: 'smart' },
+  { id: 'week', name: '最近 7 天', icon: 'last-7day', count: 0, kind: 'smart' },
+  { id: 'deadline', name: '截止任务', icon: 'deadline', count: 0, kind: 'smart' },
+  { id: 'inbox', name: '收集箱', icon: 'box', count: 0, kind: 'smart' }
 ])
-
-const customGroups = ref<TaskGroup[]>([])
-const bottomGroups = ref<TaskGroup[]>([
-  { id: 'completed', name: '已完成', icon: 'done', count: 0 },
-  { id: 'trash', name: '垃圾箱', icon: 'deleted', count: 0 }
+const customGroups = ref<WorkspaceGroup[]>([])
+const systemGroups = ref<WorkspaceGroup[]>([
+  { id: 'completed', name: '已完成', icon: 'done', count: 0, kind: 'system' },
+  { id: 'trash', name: '垃圾箱', icon: 'deleted', count: 0, kind: 'system' }
 ])
-
-// 当前选中的分组
-const currentGroup = ref<TaskGroup | null>(null)
-
-// 任务相关
-const newTaskName = ref('')
+const moveList = ref<TaskGroupMoveListVo[]>([])
+const currentGroupId = ref('today')
+const sections = ref<TaskSection[]>([])
+const navigationLoading = ref(true)
+const pageLoading = ref(false)
+const pageError = ref('')
+const searchText = ref('')
+const statusFilter = ref<TaskStatusFilter>('active')
+const sortMode = ref<TaskSortMode>('default')
+const sidebarOpen = ref(false)
+const detailOpen = ref(false)
 const selectedTask = ref<TaskBasicsVo | null>(null)
-const isHideCompleted = ref(false)
-const activeCollapse = ref<(string | number)[]>([])
-const activeTask = ref<TaskBasicsVo | null>(null)
+const detailLoading = ref(false)
+const busyTaskIds = ref(new Set<number>())
+const uploadingImage = ref(false)
+const quickTaskName = ref('')
+const quickGroupId = ref<number | null>(null)
+const addingTask = ref(false)
+const completedPage = ref(1)
+const hasMoreCompleted = ref(true)
+const loadingMore = ref(false)
+const quickTaskInput = ref<{ focus: () => void } | null>(null)
+let loadSequence = 0
+let detailSequence = 0
 
-// 添加清单相关
-const addGroupDialogVisible = ref(false)
-const addGroupFormRef = ref<FormInstance>()
-const addGroupForm = reactive({
-  groupName: '',
-  parentId: undefined as string | undefined
-})
-const addGroupRules: FormRules = {
-  groupName: [
-    { required: true, message: '请输入分组名称', trigger: 'submit' },
-    { min: 1, max: 20, message: '长度在 1 到 20 个字符', trigger: 'submit' }
-  ]
-}
-
-// 子分组数据
-interface SubGroup {
-  id: string;
-  name: string;
-  tasks: TaskBasicsVo[];
-  parentId?: string;
-  loading?: boolean;
-  showNewTaskInput?: boolean;
-  newTaskName?: string;
-  taskNum?: number;
-}
-
-const subGroups = ref<SubGroup[]>([])
-const loadingSubGroups = ref(false)
-
-// 拖拽调整宽度
-const startResize = (e: MouseEvent, type: 'left' | 'right') => {
-  const startX = e.clientX
-  const startLeftWidth = leftWidth.value
-  const startMiddleWidth = middleWidth.value
-
-  const handleMouseMove = (e: MouseEvent) => {
-    const deltaX = e.clientX - startX
-
-    if (type === 'left') {
-      const newLeftWidth = startLeftWidth + deltaX
-      if (newLeftWidth >= 200 && newLeftWidth <= 400) {
-        leftWidth.value = newLeftWidth
-      }
-    } else {
-      const newMiddleWidth = startMiddleWidth + deltaX
-      if (newMiddleWidth >= 300 && newMiddleWidth <= 600) {
-        middleWidth.value = newMiddleWidth
-      }
-    }
-  }
-
-  const handleMouseUp = () => {
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-  }
-
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
-}
-
-// 切换左侧面板显示/隐藏
-const toggleLeftPanel = () => {
-  isLeftCollapsed.value = !isLeftCollapsed.value
-  if (isLeftCollapsed.value) {
-    leftWidth.value = 0
-  } else {
-    leftWidth.value = 250
-  }
-}
-
-// 切换分组
-const switchGroup = async (group: TaskGroup) => {
-  currentGroup.value = group
-  activeCollapse.value = []
-  subGroups.value = []
-  selectedTask.value = null  // 清空选中的任务
-  activeTask.value = null   // 清空高亮的任务
-  
-  // 如果是已完成分组，加载已完成任务列表
-  if (group.id === 'completed') {
-    try {
-      loadingSubGroups.value = true
-      currentPage.value = 1 // 重置页码
-      hasMore.value = true // 重置加载更多状态
-      const res = await request.get(`/points-service/points/task/basics/doneList?currentPage=${currentPage.value}`)
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: 'completed',
-          name: '已完成',
-          tasks: res.data.map(task => ({
-            ...task,
-            completed: true
-          })),
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-        // 如果返回的数据少于10条，说明没有更多数据了
-        hasMore.value = res.data.length >= 10
-      }
-    } catch (error) {
-      console.error('加载已完成任务失败:', error)
-      ElMessage.error('加载已完成任务失败')
-    } finally {
-      loadingSubGroups.value = false
-    }
-    return
-  }
-
-  // 如果是垃圾箱分组，加载已删除任务列表
-  if (group.id === 'trash') {
-    try {
-      loadingSubGroups.value = true
-      const res = await request.get('/points-service/points/task/basics/deletedList')
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: 'trash',
-          name: '垃圾箱',
-          tasks: res.data.map(task => ({
-            ...task,
-            completed: false
-          })),
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-      }
-    } catch (error) {
-      console.error('加载已删除任务失败:', error)
-      ElMessage.error('加载已删除任务失败')
-    } finally {
-      loadingSubGroups.value = false
-    }
-    return
-  }
-
-  // 如果是固定清单（今天、最近7天、收集箱），加载对应的任务列表
-  if (['today', 'week', 'inbox', 'deadline'].includes(group.id)) {
-    try {
-      loadingSubGroups.value = true
-      let startDeadlineDate: string | undefined
-      let endDeadlineDate: string | undefined
-      const today = new Date()
-      const todayStr = formatDate(today)
-
-      switch (group.id) {
-        case 'today':
-          // startDeadlineDate = todayStr
-          endDeadlineDate = todayStr
-          break
-        case 'week':
-          // startDeadlineDate = todayStr
-          const nextWeek = new Date(today)
-          nextWeek.setDate(nextWeek.getDate() + 7)
-          endDeadlineDate = formatDate(nextWeek)
-          break
-        case 'inbox':
-          // 收集箱不需要时间范围
-          break
-        case 'deadline':
-          // 截止任务不需要时间范围
-          break
-      }
-
-      const res = await getTaskList(group.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, group.id === 'deadline')
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: group.id,
-          name: group.name,
-          tasks: res.data,
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-      }
-    } catch (error) {
-      console.error('加载任务列表失败:', error)
-      ElMessage.error('加载任务列表失败')
-    } finally {
-      loadingSubGroups.value = false
-    }
-    return
-  }
-  
-  // 如果是自定义分组，加载其子分组
-  if (customGroups.value.find(g => g.id === group.id)) {
-    await loadSubGroups(group.id)
-  }
-}
-
-// 添加任务
-const addTask = async () => {
-  if (!newTaskName.value.trim()) return
-  
-  try {
-    let deadlineDate: string | null = null
-    let taskGroupId = 0
-
-    // 根据当前清单设置截止日期和任务分组ID
-    if (currentGroup.value) {
-      switch (currentGroup.value.id) {
-        case 'today':
-          deadlineDate = formatDate(new Date())
-          taskGroupId = 0
-          break
-        case 'week':
-          const nextWeek = new Date()
-          nextWeek.setDate(nextWeek.getDate() + 7)
-          deadlineDate = formatDate(nextWeek)
-          taskGroupId = 0
-          break
-        case 'inbox':
-          deadlineDate = null
-          taskGroupId = 0
-          break
-        case 'deadline':
-          const nextMonth = new Date()
-          nextMonth.setDate(nextMonth.getDate() + 30)
-          deadlineDate = formatDate(nextMonth)
-          taskGroupId = 0
-          break
-        default:
-          // 如果是自定义清单，检查是否有分组
-          if (subGroups.value.length === 0) {
-            // 如果没有分组，先创建默认分组
-            const res = await addTaskGroup({
-              groupName: '未分组',
-              parentId: currentGroup.value.id
-            })
-            if (res.data) {
-              taskGroupId = res.data
-              // 刷新分组列表
-              await loadSubGroups(currentGroup.value.id)
-            }
-          } else {
-            // 如果有分组，使用第一个分组的ID
-            taskGroupId = subGroups.value[0]?.id ? parseInt(subGroups.value[0].id) : 0
-          }
-      }
-    }
-
-    await addTaskApi({
-      taskName: newTaskName.value.trim(),
-      taskGroupId,
-      deadlineDate
-    })
-
-    // 更新当前分组的任务列表
-    if (currentGroup.value && ['today', 'week', 'inbox', 'deadline'].includes(currentGroup.value.id)) {
-      let startDeadlineDate: string | undefined
-      let endDeadlineDate: string | undefined
-      const today = new Date()
-      const todayStr = formatDate(today)
-
-      switch (currentGroup.value.id) {
-        case 'today':
-          startDeadlineDate = todayStr
-          endDeadlineDate = todayStr
-          break
-        case 'week':
-          startDeadlineDate = todayStr
-          const nextWeek = new Date(today)
-          nextWeek.setDate(nextWeek.getDate() + 7)
-          endDeadlineDate = formatDate(nextWeek)
-          break
-        case 'inbox':
-          // 收集箱不需要时间范围
-          break
-        case 'deadline':
-          // 截止任务不需要时间范围
-          break
-      }
-
-      const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value.id === 'deadline')
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: currentGroup.value.id,
-          name: currentGroup.value.name,
-          tasks: res.data,
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-      }
-    } else if (currentGroup.value && !['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value.id)) {
-      // 如果是自定义清单，只刷新第一个分组的任务列表
-      if (subGroups.value.length > 0) {
-        await loadGroupTasks(subGroups.value[0].id)
-        // 更新第一个分组的任务数量
-        subGroups.value[0].taskNum = (subGroups.value[0].taskNum || 0) + 1
-      }
-    }
-    
-    newTaskName.value = ''
-    
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-
-    ElMessage.success('添加任务成功')
-  } catch (error) {
-    console.error('添加任务失败:', error)
-    ElMessage.error('添加任务失败')
-  }
-}
-
-// 切换任务状态
-const toggleTaskStatus = async (task: TaskBasicsVo) => {
-  try {
-    await request.put('/points-service/points/task/basics/updateStatus', {
-      id: task.id,
-      taskStatus: task.completed ? 1 : 0
-    })
-    
-    // 更新本地任务数据
-    const group = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
-    if (group) {
-      const taskIndex = group.tasks.findIndex(t => t.id === task.id)
-      if (taskIndex > -1) {
-        // 添加动画效果
-        const taskElement = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement
-        if (taskElement && task.completed) {
-          taskElement.style.transition = 'all 0.3s ease-out'
-          taskElement.style.opacity = '0'
-          taskElement.style.transform = 'translateX(20px)'
-          
-          // 等待动画完成后移除任务
-          setTimeout(() => {
-            group.tasks.splice(taskIndex, 1)
-            group.taskNum = (group.taskNum || 1) - 1
-          }, 300)
-        } else {
-          group.tasks[taskIndex] = {
-            ...group.tasks[taskIndex],
-            completed: task.completed
-          }
-        }
-      }
-    }
-
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-    
-    // 如果是已完成清单中的任务，取消完成状态后需要重新加载已完成任务列表
-    if (currentGroup.value?.id === 'completed') {
-      const res = await request.get('/points-service/points/task/basics/doneList')
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: 'completed',
-          name: '已完成',
-          tasks: res.data.map(t => ({
-            ...t,
-            completed: true
-          })),
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-      }
-    }
-    
-    ElMessage.success(task.completed ? '任务已完成' : '任务已恢复')
-  } catch (error) {
-    console.error('更新任务状态失败:', error)
-    ElMessage.error('更新任务状态失败')
-  }
-}
-
-// 选择任务
-const selectTask = async (task: TaskBasicsVo) => {
-  selectedTask.value = task
-  isTaskDetailVisible.value = true
-  
-  // 获取任务详情
-  await handleTaskDetail(task.id)
-}
-
-const handleTaskDetail = async (taskId: number) => {
-  const res = await request.get<unknown, GeneralResponse<TaskBasicsVo>>(`/points-service/points/task/basics/detail?id=${taskId}`)
-  if (!selectedTask.value) return
-
-  selectedTask.value = {
-    ...selectedTask.value,
-    taskRemark: res.data.taskRemark,
-    rewardPoints: res.data.rewardPoints,
-    punishPoints: res.data.punishPoints,
-    fileList: res.data.fileList
-  }
-}
-
-// 更新任务详情
-const updateTaskDetail = async (field: 'taskName' | 'taskRemark') => {
-  if (!selectedTask.value) return
-
-  try {
-    const group = subGroups.value.find(g => g.tasks.some(t => t.id === selectedTask.value?.id))
-    if (!group) return
-
-    await updateTask({
-      id: selectedTask.value.id,
-      taskName: selectedTask.value.taskName,
-      taskRemark: selectedTask.value.taskRemark,
-      taskGroupId: selectedTask.value.taskGroupId
-    })
-
-    // 更新列表中的任务名称
-    if (field === 'taskName') {
-      const task = group.tasks.find(t => t.id === selectedTask.value?.id)
-      if (task) {
-        task.taskName = selectedTask.value.taskName
-      }
-    }
-  } catch (error) {
-    console.error('更新任务失败:', error)
-    ElMessage.error('更新任务失败')
-  }
-}
-
-// 打开添加清单弹框
-const openAddGroupDialog = () => {
-  // 清空父分组ID，因为点击清单旁边的加号时不需要父分组
-  addGroupForm.parentId = undefined
-  addGroupDialogVisible.value = true
-  nextTick(() => {
-    // 使用更精确的选择器
-    const input = document.querySelector('.add-group-dialog .el-input__inner') as HTMLInputElement
-    if (input) {
-      input.focus()
-    }
-  })
-}
-
-// 添加分组
-const addGroup = () => {
-  // 设置父分组ID
-  if (currentGroup.value) {
-    addGroupForm.parentId = currentGroup.value.id
-  }
-  addGroupDialogVisible.value = true
-  nextTick(() => {
-    // 使用更精确的选择器
-    const input = document.querySelector('.add-group-dialog .el-input__inner') as HTMLInputElement
-    if (input) {
-      input.focus()
-    }
-  })
-}
-
-// 切换隐藏已完成任务
-const toggleHideCompleted = () => {
-  isHideCompleted.value = !isHideCompleted.value
-}
-
-// 重置添加清单表单
-const resetAddGroupForm = () => {
-  if (addGroupFormRef.value) {
-    addGroupFormRef.value.resetFields()
-  }
-  addGroupForm.groupName = ''
-  addGroupForm.parentId = undefined
-}
-
-// 加载自定义分组列表
-const loadCustomGroups = async () => {
-  try {
-    const res = await getTaskGroupList()
-    // 将后端返回的数据格式转换为前端使用的格式
-    if (Array.isArray(res.data)) {
-      customGroups.value = res.data.map((item: TaskGroupListVo) => ({
-        id: item.id.toString(),
-        name: item.groupName,
-        count: item.taskNum,
-        sort: item.sort,
-        isTop: item.isTop
-      }))
-      // 根据置顶和排序进行排序
-      customGroups.value.sort((a, b) => {
-        if (a.isTop !== b.isTop) {
-          return (b.isTop || 0) - (a.isTop || 0)
-        }
-        return (b.sort || 0) - (a.sort || 0)
-      })
-    }
-  } catch (error) {
-    console.error('加载自定义分组失败:', error)
-    ElMessage.error('获取清单失败')
-  }
-}
-
-// 提交添加清单/分组
-const submitAddGroup = async () => {
-  if (!addGroupFormRef.value) return
-  
-  await addGroupFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        await addTaskGroup({
-          groupName: addGroupForm.groupName,
-          parentId: addGroupForm.parentId
-        })
-        
-        ElMessage.success(addGroupForm.parentId ? '添加分组成功' : '添加清单成功')
-        addGroupDialogVisible.value = false
-        resetAddGroupForm()
-        
-        // 如果是添加分组，刷新当前清单的分组列表
-        if (currentGroup.value) {
-          await loadSubGroups(currentGroup.value.id)
-        }
-        
-        // 重新加载自定义分组和移动清单列表
-        await loadCustomGroups()
-        await loadMoveList()
-      } catch (error) {
-        console.error(addGroupForm.parentId ? '添加分组失败:' : '添加清单失败:', error)
-        ElMessage.error('添加失败')
-      }
-    }
-  })
-}
-
-// 加载子分组
-const loadSubGroups = async (parentId: string) => {
-  // 如果不是自定义清单，直接返回
-  if (['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(parentId)) {
-    return
-  }
-
-  try {
-    loadingSubGroups.value = true
-    const res = await getTaskGroupList(parentId)
-    if (Array.isArray(res.data)) {
-      subGroups.value = res.data.map(item => ({
-        id: item.id.toString(),
-        name: item.groupName,
-        tasks: [],
-        loading: false,
-        showNewTaskInput: false,
-        newTaskName: '',
-        taskNum: item.taskNum
-      }))
-
-      // 如果只有一个分组且分组名为"未分组"，自动加载其任务列表
-      if (subGroups.value.length === 1 && subGroups.value[0].name === '未分组') {
-        await loadGroupTasks(subGroups.value[0].id)
-      }
-    }
-  } catch (error) {
-    console.error('加载子分组失败:', error)
-    ElMessage.error('加载子分组失败')
-  } finally {
-    loadingSubGroups.value = false
-  }
-}
-
-// 加载分组下的任务
-const loadGroupTasks = async (groupId: string) => {
-  const group = subGroups.value.find(g => g.id === groupId)
-  if (!group) return
-  
-  try {
-    group.loading = true
-    const res = await getTaskList(groupId)
-    if (Array.isArray(res.data)) {
-      group.tasks = res.data
-    }
-  } catch (error) {
-    console.error('加载任务列表失败:', error)
-    ElMessage.error('加载任务列表失败')
-  } finally {
-    group.loading = false
-  }
-}
-
-// 切换分组展开状态
-const handleCollapseChange = async (activeNames: (string | number)[]) => {
-  // 将 activeNames 转换为字符串数组
-  const activeNamesStr = Array.isArray(activeNames) ? activeNames.map(String) : [String(activeNames)]
-  
-  // 更新当前展开状态
-  activeCollapse.value = activeNamesStr
-  
-  // 遍历所有展开的分组,重新加载数据
-  for (const groupId of activeNamesStr) {
-    await loadGroupTasks(groupId)
-  }
-}
-
-// 显示新任务输入框
-const showNewTaskInput = async (groupId: string) => {
-  // 如果分组未展开，先展开分组
-  if (!activeCollapse.value.includes(groupId)) {
-    activeCollapse.value = [...activeCollapse.value, groupId]
-    // 加载任务列表
-    await loadGroupTasks(groupId)
-  }
-
-  // 显示新任务输入框
-  const group = subGroups.value.find(g => g.id === groupId)
-  if (group) {
-    group.showNewTaskInput = true
-    group.newTaskName = ''
-  }
-}
-
-// 保存新任务
-const saveNewTask = async (groupId: string) => {
-  const group = subGroups.value.find(g => g.id === groupId)
-  if (!group || !group.newTaskName?.trim()) {
-    group && (group.showNewTaskInput = false)
-    return
-  }
-
-  try {
-    await addTaskApi({
-      taskName: group.newTaskName.trim(),
-      taskGroupId: parseInt(groupId)
-    })
-    
-    // 只刷新当前分组的任务列表
-    await loadGroupTasks(groupId)
-    
-    ElMessage.success('添加任务成功')
-  } catch (error) {
-    console.error('添加任务失败:', error)
-    ElMessage.error('添加任务失败')
-  } finally {
-    group.showNewTaskInput = false
-    group.newTaskName = ''
-  }
-}
-
-// 自动聚焦指令
-const vFocus = {
-  mounted: (el: HTMLElement) => {
-    const input = el.querySelector('input')
-    if (input) {
-      input.focus()
-    }
-  }
-}
-
-// 重命名分组对话框
-const renameDialogVisible = ref(false)
-const renameForm = reactive({
+const groupDialog = reactive({
+  visible: false,
+  mode: 'add-list' as GroupDialogMode,
   id: 0,
-  groupName: ''
-})
-const renameFormRef = ref<FormInstance>()
-
-// 重命名分组
-const renameGroup = (group: TaskGroup) => {
-  renameForm.id = parseInt(group.id)
-  renameForm.groupName = group.name
-  renameDialogVisible.value = true
-}
-
-// 提交重命名
-const submitRename = async () => {
-  if (!renameFormRef.value) return
-
-  await renameFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        await renameTaskGroup({
-          id: renameForm.id,
-          groupName: renameForm.groupName
-        })
-        
-        ElMessage.success('重命名成功')
-        renameDialogVisible.value = false
-        
-        // 更新本地分组名称
-        const group = subGroups.value.find(g => g.id === renameForm.id.toString())
-        if (group) {
-          group.name = renameForm.groupName
-        }
-
-        // 重新加载自定义分组列表和移动清单列表
-        await loadCustomGroups()
-        await loadMoveList()
-      } catch (error) {
-        console.error('重命名分组失败:', error)
-        ElMessage.error('重命名失败')
-      }
-    }
-  })
-}
-
-// 删除分组
-const deleteGroup = async (group: TaskGroup) => {
-  try {
-    await ElMessageBox.confirm(
-      '确定要删除该分组吗？删除后无法恢复，分组内的所有任务也将被删除。',
-      '删除确认',
-      {
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await deleteTaskGroup(parseInt(group.id))
-    ElMessage.success('删除成功')
-
-    // 重新加载自定义分组列表和移动清单列表
-    await loadCustomGroups()
-    await loadMoveList()
-
-    // 如果分组是自定义清单，则刷新任务列表
-    if (group.parentId && group.parentId === '0') {
-      await loadSubGroups(group.parentId)
-    }
-    
-    // 从列表中移除该分组
-    const index = customGroups.value.findIndex(g => g.id === group.id)
-    if (index > -1) {
-      customGroups.value.splice(index, 1)
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除分组失败:', error)
-      ElMessage.error('删除失败')
-    }
-  }
-}
-
-// 处理对话框打开完成事件
-const handleDialogOpened = () => {
-  nextTick(() => {
-    const input = document.querySelector('.add-group-dialog .el-input__inner') as HTMLInputElement
-    if (input) {
-      input.focus()
-    }
-  })
-}
-
-// 格式化日期为yyyy-MM-dd
-const formatDate = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-// 设置任务截止日期
-const setTaskDeadline = async (task: TaskBasicsVo, type: 'today' | 'tomorrow' | 'nextWeek' | 'custom') => {
-  let deadlineDate: string | null = null
-  const now = new Date()
-  
-  switch (type) {
-    case 'today':
-      deadlineDate = formatDate(now)
-      break
-    case 'tomorrow':
-      const tomorrow = new Date(now)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      deadlineDate = formatDate(tomorrow)
-      break
-    case 'nextWeek':
-      const nextWeek = new Date(now)
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      deadlineDate = formatDate(nextWeek)
-      break
-    case 'custom':
-      // 自定义日期时，显示日期选择器
-      showDatePicker(new MouseEvent('click'), task)
-      return
-  }
-
-  try {
-    await updateTask({
-      id: task.id,
-      taskName: task.taskName,
-      taskRemark: task.taskRemark,
-      taskGroupId: task.taskGroupId,
-      deadlineDate,
-      priority: task.priority || 0,
-      isTop: task.isTop || 0
-    })
-
-    // 更新本地任务数据
-    const group = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
-    if (group) {
-      const taskIndex = group.tasks.findIndex(t => t.id === task.id)
-      if (taskIndex > -1) {
-        group.tasks[taskIndex] = {
-          ...group.tasks[taskIndex],
-          deadlineDate
-        }
-      }
-    }
-
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-    
-    ElMessage.success('设置截止日期成功')
-    closeContextMenu() // 关闭菜单
-  } catch (error) {
-    console.error('设置截止日期失败:', error)
-    ElMessage.error('设置截止日期失败')
-  }
-}
-
-// 设置任务优先级
-const setTaskPriority = async (task: TaskBasicsVo, priority: number) => {
-  try {
-    await updateTask({
-      id: task.id,
-      taskName: task.taskName,
-      taskRemark: task.taskRemark,
-      taskGroupId: task.taskGroupId,
-      deadlineDate: task.deadlineDate,
-      priority,
-      isTop: task.isTop || 0
-    })
-    task.priority = priority
-    ElMessage.success('设置优先级成功')
-    closeContextMenu() // 关闭菜单
-  } catch (error) {
-    console.error('设置优先级失败:', error)
-    ElMessage.error('设置优先级失败')
-  }
-}
-
-// 切换任务置顶状态
-const toggleTaskTop = async (task: TaskBasicsVo) => {
-  const newIsTop = task.isTop === 1 ? 0 : 1
-  try {
-    await updateTask({
-      id: task.id,
-      taskName: task.taskName,
-      taskRemark: task.taskRemark,
-      taskGroupId: task.taskGroupId,
-      deadlineDate: task.deadlineDate,
-      priority: task.priority || 0,
-      isTop: newIsTop
-    })
-    task.isTop = newIsTop
-    ElMessage.success(newIsTop === 1 ? '置顶成功' : '取消置顶成功')
-  } catch (error) {
-    console.error('切换置顶状态失败:', error)
-    ElMessage.error('操作失败')
-  }
-}
-
-// 恢复任务
-const restoreTask = async (task: TaskBasicsVo) => {
-  try {
-    await request.put('/points-service/points/task/basics/updateStatus', {
-      id: task.id,
-      taskStatus: 0
-    })
-    
-    // 从列表中移除该任务并更新任务数量
-    const group = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
-    if (group) {
-      const index = group.tasks.findIndex(t => t.id === task.id)
-      if (index > -1) {
-        group.tasks.splice(index, 1)
-        group.taskNum = (group.taskNum || 1) - 1
-      }
-    }
-    
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-    
-    // 如果是垃圾箱清单，刷新任务列表
-    if (currentGroup.value?.id === 'trash') {
-      const res = await request.get('/points-service/points/task/basics/deletedList')
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: 'trash',
-          name: '垃圾箱',
-          tasks: res.data.map(t => ({
-            ...t,
-            completed: false
-          })),
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-      }
-    }
-    
-    ElMessage.success('恢复任务成功')
-    closeContextMenu() // 关闭右键菜单
-  } catch (error) {
-    console.error('恢复任务失败:', error)
-    ElMessage.error('恢复任务失败')
-  }
-}
-
-// 删除任务
-const deleteTask = async (task: TaskBasicsVo) => {
-  try {
-    // 根据当前清单类型显示不同的确认提示
-    const confirmMessage = currentGroup.value?.id === 'trash' 
-      ? '确定要永久删除该任务吗？删除后将无法恢复。'
-      : '确定要删除该任务吗？删除后任务将进入垃圾箱。'
-
-    await ElMessageBox.confirm(
-      confirmMessage,
-      '删除确认',
-      {
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    // 根据当前清单类型调用不同的删除接口
-    if (currentGroup.value?.id === 'trash') {
-      // 垃圾箱清单下使用永久删除接口
-      await request.delete('/points-service/points/task/basics/delete?id=' + task.id)
-    } else {
-      // 其他清单下使用更新状态接口
-      await request.put('/points-service/points/task/basics/updateStatus', {
-        id: task.id,
-        taskStatus: 3
-      })
-    }
-    
-    // 从列表中移除该任务并更新任务数量
-    const group = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
-    if (group) {
-      const index = group.tasks.findIndex(t => t.id === task.id)
-      if (index > -1) {
-        group.tasks.splice(index, 1)
-        group.taskNum = (group.taskNum || 1) - 1
-      }
-    }
-    
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-    
-    // 如果是垃圾箱清单或固定清单，刷新任务列表
-    if (currentGroup.value && ['trash', 'today', 'week', 'inbox', 'deadline'].includes(currentGroup.value.id)) {
-      let startDeadlineDate: string | undefined
-      let endDeadlineDate: string | undefined
-      const today = new Date()
-      const todayStr = formatDate(today)
-
-      switch (currentGroup.value.id) {
-        case 'trash':
-          const res = await request.get('/points-service/points/task/basics/deletedList')
-          if (Array.isArray(res.data)) {
-            subGroups.value = [{
-              id: 'trash',
-              name: '垃圾箱',
-              tasks: res.data.map(t => ({
-                ...t,
-                completed: false
-              })),
-              loading: false,
-              showNewTaskInput: false,
-              newTaskName: '',
-              taskNum: res.data.length
-            }]
-          }
-          break
-        case 'today':
-          startDeadlineDate = todayStr
-          endDeadlineDate = todayStr
-          break
-        case 'week':
-          startDeadlineDate = todayStr
-          const nextWeek = new Date(today)
-          nextWeek.setDate(nextWeek.getDate() + 7)
-          endDeadlineDate = formatDate(nextWeek)
-          break
-        case 'inbox':
-          // 收集箱不需要时间范围
-          break
-      }
-
-      if (currentGroup.value.id !== 'trash') {
-        const res = await getTaskList(currentGroup.value.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value.id === 'deadline')
-        if (Array.isArray(res.data)) {
-          subGroups.value = [{
-            id: currentGroup.value.id,
-            name: currentGroup.value.name,
-            tasks: res.data,
-            loading: false,
-            showNewTaskInput: false,
-            newTaskName: '',
-            taskNum: res.data.length
-          }]
-        }
-      }
-    }
-    
-    ElMessage.success('删除成功')
-    closeContextMenu() // 关闭右键菜单
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除任务失败:', error)
-      ElMessage.error('删除失败')
-    }
-  }
-}
-
-// 右键菜单相关
-const contextMenuVisible = ref(false)
-const contextMenuX = ref(0)
-const contextMenuY = ref(0)
-const contextMenuTask = ref<TaskBasicsVo | null>(null)
-const contextMenuDirection = ref<'top' | 'bottom'>('bottom')
-
-// 显示右键菜单
-const showTaskContextMenu = (event: MouseEvent, task: TaskBasicsVo) => {
-  event.preventDefault()
-  contextMenuTask.value = task
-  activeTask.value = task
-  contextMenuX.value = event.clientX
-  
-  // 计算菜单高度（每个菜单项高度约40px，分隔线高度约8px）
-  const menuHeight = 40 * 4 + 8 // 4个菜单项 + 1个分隔线
-  
-  // 获取视窗高度
-  const windowHeight = window.innerHeight
-  
-  // 计算点击位置到视窗底部的距离
-  const distanceToBottom = windowHeight - event.clientY
-  
-  // 如果点击位置到视窗底部的距离小于菜单高度，则向上展示
-  if (distanceToBottom < menuHeight) {
-    contextMenuDirection.value = 'top'
-    // 从鼠标位置开始向上展示
-    contextMenuY.value = event.clientY - menuHeight
-  } else {
-    contextMenuDirection.value = 'bottom'
-    contextMenuY.value = event.clientY
-  }
-  
-  contextMenuVisible.value = true
-}
-
-// 关闭右键菜单
-const closeContextMenu = () => {
-  contextMenuVisible.value = false
-  contextMenuTask.value = null
-  activeTask.value = null
-}
-
-// 点击其他地方关闭右键菜单和高亮效果
-onMounted(() => {
-  document.addEventListener('click', () => {
-    closeContextMenu()
-    activeTask.value = null
-  })
+  name: '',
+  submitting: false
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', () => {
-    closeContextMenu()
-    activeTask.value = null
-  })
+const deadlineDialog = reactive({
+  visible: false,
+  task: null as TaskBasicsVo | null,
+  date: null as string | null,
+  submitting: false
 })
 
-// 初始化
-onMounted(async () => {
-  try {
-    // 加载分组数量
-    const res = await getTaskGroupStatistics()
-    
-    // 更新固定分组的数量
-    fixedGroups.value = fixedGroups.value.map(group => ({
-      ...group,
-      count: group.id === 'today' ? res.data.todayNum :
-             group.id === 'week' ? res.data.weekNum :
-             group.id === 'inbox' ? res.data.noGroupNum :
-             group.id === 'deadline' ? res.data.withDeadlineNum : 0
-    }))
-    
-    // 加载自定义分组
-    await loadCustomGroups()
-    
-    // 加载移动清单列表
-    await loadMoveList()
-
-    // 默认选中今天分组
-    switchGroup(fixedGroups.value[0])
-  } catch (error) {
-    console.error('初始化失败:', error)
-    ElMessage.error('加载数据失败')
-  }
+const moveDialog = reactive({
+  visible: false,
+  task: null as TaskBasicsVo | null,
+  targetGroupId: null as number | null,
+  submitting: false
 })
 
-const datePickerVisible = ref(false)
-const datePickerPosition = reactive({
+const pointsDialog = reactive({
+  visible: false,
+  task: null as TaskBasicsVo | null,
+  rewardPoints: 0,
+  punishPoints: 0,
+  loading: false,
+  submitting: false
+})
+
+const contextMenu = reactive({
+  visible: false,
+  task: null as TaskBasicsVo | null,
   x: 0,
   y: 0
 })
-const currentTask = ref<TaskBasicsVo | null>(null)
 
-// 显示日期选择器
-const showDatePicker = (event: MouseEvent, task: TaskBasicsVo | null) => {
-  if (!task) return
-  
-  event.stopPropagation()
-  currentTask.value = task
-  
-  // 计算日期选择器的位置
-  const rect = (event.target as HTMLElement).getBoundingClientRect()
-  datePickerPosition.x = rect.right + 8 // 在点击位置右侧显示
-  datePickerPosition.y = rect.top // 与点击位置顶部对齐
-  
-  // 检查是否超出视窗右边界
-  const pickerWidth = 280 // 日期选择器的宽度
-  if (datePickerPosition.x + pickerWidth > window.innerWidth) {
-    datePickerPosition.x = rect.left - pickerWidth - 8 // 在左侧显示
-  }
-  
-  // 检查是否超出视窗底部
-  const pickerHeight = 320 // 日期选择器的高度
-  if (datePickerPosition.y + pickerHeight > window.innerHeight) {
-    datePickerPosition.y = window.innerHeight - pickerHeight - 8 // 向上偏移
-  }
-  
-  datePickerVisible.value = true
-}
-
-// 关闭日期选择器
-const closeDatePicker = () => {
-  datePickerVisible.value = false
-  currentTask.value = null
-}
-
-// 点击其他地方关闭日期选择器
-onMounted(() => {
-  document.addEventListener('click', () => {
-    closeContextMenu()
-    closeDatePicker()
-    activeTask.value = null
-  })
+const allGroups = computed(() => [...smartGroups.value, ...customGroups.value, ...systemGroups.value])
+const currentGroup = computed(() => allGroups.value.find((group) => group.id === currentGroupId.value) ?? smartGroups.value[0])
+const isCustomGroup = computed(() => currentGroup.value?.kind === 'custom')
+const canAddTask = computed(() => !['completed', 'trash'].includes(currentGroupId.value))
+const showSectionHeader = computed(() => isCustomGroup.value && (sections.value.length > 1 || sections.value[0]?.name !== '未分组'))
+const showTaskGroupName = computed(() => ['today', 'week', 'deadline', 'completed', 'trash'].includes(currentGroupId.value))
+const canDragTasks = computed(() => (
+  statusFilter.value === 'all'
+  && !searchText.value.trim()
+  && sortMode.value === 'default'
+  && !['completed', 'trash'].includes(currentGroupId.value)
+))
+const visibleTaskCount = computed(() => sections.value.reduce((total, section) => total + visibleTasks(section).length, 0))
+const quickTargetName = computed(() => {
+  if (!isCustomGroup.value) return ''
+  if (!sections.value.length) return '未分组'
+  return sections.value.find((section) => Number(section.id) === quickGroupId.value)?.name ?? sections.value[0].name
+})
+const quickTargetDisplayName = computed(() => {
+  const characters = [...quickTargetName.value]
+  return characters.length > 5 ? `${characters.slice(0, 5).join('')}...` : quickTargetName.value
+})
+const canSubmitQuickTask = computed(() => Boolean(quickTaskName.value.trim()))
+const detailGroupOptions = computed<DetailGroupOption[]>(() => moveList.value.map((group) => ({
+  label: group.groupName,
+  options: (group.subGroupList ?? []).map((section) => ({ label: section.groupName, value: section.id }))
+})))
+const groupDialogTitle = computed(() => ({
+  'add-list': '新建清单',
+  'add-section': '添加分组',
+  'rename-list': '重命名清单',
+  'rename-section': '重命名分组'
+}[groupDialog.mode]))
+const groupDescription = computed(() => ({
+  today: '包括今天到期和已经逾期的任务',
+  week: '未来 7 天内需要处理的任务',
+  deadline: '所有设置了截止日期的任务',
+  inbox: '尚未归入自定义清单的任务',
+  completed: '最近完成的任务，可继续加载历史记录',
+  trash: '删除的任务可以恢复或永久移除'
+}[currentGroupId.value] ?? '按分组组织和推进当前清单'))
+const emptyStateText = computed(() => {
+  if (searchText.value.trim() || statusFilter.value !== 'all') return '没有符合当前筛选条件的任务'
+  if (currentGroupId.value === 'completed') return '还没有已完成任务'
+  if (currentGroupId.value === 'trash') return '垃圾箱是空的'
+  if (isCustomGroup.value && !sections.value.length) return '当前清单还没有任务，新任务将添加到未分组'
+  return '当前清单还没有任务'
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', () => {
-    closeContextMenu()
-    closeDatePicker()
-    activeTask.value = null
-  })
-})
+const visibleTasks = (section: TaskSection): TaskBasicsVo[] => {
+  return filterAndSortTasks(section.tasks, searchText.value, statusFilter.value, sortMode.value)
+}
 
-// 选择日期
-const handleDateSelect = async (date: Date) => {
-  if (!currentTask.value) return
-  
+const normalizeTasks = (tasks: TaskBasicsVo[], completed?: boolean): TaskBasicsVo[] => {
+  return tasks.map((task) => withCompletionState(task, completed))
+}
+
+const setTaskBusy = (id: number, busy: boolean) => {
+  const next = new Set(busyTaskIds.value)
+  if (busy) next.add(id)
+  else next.delete(id)
+  busyTaskIds.value = next
+}
+
+const isCancel = (error: unknown) => error === 'cancel' || error === 'close'
+
+const loadNavigation = async () => {
+  navigationLoading.value = true
   try {
-    // 使用新的格式化方法
-    const formattedDate = formatDate(date)
-    
-    await updateTask({
-      id: currentTask.value.id,
-      taskName: currentTask.value.taskName,
-      taskRemark: currentTask.value.taskRemark,
-      taskGroupId: currentTask.value.taskGroupId,
-      deadlineDate: formattedDate,
-      priority: currentTask.value.priority || 0,
-      isTop: currentTask.value.isTop || 0
-    })
-
-    // 更新本地任务数据
-    if (['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value?.id || '')) {
-      // 对于固定清单和特殊清单，重新加载整个任务列表
-      let startDeadlineDate: string | undefined
-      let endDeadlineDate: string | undefined
-      const today = new Date()
-      const todayStr = formatDate(today)
-
-      switch (currentGroup.value?.id) {
-        case 'today':
-          startDeadlineDate = todayStr
-          endDeadlineDate = todayStr
-          break
-        case 'week':
-          startDeadlineDate = todayStr
-          const nextWeek = new Date(today)
-          nextWeek.setDate(nextWeek.getDate() + 7)
-          endDeadlineDate = formatDate(nextWeek)
-          break
-        case 'inbox':
-          // 收集箱不需要时间范围
-          break
-        case 'completed':
-          const res = await request.get('/points-service/points/task/basics/doneList')
-          if (Array.isArray(res.data)) {
-            subGroups.value = [{
-              id: 'completed',
-              name: '已完成',
-              tasks: res.data.map(t => ({
-                ...t,
-                completed: true
-              })),
-              loading: false,
-              showNewTaskInput: false,
-              newTaskName: '',
-              taskNum: res.data.length
-            }]
-          }
-          return
-        case 'trash':
-          const trashRes = await request.get('/points-service/points/task/basics/deletedList')
-          if (Array.isArray(trashRes.data)) {
-            subGroups.value = [{
-              id: 'trash',
-              name: '垃圾箱',
-              tasks: trashRes.data.map(t => ({
-                ...t,
-                completed: false
-              })),
-              loading: false,
-              showNewTaskInput: false,
-              newTaskName: '',
-              taskNum: trashRes.data.length
-            }]
-          }
-          return
-      }
-
-      const res = await getTaskList(currentGroup.value?.id === 'inbox' ? '0' : '', startDeadlineDate, endDeadlineDate, currentGroup.value?.id === 'deadline')
-      if (Array.isArray(res.data)) {
-        subGroups.value = [{
-          id: currentGroup.value?.id || '',
-          name: currentGroup.value?.name || '',
-          tasks: res.data,
-          loading: false,
-          showNewTaskInput: false,
-          newTaskName: '',
-          taskNum: res.data.length
-        }]
-      }
-    } else {
-      // 对于自定义清单，只更新单个任务
-      const group = subGroups.value.find(g => g.id === currentTask.value?.taskGroupId?.toString())
-      if (group) {
-        const taskIndex = group.tasks.findIndex(t => t.id === currentTask.value?.id)
-        if (taskIndex > -1) {
-          group.tasks[taskIndex] = {
-            ...group.tasks[taskIndex],
-            deadlineDate: formattedDate
-          }
-        }
-      }
-    }
-
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-
-    ElMessage.success('设置截止日期成功')
-  } catch (error) {
-    console.error('设置截止日期失败:', error)
-    ElMessage.error('设置截止日期失败')
-  } finally {
-    closeDatePicker()
-    closeContextMenu()
-  }
-}
-
-const selectedDate = ref<Date | null>(null)
-const dateShortcuts = [
-  {
-    text: '今天',
-    value: new Date()
-  },
-  {
-    text: '明天',
-    value: () => {
-      const date = new Date()
-      date.setTime(date.getTime() + 3600 * 1000 * 24)
-      return date
-    }
-  },
-  {
-    text: '一周后',
-    value: () => {
-      const date = new Date()
-      date.setTime(date.getTime() + 3600 * 1000 * 24 * 7)
-      return date
-    }
-  }
-]
-
-// 日期选择器相关
-const currentDate = ref(new Date())
-const currentYear = computed(() => currentDate.value.getFullYear())
-const currentMonth = computed(() => currentDate.value.getMonth())
-const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-
-// 计算日历数据
-const calendarDays = computed(() => {
-  const year = currentYear.value
-  const month = currentMonth.value
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const days = []
-  
-  // 添加上个月的日期
-  const firstDayWeekday = firstDay.getDay()
-  for (let i = firstDayWeekday - 1; i >= 0; i--) {
-    const date = new Date(year, month, -i)
-    days.push({
-      date,
-      dayOfMonth: date.getDate(),
-      currentMonth: false,
-      key: date.toISOString() // 添加唯一key
-    })
-  }
-  
-  // 添加当前月的日期
-  for (let i = 1; i <= lastDay.getDate(); i++) {
-    const date = new Date(year, month, i)
-    days.push({
-      date,
-      dayOfMonth: i,
-      currentMonth: true,
-      key: date.toISOString() // 添加唯一key
-    })
-  }
-  
-  // 添加下个月的日期
-  const remainingDays = 42 - days.length // 保持6行
-  for (let i = 1; i <= remainingDays; i++) {
-    const date = new Date(year, month + 1, i)
-    days.push({
-      date,
-      dayOfMonth: date.getDate(),
-      currentMonth: false,
-      key: date.toISOString() // 添加唯一key
-    })
-  }
-  
-  return days
-})
-
-// 日期选择器方法
-const prevMonth = () => {
-  currentDate.value = new Date(currentYear.value, currentMonth.value - 1)
-}
-
-const nextMonth = () => {
-  currentDate.value = new Date(currentYear.value, currentMonth.value + 1)
-}
-
-// 判断日期是否为今天
-const isToday = (date: Date | string | null | undefined): boolean => {
-  if (!date) return false
-  const today = new Date()
-  const taskDate = date instanceof Date ? date : new Date(date)
-  return today.getDate() === taskDate.getDate() &&
-         today.getMonth() === taskDate.getMonth() &&
-         today.getFullYear() === taskDate.getFullYear()
-}
-
-// 判断日期是否为明天
-const isTomorrow = (date: Date | string | null | undefined): boolean => {
-  if (!date) return false
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const taskDate = date instanceof Date ? date : new Date(date)
-  return tomorrow.getDate() === taskDate.getDate() &&
-         tomorrow.getMonth() === taskDate.getMonth() &&
-         tomorrow.getFullYear() === taskDate.getFullYear()
-}
-
-// 判断日期是否在一周内
-const isWithinWeek = (date: Date | string | null | undefined): boolean => {
-  if (!date) return false
-  const today = new Date()
-  const taskDate = date instanceof Date ? date : new Date(date)
-  const diffTime = taskDate.getTime() - today.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  return diffDays >= 0 && diffDays <= 7
-}
-
-// 格式化日期显示
-const formatDeadlineDisplay = (date: Date | string | null | undefined): string => {
-  if (!date) return ''
-  if (isToday(date)) return '今天'
-  if (isTomorrow(date)) return '明天'
-  return date instanceof Date ? formatDate(date) : date
-}
-
-// 修改日期选择器相关的方法
-const isSelected = (date: Date) => {
-  if (!selectedDate.value) return false
-  return date.getDate() === selectedDate.value.getDate() &&
-         date.getMonth() === selectedDate.value.getMonth() &&
-         date.getFullYear() === selectedDate.value.getFullYear()
-}
-
-const selectDate = (date: Date) => {
-  selectedDate.value = date
-  handleDateSelect(date)
-}
-
-const selectToday = () => {
-  const today = new Date()
-  selectDate(today)
-}
-
-const selectTomorrow = () => {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  selectDate(tomorrow)
-}
-
-const selectNextWeek = () => {
-  const nextWeek = new Date()
-  nextWeek.setDate(nextWeek.getDate() + 7)
-  selectDate(nextWeek)
-}
-
-// 更新任务数量
-const updateTaskCounts = async () => {
-  try {
-    // 更新固定分组的数量
-    const res = await getTaskGroupStatistics()
-    fixedGroups.value = fixedGroups.value.map(group => ({
+    const [statisticsResponse, customResponse, moveResponse] = await Promise.all([
+      getTaskGroupStatistics(),
+      getTaskGroupList(),
+      getTaskGroupMoveList()
+    ])
+    const statistics = statisticsResponse.data
+    smartGroups.value = smartGroups.value.map((group) => ({
       ...group,
-      count: group.id === 'today' ? res.data.todayNum :
-             group.id === 'week' ? res.data.weekNum :
-             group.id === 'inbox' ? res.data.noGroupNum :
-             group.id === 'deadline' ? res.data.withDeadlineNum : 0
+      count: group.id === 'today' ? statistics.todayNum
+        : group.id === 'week' ? statistics.weekNum
+          : group.id === 'deadline' ? statistics.withDeadlineNum
+            : statistics.noGroupNum
     }))
-    
-    // 更新自定义分组列表
-    await loadCustomGroups()
-  } catch (error) {
-    console.error('更新任务数量失败:', error)
+    customGroups.value = customResponse.data
+      .map((group) => ({
+        id: String(group.id),
+        name: group.groupName,
+        icon: 'list',
+        count: group.taskNum,
+        kind: 'custom' as const,
+        sort: group.sort,
+        isTop: group.isTop
+      }))
+      .sort((left, right) => (right.isTop ?? 0) - (left.isTop ?? 0) || (right.sort ?? 0) - (left.sort ?? 0))
+    moveList.value = moveResponse.data
+  } finally {
+    navigationLoading.value = false
   }
 }
 
-// 判断是否为紧急截止日期（今天或更早）
-const isUrgentDeadline = (date: string, taskStatus: number): boolean => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const deadline = new Date(date)
-  deadline.setHours(0, 0, 0, 0)
-  return deadline <= today && taskStatus == 0
+const loadSmartTasks = async (groupId: string): Promise<TaskBasicsVo[]> => {
+  if (groupId === 'completed') {
+    completedPage.value = 1
+    const response = await getCompletedTasks(1)
+    hasMoreCompleted.value = response.data.length >= 10
+    return normalizeTasks(response.data, true)
+  }
+  if (groupId === 'trash') {
+    const response = await getDeletedTasks()
+    return normalizeTasks(response.data, false)
+  }
+  if (groupId === 'inbox') return normalizeTasks((await getTaskList('0')).data)
+  if (groupId === 'deadline') return normalizeTasks((await getTaskList('', undefined, undefined, true)).data)
+  if (groupId === 'week') return normalizeTasks((await getTaskList('', undefined, offsetDate(7))).data)
+  return normalizeTasks((await getTaskList('', undefined, offsetDate(0))).data)
 }
 
-// 判断是否为警告截止日期（明天到一周内）
-const isWarningDeadline = (date: string, taskStatus: number): boolean => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const deadline = new Date(date)
-  deadline.setHours(0, 0, 0, 0)
-  const diffTime = deadline.getTime() - today.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  return diffDays > 0 && diffDays <= 7 && taskStatus == 0
+const loadCurrentGroup = async (keepSelected: boolean) => {
+  const sequence = ++loadSequence
+  const selectedId = keepSelected ? selectedTask.value?.id : undefined
+  if (!keepSelected && selectedTask.value) closeDetail()
+  pageLoading.value = true
+  pageError.value = ''
+  closeContextMenu()
+
+  try {
+    let nextSections: TaskSection[]
+    if (isSpecialGroup(currentGroupId.value)) {
+      const tasks = await loadSmartTasks(currentGroupId.value)
+      nextSections = [{ id: currentGroupId.value, name: currentGroup.value.name, taskNum: tasks.length, tasks, loading: false, expanded: true }]
+      const target = allGroups.value.find((group) => group.id === currentGroupId.value)
+      if (target) target.count = tasks.length
+    } else {
+      const groupResponse = await getTaskGroupList(currentGroupId.value)
+      nextSections = await Promise.all(groupResponse.data.map(async (group) => {
+        const taskResponse = await getTaskList(String(group.id))
+        return {
+          id: String(group.id),
+          name: group.groupName,
+          taskNum: group.taskNum,
+          tasks: normalizeTasks(taskResponse.data),
+          loading: false,
+          expanded: true
+        }
+      }))
+    }
+
+    if (sequence !== loadSequence) return
+    sections.value = nextSections
+    const selectedSectionStillExists = nextSections.some((section) => Number(section.id) === quickGroupId.value)
+    if (!selectedSectionStillExists) quickGroupId.value = nextSections[0] ? Number(nextSections[0].id) : null
+
+    if (selectedId) {
+      const stillVisible = nextSections.flatMap((section) => section.tasks).find((task) => task.id === selectedId)
+      if (stillVisible) await selectTask(stillVisible)
+      else closeDetail()
+    }
+  } catch (error) {
+    console.error('加载任务工作台失败:', error)
+    if (sequence === loadSequence) {
+      sections.value = []
+      pageError.value = '请检查网络连接或稍后重试'
+    }
+  } finally {
+    if (sequence === loadSequence) pageLoading.value = false
+  }
 }
 
-// 清空垃圾箱
-const clearTrash = async () => {
+const refreshCurrent = async (keepSelected = true) => {
+  await loadCurrentGroup(keepSelected)
+}
+
+const selectGroup = async (group: WorkspaceGroup) => {
+  currentGroupId.value = group.id
+  searchText.value = ''
+  statusFilter.value = group.id === 'completed' ? 'completed' : group.id === 'trash' ? 'all' : 'active'
+  sortMode.value = 'default'
+  quickTaskName.value = ''
+  quickGroupId.value = null
+  closeDetail()
+  await loadCurrentGroup(false)
+}
+
+const selectTask = async (task: TaskBasicsVo) => {
+  const sequence = ++detailSequence
+  selectedTask.value = { ...task }
+  detailOpen.value = true
+  detailLoading.value = true
+  try {
+    const response = await getTaskDetail(task.id)
+    if (sequence !== detailSequence || selectedTask.value?.id !== task.id) return
+    selectedTask.value = withCompletionState({ ...task, ...response.data })
+  } catch (error) {
+    console.error('加载任务详情失败:', error)
+    ElMessage.error('任务详情加载失败')
+  } finally {
+    if (sequence === detailSequence) detailLoading.value = false
+  }
+}
+
+const closeDetail = () => {
+  detailSequence++
+  selectedTask.value = null
+  detailOpen.value = false
+  detailLoading.value = false
+}
+
+const updateTaskInSections = (taskId: number, patch: Partial<TaskBasicsVo>) => {
+  for (const section of sections.value) {
+    const task = section.tasks.find((item) => item.id === taskId)
+    if (task) Object.assign(task, patch)
+  }
+  if (selectedTask.value?.id === taskId) selectedTask.value = { ...selectedTask.value, ...patch }
+}
+
+const saveTaskPatch = async (task: TaskBasicsVo, patch: Partial<TaskBasicsVo>) => {
+  if (patch.taskName !== undefined && !patch.taskName.trim()) {
+    ElMessage.warning('任务名称不能为空')
+    selectedTask.value = { ...task }
+    return
+  }
+  setTaskBusy(task.id, true)
+  try {
+    await updateTask(toTaskUpdate(task, patch))
+    const moved = patch.taskGroupId !== undefined && patch.taskGroupId !== task.taskGroupId
+    updateTaskInSections(task.id, patch)
+    if (moved) {
+      await Promise.all([loadNavigation(), refreshCurrent(true)])
+      ElMessage.success('任务已移动')
+    }
+  } catch (error) {
+    console.error('保存任务失败:', error)
+    if (selectedTask.value?.id === task.id) selectedTask.value = { ...task }
+    ElMessage.error('保存失败，修改未生效')
+  } finally {
+    setTaskBusy(task.id, false)
+  }
+}
+
+const toggleTask = async (task: TaskBasicsVo, completed: boolean) => {
+  setTaskBusy(task.id, true)
+  try {
+    await updateTaskStatus(task.id, completed ? 1 : 0)
+    updateTaskInSections(task.id, { completed, taskStatus: completed ? 1 : 0 })
+    await Promise.all([loadNavigation(), refreshCurrent(false)])
+    ElMessage.success(completed ? '任务已完成' : '任务已恢复')
+  } catch (error) {
+    console.error('更新任务状态失败:', error)
+    ElMessage.error('状态更新失败')
+  } finally {
+    setTaskBusy(task.id, false)
+  }
+}
+
+const createQuickTask = async () => {
+  if (!canSubmitQuickTask.value || addingTask.value) return
+  addingTask.value = true
+  try {
+    let taskGroupId = 0
+    if (isCustomGroup.value) {
+      if (!sections.value.length) {
+        const response = await addTaskGroup({ groupName: '未分组', parentId: currentGroupId.value })
+        taskGroupId = Number(response.data)
+      } else taskGroupId = quickGroupId.value ?? Number(sections.value[0].id)
+    }
+    await addTask({
+      taskName: quickTaskName.value.trim(),
+      taskGroupId,
+      deadlineDate: defaultDeadlineForGroup(currentGroupId.value)
+    })
+    quickTaskName.value = ''
+    await Promise.all([loadNavigation(), refreshCurrent(false)])
+    ElMessage.success('任务已创建')
+  } catch (error) {
+    console.error('创建任务失败:', error)
+    ElMessage.error('创建任务失败')
+  } finally {
+    addingTask.value = false
+  }
+}
+
+const handleTaskAction = async (task: TaskBasicsVo, command: TaskActionCommand) => {
+  closeContextMenu()
+  const priorityMap: Partial<Record<TaskActionCommand, number>> = {
+    'priority-high': 30,
+    'priority-medium': 20,
+    'priority-low': 10,
+    'priority-none': 0
+  }
+  if (command in priorityMap) {
+    await saveTaskPatch(task, { priority: priorityMap[command] })
+    return
+  }
+  if (command === 'deadline-today') return saveTaskPatch(task, { deadlineDate: offsetDate(0) })
+  if (command === 'deadline-tomorrow') return saveTaskPatch(task, { deadlineDate: offsetDate(1) })
+  if (command === 'deadline-week') return saveTaskPatch(task, { deadlineDate: offsetDate(7) })
+  if (command === 'toggle-top') return saveTaskPatch(task, { isTop: task.isTop ? 0 : 1 })
+  if (command === 'deadline-custom') {
+    deadlineDialog.task = task
+    deadlineDialog.date = task.deadlineDate ?? offsetDate(0)
+    deadlineDialog.visible = true
+    return
+  }
+  if (command === 'move') {
+    moveDialog.task = task
+    moveDialog.targetGroupId = task.taskGroupId
+    moveDialog.visible = true
+    return
+  }
+  if (command === 'points') return openPointsDialog(task)
+  if (command === 'restore') return restoreTask(task)
+  if (command === 'delete') return deleteTask(task)
+}
+
+const submitDeadline = async () => {
+  if (!deadlineDialog.task) return
+  deadlineDialog.submitting = true
+  try {
+    await saveTaskPatch(deadlineDialog.task, { deadlineDate: deadlineDialog.date })
+    deadlineDialog.visible = false
+  } finally {
+    deadlineDialog.submitting = false
+  }
+}
+
+const submitMove = async () => {
+  if (!moveDialog.task || moveDialog.targetGroupId === null) return
+  moveDialog.submitting = true
+  try {
+    await saveTaskPatch(moveDialog.task, { taskGroupId: moveDialog.targetGroupId })
+    moveDialog.visible = false
+  } finally {
+    moveDialog.submitting = false
+  }
+}
+
+const restoreTask = async (task: TaskBasicsVo) => {
+  setTaskBusy(task.id, true)
+  try {
+    await updateTaskStatus(task.id, 0)
+    await Promise.all([loadNavigation(), refreshCurrent(false)])
+    ElMessage.success('任务已恢复到原清单')
+  } catch (error) {
+    console.error('恢复任务失败:', error)
+    ElMessage.error('恢复任务失败')
+  } finally {
+    setTaskBusy(task.id, false)
+  }
+}
+
+const deleteTask = async (task: TaskBasicsVo) => {
+  const permanent = currentGroupId.value === 'trash'
   try {
     await ElMessageBox.confirm(
-      '确定要清空垃圾箱吗？此操作将永久删除所有已删除的任务，且无法恢复。',
-      '清空确认',
-      {
-        confirmButtonText: '清空',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
+      permanent ? `永久删除“${task.taskName}”？此操作无法恢复。` : `将“${task.taskName}”移入垃圾箱？`,
+      permanent ? '永久删除任务' : '删除任务',
+      { confirmButtonText: permanent ? '永久删除' : '移入垃圾箱', cancelButtonText: '取消', type: 'warning' }
     )
-
-    await request.delete('/points-service/points/task/basics/clearDeletedList')
-    
-    // 重新加载垃圾箱的任务列表
-    const res = await request.get('/points-service/points/task/basics/deletedList')
-    if (Array.isArray(res.data)) {
-      subGroups.value = [{
-        id: 'trash',
-        name: '垃圾箱',
-        tasks: res.data.map(t => ({
-          ...t,
-          completed: false
-        })),
-        loading: false,
-        showNewTaskInput: false,
-        newTaskName: '',
-        taskNum: res.data.length
-      }]
-    }
-    
-    // 更新固定分组和清单列表的任务数量
-    await updateTaskCounts()
-    
-    ElMessage.success('清空垃圾箱成功')
+    setTaskBusy(task.id, true)
+    if (permanent) await permanentlyDeleteTask(task.id)
+    else await updateTaskStatus(task.id, 3)
+    await Promise.all([loadNavigation(), refreshCurrent(false)])
+    ElMessage.success(permanent ? '任务已永久删除' : '任务已移入垃圾箱')
   } catch (error) {
-    if (error !== 'cancel') {
+    if (!isCancel(error)) {
+      console.error('删除任务失败:', error)
+      ElMessage.error('删除任务失败')
+    }
+  } finally {
+    setTaskBusy(task.id, false)
+  }
+}
+
+const clearTrash = async () => {
+  try {
+    await ElMessageBox.confirm('永久删除垃圾箱中的所有任务？此操作无法恢复。', '清空垃圾箱', {
+      confirmButtonText: '永久清空', cancelButtonText: '取消', type: 'warning'
+    })
+    await clearDeletedTasks()
+    await Promise.all([loadNavigation(), refreshCurrent(false)])
+    ElMessage.success('垃圾箱已清空')
+  } catch (error) {
+    if (!isCancel(error)) {
       console.error('清空垃圾箱失败:', error)
       ElMessage.error('清空垃圾箱失败')
     }
   }
 }
 
-// 加载更多已完成任务
-const loadMoreCompletedTasks = async () => {
+const openPointsDialog = async (task: TaskBasicsVo) => {
+  pointsDialog.visible = true
+  pointsDialog.task = task
+  pointsDialog.loading = true
+  pointsDialog.rewardPoints = task.rewardPoints ?? 0
+  pointsDialog.punishPoints = task.punishPoints ?? 0
   try {
-    loadingSubGroups.value = true
-    currentPage.value++ // 页码自增
-    const res = await request.get(`/points-service/points/task/basics/doneList?currentPage=${currentPage.value}`)
-    if (Array.isArray(res.data)) {
-      // 将新数据追加到现有列表中
-      if (subGroups.value[0]) {
-        subGroups.value[0].tasks = [
-          ...subGroups.value[0].tasks,
-          ...res.data.map(task => ({
-            ...task,
-            completed: true
-          }))
-        ]
-        // 如果返回的数据少于10条，说明没有更多数据了
-        hasMore.value = res.data.length >= 10
-      }
-    }
+    const response = await getTaskPoints(task.id)
+    pointsDialog.rewardPoints = response.data?.rewardPoints ?? 0
+    pointsDialog.punishPoints = response.data?.punishPoints ?? 0
   } catch (error) {
-    console.error('加载更多已完成任务失败:', error)
-    ElMessage.error('加载更多已完成任务失败')
+    console.error('加载任务积分失败:', error)
+    ElMessage.error('任务积分加载失败')
   } finally {
-    loadingSubGroups.value = false
+    pointsDialog.loading = false
   }
 }
 
-// 添加分页相关的响应式变量
-const currentPage = ref(1)
-const hasMore = ref(true)
-
-// 添加拖拽排序相关的函数
-const handleDragEnd = async (evt: any, groupId: string) => {
-  const { oldIndex, newIndex } = evt
-  if (oldIndex === newIndex) return
-
-  const group = subGroups.value.find(g => g.id === groupId)
-  if (!group) return
-
-  const task = group.tasks[newIndex]
-  const oldTask = group.tasks[oldIndex]
-
+const savePoints = async () => {
+  if (!pointsDialog.task) return
+  pointsDialog.submitting = true
   try {
-    let newSort = 0
-    if (newIndex > oldIndex) {
-      // 向下移动，使用上方任务的sort值减1，允许为负数
-      const prevTask = group.tasks[newIndex - 1]
-      newSort = (prevTask.sort || 0) - 1
-    } else {
-      // 向上移动
-      const nextTask = group.tasks[newIndex + 1]
-      newSort = nextTask.sort ? nextTask.sort + 1 : 1
-    }
-
-    // 调用更新任务接口
-    await updateTask({
-      id: task.id,
-      taskName: task.taskName,
-      taskRemark: task.taskRemark,
-      taskGroupId: task.taskGroupId,
-      deadlineDate: task.deadlineDate,
-      priority: task.priority || 0,
-      isTop: task.isTop || 0,
-      sort: newSort
+    await saveTaskPoints({
+      taskId: pointsDialog.task.id,
+      rewardPoints: pointsDialog.rewardPoints,
+      punishPoints: pointsDialog.punishPoints
     })
+    updateTaskInSections(pointsDialog.task.id, {
+      rewardPoints: pointsDialog.rewardPoints,
+      punishPoints: pointsDialog.punishPoints
+    })
+    pointsDialog.visible = false
+    ElMessage.success('任务积分已保存')
+  } catch (error) {
+    console.error('保存任务积分失败:', error)
+    ElMessage.error('任务积分保存失败')
+  } finally {
+    pointsDialog.submitting = false
+  }
+}
 
-    // 更新本地任务数据
-    task.sort = newSort
+const uploadImage = async (file: File) => {
+  if (!selectedTask.value) return
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('只能上传图片文件')
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('图片大小不能超过 10MB')
+    return
+  }
+  const taskId = selectedTask.value.id
+  uploadingImage.value = true
+  try {
+    const uploadResponse = await uploadTaskImage(file)
+    await addTaskFile({ taskId, fileName: uploadResponse.data.fileName, fileUrl: uploadResponse.data.fileUrl })
+    const detailResponse = await getTaskDetail(taskId)
+    if (selectedTask.value?.id === taskId) selectedTask.value = withCompletionState(detailResponse.data)
+    ElMessage.success('图片已上传')
+  } catch (error) {
+    console.error('上传任务图片失败:', error)
+    ElMessage.error('图片上传失败')
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+const removeTaskFile = async (file: TaskFileVo) => {
+  if (!selectedTask.value) return
+  const taskId = selectedTask.value.id
+  try {
+    await ElMessageBox.confirm('删除这张任务图片？', '删除附件', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deleteTaskFile({ taskId, fileUrl: file.fileUrl })
+    const detailResponse = await getTaskDetail(taskId)
+    if (selectedTask.value?.id === taskId) selectedTask.value = withCompletionState(detailResponse.data)
+    ElMessage.success('附件已删除')
+  } catch (error) {
+    if (!isCancel(error)) {
+      console.error('删除任务附件失败:', error)
+      ElMessage.error('附件删除失败')
+    }
+  }
+}
+
+const toggleSection = (section: TaskSection) => {
+  section.expanded = !section.expanded
+}
+
+const selectQuickTarget = (section: TaskSection, focusInput = false) => {
+  quickGroupId.value = Number(section.id)
+  if (focusInput) void nextTick(() => quickTaskInput.value?.focus())
+}
+
+const openGroupDialog = (mode: GroupDialogMode, id = 0, name = '') => {
+  groupDialog.mode = mode
+  groupDialog.id = id
+  groupDialog.name = name
+  groupDialog.visible = true
+}
+
+const openRenameList = (group: WorkspaceGroup) => openGroupDialog('rename-list', Number(group.id), group.name)
+
+const handleSectionCommand = (command: 'add-task' | 'rename' | 'delete', section: TaskSection) => {
+  if (command === 'add-task') selectQuickTarget(section, true)
+  else if (command === 'rename') openGroupDialog('rename-section', Number(section.id), section.name)
+  else void deleteSection(section)
+}
+
+const submitGroupDialog = async () => {
+  if (groupDialog.submitting) return
+  const name = groupDialog.name.trim()
+  if (!name) {
+    ElMessage.warning('名称不能为空')
+    return
+  }
+  groupDialog.submitting = true
+  try {
+    if (groupDialog.mode === 'add-list') {
+      const response = await addTaskGroup({ groupName: name })
+      await loadNavigation()
+      const created = customGroups.value.find((group) => group.id === String(response.data))
+      if (created) await selectGroup(created)
+    } else if (groupDialog.mode === 'add-section') {
+      await addTaskGroup({ groupName: name, parentId: currentGroupId.value })
+      await Promise.all([loadNavigation(), refreshCurrent(false)])
+    } else {
+      await renameTaskGroup({ id: groupDialog.id, groupName: name })
+      await Promise.all([loadNavigation(), refreshCurrent(false)])
+    }
+    groupDialog.visible = false
+    ElMessage.success('保存成功')
+  } catch (error) {
+    console.error('保存清单或分组失败:', error)
+    ElMessage.error('保存失败')
+  } finally {
+    groupDialog.submitting = false
+  }
+}
+
+const deleteList = async (group: WorkspaceGroup) => {
+  try {
+    await ElMessageBox.confirm(`删除清单“${group.name}”及其中的所有任务？`, '删除清单', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deleteTaskGroup(Number(group.id))
+    await loadNavigation()
+    if (currentGroupId.value === group.id) await selectGroup(smartGroups.value[0])
+    ElMessage.success('清单已删除')
+  } catch (error) {
+    if (!isCancel(error)) {
+      console.error('删除清单失败:', error)
+      ElMessage.error('删除清单失败')
+    }
+  }
+}
+
+const deleteSection = async (section: TaskSection) => {
+  try {
+    await ElMessageBox.confirm(`删除分组“${section.name}”及其中的所有任务？`, '删除分组', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deleteTaskGroup(Number(section.id))
+    await Promise.all([loadNavigation(), refreshCurrent(false)])
+    ElMessage.success('分组已删除')
+  } catch (error) {
+    if (!isCancel(error)) {
+      console.error('删除分组失败:', error)
+      ElMessage.error('删除分组失败')
+    }
+  }
+}
+
+const handleDragEnd = async (event: DragEvent, section: TaskSection) => {
+  if (event.oldIndex === undefined || event.newIndex === undefined || event.oldIndex === event.newIndex) return
+  const task = section.tasks[event.newIndex]
+  if (!task) return
+  const previous = section.tasks[event.newIndex - 1]
+  const next = section.tasks[event.newIndex + 1]
+  const sort = event.newIndex > event.oldIndex ? (previous?.sort ?? 0) - 1 : (next?.sort ?? 0) + 1
+  try {
+    await updateTask(toTaskUpdate(task, { sort }))
+    task.sort = sort
   } catch (error) {
     console.error('更新任务排序失败:', error)
-    ElMessage.error('更新任务排序失败')
+    ElMessage.error('排序保存失败，已恢复原顺序')
+    await refreshCurrent(false)
   }
 }
 
-// 移动清单列表缓存
-const moveListCache = ref<TaskGroupMoveListVo[]>([])
-
-// 加载移动清单列表
-const loadMoveList = async () => {
+const loadMoreCompleted = async () => {
+  if (!sections.value[0] || loadingMore.value) return
+  loadingMore.value = true
   try {
-    const res = await getTaskGroupMoveList()
-    if (Array.isArray(res.data)) {
-      moveListCache.value = res.data
-    }
+    const response = await getCompletedTasks(completedPage.value + 1)
+    completedPage.value += 1
+    sections.value[0].tasks.push(...normalizeTasks(response.data, true))
+    hasMoreCompleted.value = response.data.length >= 10
   } catch (error) {
-    console.error('加载移动清单列表失败:', error)
-  }
-}
-
-// 移动任务
-const moveTask = async (task: TaskBasicsVo, targetGroupId: number) => {
-  try {
-    // 调用更新任务接口
-    await updateTask({
-      id: task.id,
-      taskName: task.taskName,
-      taskRemark: task.taskRemark,
-      taskGroupId: targetGroupId,
-      deadlineDate: task.deadlineDate,
-      priority: task.priority || 0,
-      isTop: task.isTop || 0
-    })
-
-    // 重新加载固定清单列表和自定义清单列表
-    await updateTaskCounts()
-    await loadCustomGroups()
-
-    // 如果当前在自定义清单下，重新加载任务分组列表
-    if (currentGroup.value && !['today', 'week', 'inbox', 'deadline', 'completed', 'trash'].includes(currentGroup.value.id)) {
-      await loadSubGroups(currentGroup.value.id)
-    }
-
-    // 获取移动前和移动后的分组所在的清单
-    const sourceGroup = subGroups.value.find(g => g.id === task.taskGroupId?.toString())
-    const targetGroup = subGroups.value.find(g => g.id === targetGroupId.toString())
-
-    // 如果移动前的分组存在，重新加载其任务列表
-    if (sourceGroup) {
-      await loadGroupTasks(sourceGroup.id)
-    }
-
-    // 如果移动后的分组存在，且与移动前的分组在同一个清单下，重新加载其任务列表
-    if (targetGroup && sourceGroup && targetGroup.parentId === sourceGroup.parentId) {
-      await loadGroupTasks(targetGroup.id)
-    }
-
-    ElMessage.success('移动任务成功')
-    closeContextMenu()
-    showMoveToMenu.value = false
-  } catch (error) {
-    console.error('移动任务失败:', error)
-    ElMessage.error('移动任务失败')
-  }
-}
-
-const showMoveToMenu = ref(false)
-const moveToSearchText = ref('')
-const filteredMoveList = computed(() => {
-  return moveListCache.value.filter(list => list.groupName.toLowerCase().includes(moveToSearchText.value.toLowerCase()))
-})
-
-// 处理移动到菜单的鼠标离开事件
-const handleMoveToMenuLeave = (e: MouseEvent) => {
-  // 检查鼠标是否移动到子菜单
-  const target = e.relatedTarget as HTMLElement
-  if (!target?.closest('.move-to-menu') && !target?.closest('.move-to-submenu')) {
-    showMoveToMenu.value = false
-  }
-}
-
-// 积分弹框相关
-const pointsDialogVisible = ref(false)
-const pointsForm = ref({
-  rewardPoints: '',
-  punishPoints: ''
-})
-const currentTaskForPoints = ref<TaskBasicsVo | null>(null)
-
-// 打开积分弹框
-const openPointsDialog = async (task: TaskBasicsVo) => {
-  currentTaskForPoints.value = task
-  // 先查询任务积分
-  const res = await request.get(`/bookkeeping-service/points/task/relation/getByTaskId?taskId=${task.id}`)
-  if (res.data) {
-    pointsForm.value = {
-      rewardPoints: res.data.rewardPoints?.toString() || '',
-      punishPoints: res.data.punishPoints?.toString() || ''
-    }
-  } else {
-    pointsForm.value = {
-      rewardPoints: '',
-      punishPoints: ''
-    }
-  }
-
-  pointsDialogVisible.value = true
-}
-
-// 保存积分
-const savePoints = async () => {
-  if (!currentTaskForPoints.value) return
-  
-  try {
-    const res = await request.post<unknown, GeneralResponse<{ msg?: string }>>('/bookkeeping-service/points/task/relation/save', {
-      taskId: currentTaskForPoints.value.id,
-      rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
-      punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
-    })
-    
-    if (res.code === 200) {
-      ElMessage.success('保存成功')
-      pointsDialogVisible.value = false
-      // 更新当前任务数据
-      if (selectedTask.value?.id === currentTaskForPoints.value.id) {
-        selectedTask.value = {
-          ...selectedTask.value,
-          rewardPoints: pointsForm.value.rewardPoints ? parseInt(pointsForm.value.rewardPoints) : 0,
-          punishPoints: pointsForm.value.punishPoints ? parseInt(pointsForm.value.punishPoints) : 0
-        }
-      }
-    } else {
-      ElMessage.error(res.data.msg || '保存失败')
-    }
-  } catch (error) {
-    console.error('保存积分失败:', error)
-    ElMessage.error('保存失败')
-  }
-}
-
-// 验证积分输入
-const validatePoints = (rule: any, value: string, callback: any) => {
-  if (value && (isNaN(Number(value)) || Number(value) < 0)) {
-    callback(new Error('请输入大于等于0的数值'))
-  } else {
-    callback()
-  }
-}
-
-const pointsRules = {
-  rewardPoints: [{ validator: validatePoints, trigger: 'blur' }],
-  punishPoints: [{ validator: validatePoints, trigger: 'blur' }]
-}
-
-// 移动任务到顶部
-const moveTaskToTop = (task: TaskBasicsVo) => {
-  const group = subGroups.value.find(g => g.tasks.some(t => t.id === task.id))
-  if (group) {
-    const taskIndex = group.tasks.findIndex(t => t.id === task.id)
-    if (taskIndex > -1) {
-      group.tasks.splice(taskIndex, 1)
-      group.tasks.unshift(task)
-      group.taskNum = (group.taskNum || 0) + 1
-    }
-  }
-}
-
-// 移动任务到底部
-const moveTaskToBottom = (task: TaskBasicsVo) => {
-  const group = subGroups.value.find(g => g.tasks.some(t => t.id === task.id))
-  if (group) {
-    const taskIndex = group.tasks.findIndex(t => t.id === task.id)
-    if (taskIndex > -1) {
-      group.tasks.splice(taskIndex, 1)
-      group.tasks.push(task)
-      group.taskNum = (group.taskNum || 0) + 1
-    }
-  }
-}
-
-// 在 setup 函数开始处添加
-const isTaskDetailVisible = ref(false)
-
-// 在 setup 函数中添加图片上传相关的响应式变量
-const taskImages = ref<string[]>([])
-const isUploading = ref(false)
-
-const beforeImageUpload = (file: UploadRawFile) => {
-  handleImageUpload(file)
-  return false
-}
-
-// 添加图片上传相关的方法
-const handleImageUpload = async (file: File) => {
-  try {
-    isUploading.value = true
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    const uploadRes = await request.post('/auth-service/file/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-    
-    if (uploadRes.data) {
-      const fileData = {
-        fileName: uploadRes.data.fileName,
-        fileUrl: uploadRes.data.fileUrl,
-        taskId: selectedTask.value?.id
-      }
-      
-      await request.post('/points-service/points/task/basics/addFile', fileData)
-      
-      // 重新获取任务详情以更新文件列表
-      if (selectedTask.value?.id) {
-        await handleTaskDetail(selectedTask.value.id)
-      }
-     
-      ElMessage.success('图片上传成功')
-    }
+    console.error('加载更多已完成任务失败:', error)
+    ElMessage.error('加载更多失败')
   } finally {
-    isUploading.value = false
+    loadingMore.value = false
   }
 }
 
-const handlePaste = async (event: ClipboardEvent) => {
-  const items = event.clipboardData?.items
-  if (!items) return
-  
-  for (const item of items) {
-    if (item.type.indexOf('image') !== -1) {
-      const file = item.getAsFile()
-      if (file) {
-        await handleImageUpload(file)
-      }
-    }
-  }
+const openContextMenu = (event: MouseEvent, task: TaskBasicsVo) => {
+  const menuWidth = 190
+  const menuHeight = 360
+  contextMenu.task = task
+  contextMenu.x = Math.min(event.clientX, window.innerWidth - menuWidth - 8)
+  contextMenu.y = Math.min(event.clientY, window.innerHeight - menuHeight - 8)
+  contextMenu.visible = true
 }
 
-const handleDrop = async (event: DragEvent) => {
-  event.preventDefault()
-  const files = event.dataTransfer?.files
-  if (!files) return
-  
-  for (const file of files) {
-    if (file.type.startsWith('image/')) {
-      await handleImageUpload(file)
-    }
-  }
+const closeContextMenu = () => {
+  contextMenu.visible = false
+  contextMenu.task = null
 }
 
-const handleDragOver = (event: DragEvent) => {
-  event.preventDefault()
-}
+const handleDocumentClick = () => closeContextMenu()
 
-// 添加删除文件的方法
-const handleDeleteFile = async (file: TaskFileVo) => {
-  await request.post('/points-service/points/task/basics/deleteFile', {
-    taskId: selectedTask.value?.id,
-    fileUrl: file.fileUrl
-  })
-  
-  // 重新获取任务详情以更新文件列表
-  if (selectedTask.value?.id) {
-    await handleTaskDetail(selectedTask.value.id)
+onMounted(async () => {
+  document.addEventListener('click', handleDocumentClick)
+  try {
+    await loadNavigation()
+    await loadCurrentGroup(false)
+  } catch (error) {
+    console.error('初始化任务清单失败:', error)
+    pageError.value = '任务工作台初始化失败，请稍后重试'
   }
-  
-  ElMessage.success('删除成功')
-}
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
+})
 </script>
+
 <style scoped>
-.task-list-container {
-  height: 100%;
+.task-workspace {
   position: relative;
-  background-color: #fff;
-  display: flex;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(210px, 230px) minmax(380px, 430px) minmax(400px, 1fr);
+  overflow: hidden;
+  background: var(--el-bg-color-page);
 }
 
-/* 左侧任务分组样式 */
-.task-groups {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-right: 1px solid #e0e0e0;
+.task-list-panel {
+  min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  transition: width 0.3s;
+  overflow: hidden;
+  border-right: 1px solid var(--el-border-color-lighter);
+  background: #fff;
 }
 
-.fixed-groups,
-.custom-groups,
-.bottom-groups {
-  padding: 8px 0;
-}
-
-.custom-groups {
-  flex: 1;
-  overflow-y: auto;
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.group-item {
-  padding: 8px 16px;
+.list-header {
+  min-height: 72px;
   display: flex;
   align-items: center;
-  cursor: pointer;
-  color: #666;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-.group-item:hover {
-  background-color: #eee;
+.list-heading,
+.list-title-line,
+.header-actions {
+  display: flex;
+  align-items: center;
 }
 
-.group-item.active {
-  background-color: #e6f4ff;
-  color: #1890ff;
-}
+.list-heading { min-width: 0; gap: 10px; }
+.list-heading > div { min-width: 0; }
+.list-title-line { gap: 8px; }
 
-.group-item .el-icon {
-  margin-right: 8px;
-  font-size: 16px;
-}
-
-.group-item .more-icon {
-  opacity: 0;
-  font-size: 14px;
-  color: #999;
-  cursor: pointer;
-  transition: all 0.3s;
-  margin-right: 0;
-}
-
-.group-item:hover .more-icon {
-  opacity: 1;
-}
-
-.group-item:hover .more-icon:hover {
-  color: #1890ff;
-}
-
-.group-name {
-  flex: 1;
+.list-title-line h1 {
   overflow: hidden;
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 20px;
+  line-height: 26px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.task-count {
-  margin-left: 8px;
+.list-heading p {
+  overflow: hidden;
+  margin: 3px 0 0;
+  color: var(--el-text-color-placeholder);
   font-size: 12px;
-  color: #999;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 拖动条样式 */
-.resize-bar {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background-color: transparent;
-  cursor: col-resize;
-  transition: background-color 0.3s;
+.list-count {
+  min-width: 24px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  text-align: center;
 }
 
-.resize-bar:hover {
-  background-color: #1890ff;
-}
+.header-actions { flex: none; gap: 8px; }
 
-/* 中间任务列表样式 */
-.tasks-content {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background-color: #fff;
-  border-right: 1px solid #e0e0e0;
-  display: flex;
-  flex-direction: column;
-}
-
-.content-header {
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
+.header-icon-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
   align-items: center;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
-.collapse-icon {
-  margin-right: 8px;
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.group-title {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.more-icon {
-  font-size: 14px;
-  color: #999;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-.more-icon:hover {
-  color: #1890ff;
-}
-
-.add-task {
-  padding: 16px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.add-task :deep(.el-input-group__append) {
-  padding: 0 8px;
-  background-color: #fff;
-}
-
-.calendar-icon,
-.dropdown-icon {
-  margin: 0 4px;
-  font-size: 16px;
-  color: #666;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--el-text-color-secondary);
   cursor: pointer;
 }
 
-.tasks-list {
+.header-icon-button:hover { background: var(--el-fill-color); }
+.sidebar-toggle { display: none; }
+
+.list-toolbar {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 108px;
+  gap: 6px;
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: #fff;
+}
+
+.quick-add-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: #fafdff;
+}
+
+.quick-add-card > .el-input { min-width: 0; grid-column: 1; }
+.quick-add-card > .el-button { grid-column: 2; }
+
+.quick-target-indicator {
+  max-width: 94px;
+  overflow: hidden;
+  color: var(--el-color-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-list-scroll {
+  min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-}
-
-.task-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 0;
-  cursor: pointer;
-  transition: all 0.3s ease-out;
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.task-item:hover {
-  background-color: #f5f5f5;
-}
-
-.task-item.active {
-  background-color: #e6f4ff;
-}
-
-.task-item .more-icon {
-  opacity: 0;
-  font-size: 14px;
-  color: #999;
-  cursor: pointer;
-  transition: all 0.3s;
-  margin-right: 8px;
-}
-
-.task-item:hover .more-icon {
-  opacity: 1;
-}
-
-.task-item:hover .more-icon:hover {
-  color: #1890ff;
-}
-
-.task-name {
-  margin-left: 8px;
-  flex: 1;
-}
-
-.task-name.completed {
-  color: #999;
-}
-
-.task-name.fixed-list {
-  font-weight: normal;
-}
-
-/* 右侧任务详情样式 */
-.task-detail {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background-color: #fff;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.task-name-input {
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.task-name-input :deep(.el-input__wrapper) {
-  box-shadow: none !important;
-  padding: 0;
-  background: transparent;
-}
-
-.task-name-input :deep(.el-input__inner) {
-  border: none;
-  padding: 0;
-  height: 32px;
-  color: #333;
-}
-
-.task-name-input :deep(.el-input__inner):focus {
-  box-shadow: none;
-}
-
-.task-notes-input {
-  flex: 1;
-}
-
-.task-notes-input :deep(.el-textarea__inner) {
-  border: none;
-  padding: 0;
-  background: transparent;
-  box-shadow: none !important;
-  color: #666;
-  font-size: 14px;
-  resize: none;
-}
-
-.task-notes-input :deep(.el-textarea__inner):focus {
-  box-shadow: none;
-}
-
-.no-task-selected {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-size: 14px;
-}
-
-/* Element Plus 组件样式覆盖 */
-:deep(.el-collapse) {
-  border: none;
-}
-
-:deep(.el-collapse-item__header) {
-  font-size: 14px;
-  color: #666;
-  border: none;
-}
-
-:deep(.el-collapse-item__content) {
-  padding: 0;
-}
-
-/* 自定义分组头部样式 */
-.custom-groups-header {
-  padding: 8px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #666;
-}
-
-.section-title {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.add-icon {
-  cursor: pointer;
-  font-size: 16px;
-  color: #999;
-  transition: color 0.3s;
-}
-
-.add-icon:hover {
-  color: #1890ff;
-}
-
-.loading-groups,
-.no-groups,
-.no-tasks {
-  padding: 16px;
-  text-align: center;
-  color: #999;
-  font-size: 14px;
-}
-
-.loading-groups {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.is-loading {
-  animation: rotating 2s linear infinite;
-}
-
-@keyframes rotating {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.add-task-icon {
-  font-size: 14px;
-  color: #999;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-.add-task-icon:hover {
-  color: #1890ff;
-}
-
-.new-task-input {
-  padding: 8px 0;
-}
-
-.new-task-input :deep(.el-input__wrapper) {
-  box-shadow: none;
-  padding-left: 0;
-}
-
-.new-task-input :deep(.el-input__inner) {
-  height: 24px;
-  line-height: 24px;
-  border: none;
-  padding: 0;
-  background: transparent;
-}
-
-.new-task-input :deep(.el-input__inner):focus {
-  box-shadow: none;
-}
-
-/* 下拉菜单样式 */
-:deep(.el-dropdown-menu) {
-  min-width: 160px !important;
-  padding: 4px 0;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item) {
-  padding: 0 !important;
-  line-height: 1.5;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .context-menu-item) {
-  padding: 8px 16px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  color: #666;
-  transition: background-color 0.3s;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .context-menu-item:hover) {
-  background-color: #f5f5f5;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .context-menu-item .el-icon) {
-  margin-right: 8px;
-  font-size: 16px;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .context-menu-item span) {
-  flex: 1;
-  text-align: left;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .quick-actions) {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .quick-action-icon) {
-  font-size: 14px;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.3s;
-  padding: 4px;
-  border-radius: 4px;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .quick-action-icon:hover) {
-  background-color: #f5f5f5;
-  color: #1890ff;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item .quick-action-icon.priority-high) {
-  color: #f56c6c;
-}
-:deep(.el-dropdown-menu .el-dropdown-item .quick-action-icon.priority-medium) {
-  color: #e6a23c;
-}
-:deep(.el-dropdown-menu .el-dropdown-item .quick-action-icon.priority-low) {
-  color: #409eff;
-}
-:deep(.el-dropdown-menu .el-dropdown-item .quick-action-icon.priority-none) {
-  color: #909399;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item.normal-item) {
-  padding: 8px 16px !important;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  color: #666;
-  transition: background-color 0.3s;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item.normal-item:hover) {
-  background-color: #f5f5f5;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item.normal-item .el-icon) {
-  margin-right: 8px;
-  font-size: 16px;
-}
-
-:deep(.el-dropdown-menu .el-dropdown-item.normal-item span) {
-  flex: 1;
-  text-align: left;
-}
-
-/* 右键菜单样式 */
-.context-menu {
-  position: fixed;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  z-index: 3000;
-  min-width: 160px;
-}
-
-.context-menu.menu-top {
-  transform: none; /* 移除向上偏移的transform */
-}
-
-.context-menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  cursor: pointer;
-  position: relative;
-}
-
-.context-menu-item:hover {
-  background-color: var(--el-color-primary-light-9);
-}
-
-.context-menu-item .el-icon {
-  margin-right: 8px;
-  font-size: 16px;
-}
-
-.context-menu-item span {
-  flex: 1;
-  text-align: left;
-}
-
-.context-menu-divider {
-  height: 1px;
-  background-color: #e0e0e0;
-  margin: 4px 0;
-}
-
-/* 右键菜单快捷操作样式 */
-.quick-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.quick-action-icon {
-  font-size: 14px;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.3s;
-  padding: 4px;
-  border-radius: 4px;
-}
-
-.quick-action-icon:hover {
-  background-color: #f5f5f5;
-  color: #1890ff;
-}
-
-.quick-action-icon.priority-high {
-  color: #f56c6c;
-}
-.quick-action-icon.priority-medium {
-  color: #e6a23c;
-}
-.quick-action-icon.priority-low {
-  color: #409eff;
-}
-.quick-action-icon.priority-none {
-  color: #909399;
-}
-
-.date-picker-popup {
-  position: fixed;
-  z-index: 3001;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  width: 280px;
-}
-
-.date-picker-header {
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.arrow-icon {
-  cursor: pointer;
-  font-size: 16px;
-  color: #666;
-  transition: color 0.3s;
-}
-
-.arrow-icon:hover {
-  color: #1890ff;
-}
-
-.current-date {
-  font-size: 14px;
-  color: #333;
-}
-
-.date-picker-content {
-  padding: 8px 12px;
-}
-
-.weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.weekdays span {
-  font-size: 12px;
-  color: #999;
-}
-
-.days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-
-.day {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: #333;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.3s;
-}
-
-.day:hover {
-  background-color: #f5f5f5;
-}
-
-.day.other-month {
-  color: #ccc;
-}
-
-.day.today {
-  color: #1890ff;
-  font-weight: bold;
-}
-
-.day.selected {
-  background-color: #e6f4ff;
-  color: #1890ff;
-}
-
-.date-picker-footer {
-  padding: 8px 12px;
-  border-top: 1px solid #e0e0e0;
-  display: flex;
-  gap: 8px;
-}
-
-.date-picker-footer .el-button {
-  flex: 1;
-}
-
-.deadline-date {
-  margin-left: 8px;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: #f5f5f5;
-}
-
-.deadline-urgent {
-  color: #ff4d4f;
-  background-color: #fff1f0;
-}
-
-.deadline-warning {
-  color: #faad14;
-  background-color: #fffbe6;
-}
-
-.view-more {
-  padding: 16px;
-  text-align: center;
-}
-
-.no-more {
-  color: #999;
-  font-size: 14px;
-}
-
-.ghost {
-  opacity: 0.5;
-  background: #c8ebfb;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  cursor: pointer;
-  position: relative;
-}
-
-.menu-item:hover {
-  background-color: var(--el-color-primary-light-9);
-}
-
-.menu-item .quick-actions {
-  display: none;
-  position: absolute;
-  left: 100%;
-  top: 0;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  min-width: 200px;
-}
-
-.menu-item:hover .quick-actions {
-  display: block;
-}
-
-.quick-action-icon {
-  margin-left: 8px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-/* 移除之前的 .quick-actions 相关样式 */
-
-/* 移动到菜单样式 */
-.move-to-menu {
-  position: absolute;
-  left: calc(100% - 4px);
-  top: -4px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 4px;
-  box-shadow: var(--el-box-shadow-light);
-  min-width: 200px;
-  padding: 4px 0;
-}
-
-.move-to-menu .search-box {
-  padding: 0 12px 8px;
-}
-
-.move-to-menu .search-box .el-input__inner {
-  height: 32px;
-}
-
-.move-to-menu .menu-item {
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  height: 36px;
-  cursor: pointer;
-  position: relative;
-}
-
-.move-to-menu .menu-item:hover {
-  background-color: var(--el-color-primary-light-9);
-}
-
-.move-to-menu .menu-item .el-icon {
-  margin-right: 8px;
-  font-size: 16px;
-}
-
-.move-to-menu .menu-item .arrow-icon {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.move-to-submenu {
-  position: absolute;
-  left: calc(100% - 4px);
-  top: -4px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 4px;
-  box-shadow: var(--el-box-shadow-light);
-  min-width: 160px;
-  padding: 4px 0;
-  display: none;
-}
-
-.move-to-menu .menu-item:hover .move-to-submenu {
-  display: block;
-}
-
-.move-to-wrapper {
-  position: relative;
-}
-
-.task-group-name {
-  color: #909399;
-  font-size: 12px;
-  margin-left: 4px;
-}
-
-/* 添加积分显示的样式 */
-.task-points {
-  display: flex;
-  gap: 20px;
-  margin: 10px 0;
-  color: #666;
-  font-size: 14px;
-}
-
-.reward-points {
-  color: #67C23A;
-}
-
-.punish-points {
-  color: #F56C6C;
-}
-
-.task-points .el-icon {
-  margin-right: 4px;
-}
-
-.task-images {
-  margin-top: 20px;
-  border-top: 1px solid #eee;
-  padding-top: 20px;
-}
-
-.images-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.images-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.images-container {
-  min-height: 200px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 4px;
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.images-container:hover {
-  border-color: #409eff;
-}
-
-.empty-tip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #909399;
-}
-
-.empty-tip .el-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.image-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
-}
-
-.image-item {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.image-item .el-image {
-  width: 100%;
-  height: 100%;
-}
-
-.image-actions {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.image-item:hover .image-actions {
-  opacity: 1;
-}
-
-.task-content {
-  margin-top: 20px;
-}
-
-.content-item {
-  margin-bottom: 20px;
-}
-
-.item-label {
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 8px;
-}
-
-.images-container {
-  border: 1px dashed #dcdfe6;
-  border-radius: 4px;
-  padding: 16px;
-  transition: all 0.3s;
-  background: #fafafa;
-}
-
-.images-container:hover {
-  border-color: #409eff;
-}
-
-.empty-tip {
-  text-align: center;
-  color: #909399;
-  padding: 20px 0;
-}
-
-.empty-tip .el-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
-}
-
-.empty-tip p {
-  margin: 8px 0 16px;
-}
-
-.image-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
-}
-
-.image-item {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.image-item .el-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.image-actions {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.image-item:hover .image-actions {
-  opacity: 1;
-}
-
-.add-image {
-  aspect-ratio: 1;
-  border: 1px dashed #dcdfe6;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.add-image:hover {
-  border-color: #409eff;
-}
-
-.upload-trigger {
-  font-size: 24px;
-  color: #909399;
-}
-
-.item-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 8px;
-}
-
-.upload-button {
-  display: inline-block;
-}
-
-.images-container {
-  border: 1px dashed #dcdfe6;
-  border-radius: 4px;
   padding: 12px;
-  transition: all 0.3s;
-  background: #fafafa;
-  min-height: 100px;
 }
 
-.empty-tip {
+.task-section + .task-section { margin-top: 12px; }
+
+.section-header {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 0 2px;
+  border-bottom: 1px solid var(--el-border-color-extra-light);
+  border-radius: 7px 7px 0 0;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.section-header.is-quick-target {
+  border-bottom-color: var(--el-color-primary-light-7);
+  background: var(--el-color-primary-light-9);
+}
+
+.section-heading-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.section-collapse,
+.section-target,
+.section-more {
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+}
+
+.section-collapse {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.section-collapse:hover,
+.section-target:hover { color: var(--el-color-primary); }
+
+.section-target {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 4px 7px 0;
+  font-weight: 600;
+  text-align: left;
+}
+
+.section-collapse .el-icon { transition: transform 0.18s ease; }
+.section-collapse .el-icon.is-expanded { transform: rotate(90deg); }
+.section-target small { color: var(--el-text-color-placeholder); font-weight: 400; }
+
+.section-more {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.section-more:hover { background: var(--el-fill-color); }
+
+.group-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.section-body { padding-top: 5px; }
+
+.section-empty,
+.section-loading {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
+}
+
+.workspace-empty,
+.page-error-state { min-height: 320px; }
+
+.page-skeleton { padding: 8px; }
+.skeleton-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.skeleton-row :deep(.el-skeleton__circle) { width: 18px; height: 18px; }
+
+.load-more {
+  padding: 18px 0 8px;
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
   text-align: center;
-  color: #909399;
-  padding: 20px 0;
 }
 
-.empty-tip .el-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
-}
-
-.empty-tip p {
-  margin: 8px 0 16px;
-}
-
-.image-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
-}
-
-.image-item {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 4px;
+.task-detail-panel {
+  min-width: 0;
+  height: 100%;
   overflow: hidden;
   background: #fff;
 }
 
-.image-item .el-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.workspace-backdrop { display: none; }
+
+:deep(.task-ghost) {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+  opacity: 0.55;
 }
 
-.image-actions {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  opacity: 0;
-  transition: opacity 0.3s;
+.points-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-.image-item:hover .image-actions {
-  opacity: 1;
+.points-form-grid :deep(.el-input-number) { width: 100%; }
+
+@media (max-width: 1439px) {
+  .task-workspace { grid-template-columns: minmax(210px, 230px) minmax(0, 1fr); }
+
+  .task-detail-panel {
+    position: fixed;
+    z-index: 2300;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(500px, calc(100vw - 64px));
+    height: 100vh;
+    box-shadow: -10px 0 36px rgb(31 45 61 / 16%);
+    transform: translateX(105%);
+    transition: transform 0.22s ease;
+  }
+
+  .task-detail-panel.is-open { transform: translateX(0); }
+
+  .detail-backdrop {
+    position: fixed;
+    z-index: 2200;
+    inset: 0;
+    display: block;
+    background: rgb(31 45 61 / 22%);
+  }
+}
+
+@media (max-width: 1100px) {
+  .task-workspace { grid-template-columns: minmax(0, 1fr); }
+  .sidebar-toggle { display: inline-flex; }
+
+  .sidebar-backdrop {
+    position: fixed;
+    z-index: 2000;
+    inset: 0;
+    display: block;
+    background: rgb(31 45 61 / 22%);
+  }
+}
+
+@media (max-width: 760px) {
+  .list-header { align-items: flex-start; }
+  .header-actions .el-button:not(:last-child) { display: none; }
+  .list-toolbar { grid-template-columns: 1fr 112px; }
+  .sort-filter { display: none; }
+  .quick-add-card { grid-template-columns: 1fr auto; }
+  .task-list-scroll { padding: 8px; }
+  .points-form-grid { grid-template-columns: 1fr; gap: 0; }
 }
 </style>
