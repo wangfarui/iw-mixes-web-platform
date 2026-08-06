@@ -1455,18 +1455,25 @@ const quickLaunchTask = async (task: AiSessionTask) => {
     const launchResult = await launchAiSession({
       toolType: getToolTypeCode(task.toolType),
       sessionKey: task.sessionKey,
+      sessionName: task.title,
       workspacePath: task.workspacePath,
       modelProvider: normalizeOptionalText(task.modelProvider)
     })
     const terminalName = launchResult.terminalName || 'iTerm2'
+    const sessionNameApplied = launchResult.sessionNameApplied === true
     workspaceOptions.value = rememberAiTaskLocalOption('workspace', task.workspacePath)
     modelProviderOptions.value = rememberAiTaskLocalOption('modelProvider', task.modelProvider)
     try {
       await updateAiTaskActive({ id: task.id })
       await loadTaskPage()
-      ElMessage.success(`已在 ${terminalName} 中打开会话`)
+      if (sessionNameApplied) {
+        ElMessage.success(`已在 ${terminalName} 中打开会话`)
+      } else {
+        ElMessage.warning(`${terminalName} 已打开，但 Session Name 设置失败，请重新安装本机启动器`)
+      }
     } catch {
-      ElMessage.warning(`${terminalName} 已打开，但最近活跃时间更新失败`)
+      const nameWarning = sessionNameApplied ? '' : 'Session Name 设置失败；'
+      ElMessage.warning(`${terminalName} 已打开，但${nameWarning}最近活跃时间更新失败`)
     }
   } catch (error) {
     if (error instanceof AiLauncherError && error.status === 401) {

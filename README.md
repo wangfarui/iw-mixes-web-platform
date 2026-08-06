@@ -18,7 +18,10 @@ Iw Mixes项目-Web管理平台
 首次使用：
 
 请先安装并确保可以正常启动 iTerm2。启动器通过 iTerm2 的 Bundle ID
-`com.googlecode.iterm2` 打开临时 `.command` 文件，不依赖应用显示名称。
+`com.googlecode.iterm2` 打开临时 `.command` 文件；启动脚本会在运行 AI CLI 前通过
+OSC 0 控制序列，将 Session Name 设置为 AI 会话任务名称。启动 Codex 会话时还会使用
+一次性的 `tui.terminal_title=[]` 配置覆盖，防止 Codex TUI 再将名称改回项目目录名；
+该配置不会写入用户全局的 `~/.codex/config.toml`。
 
 ```bash
 npm run ai-launcher:install

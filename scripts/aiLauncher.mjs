@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
@@ -18,6 +19,14 @@ const command = process.argv[2]
 const projectRoot = process.cwd()
 const sourceAppDir = path.join(projectRoot, 'local-ai-launcher')
 const paths = getLauncherPaths()
+const legacyITermProfilePath = path.join(
+  os.homedir(),
+  'Library',
+  'Application Support',
+  'iTerm2',
+  'DynamicProfiles',
+  `${LAUNCHER_LABEL}.json`
+)
 
 const xmlEscape = (value) => String(value)
   .replaceAll('&', '&amp;')
@@ -97,6 +106,7 @@ const install = async () => {
   await mkdir(paths.rootDir, { recursive: true, mode: 0o700 })
   await mkdir(paths.logsDir, { recursive: true, mode: 0o700 })
   await mkdir(path.dirname(paths.plistPath), { recursive: true })
+  await rm(legacyITermProfilePath, { force: true })
   await rm(paths.appDir, { recursive: true, force: true })
   await cp(sourceAppDir, paths.appDir, { recursive: true })
   await writeFile(paths.configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 })
@@ -117,6 +127,7 @@ const uninstall = async () => {
   const domain = `gui/${process.getuid()}`
   await runLaunchctl(['bootout', domain, paths.plistPath], true)
   await rm(paths.plistPath, { force: true })
+  await rm(legacyITermProfilePath, { force: true })
   await rm(paths.rootDir, { recursive: true, force: true })
   process.stdout.write('IW AI Launcher 已卸载。\n')
 }

@@ -257,6 +257,8 @@ try {
         openedSpec = spec
         return {
           terminalName: 'iTerm2',
+          sessionName: spec.sessionName,
+          sessionNameApplied: true,
           commandPreview: 'preview',
           workspacePath: spec.workspacePath
         }
@@ -270,6 +272,7 @@ try {
   const launchResult = await sessionLauncher.launch({
     toolType: 'codex',
     sessionKey: 'session-123',
+    sessionName: '实现会话名称设置',
     workspacePath,
     modelProvider: 'provider-name'
   })
@@ -279,9 +282,12 @@ try {
     'resume',
     'session-123',
     '-c',
-    'model_provider=provider-name'
+    'model_provider=provider-name',
+    '-c',
+    'tui.terminal_title=[]'
   ])
   assert.equal(openedSpec.workspacePath, resolvedWorkspacePath)
+  assert.equal(openedSpec.sessionName, '实现会话名称设置')
 
   await assert.rejects(
     () => sessionLauncher.launch({
@@ -290,6 +296,15 @@ try {
       workspacePath
     }),
     /Session格式不正确/
+  )
+  await assert.rejects(
+    () => sessionLauncher.launch({
+      toolType: 'codex',
+      sessionKey: 'session-123',
+      sessionName: '任务名称\n包含换行',
+      workspacePath
+    }),
+    /会话名称格式不正确/
   )
   await assert.rejects(
     () => sessionLauncher.launch({
@@ -306,10 +321,14 @@ try {
     args: ['resume', "session'; touch /tmp/unsafe", '-c', 'model_provider=a b'],
     workspacePath,
     commandPath,
-    tempDir
+    tempDir,
+    sessionName: "任务名称包含单引号'与空格"
   })
   assert.match(script, /cd -- '.*workspace with '"'"'quote'/)
   assert.match(script, /'session'"'"'; touch \/tmp\/unsafe'/)
+  const sessionNameCommand = "printf '\\033]0;%s\\007' '任务名称包含单引号'\"'\"'与空格'"
+  assert.ok(script.includes(sessionNameCommand))
+  assert.ok(script.indexOf(sessionNameCommand) < script.indexOf('exec '))
   await writeFile(commandPath, script, { mode: 0o700 })
   await chmod(commandPath, 0o700)
   const capturePath = path.join(tempDir, 'args.txt')
@@ -338,14 +357,19 @@ try {
   const terminalResult = await terminalAdapter.open({
     executable: executablePath,
     args: ['resume', 'session-123'],
-    workspacePath
+    workspacePath,
+    sessionName: "任务名称包含单引号'与空格"
   })
   assert.equal(openedExecutable, '/usr/bin/open')
   assert.equal(openedArgs[0], '-b')
   assert.equal(openedArgs[1], 'com.googlecode.iterm2')
   assert.equal(path.basename(openedArgs[2]), 'launch.command')
   assert.equal(terminalResult.terminalName, 'iTerm2')
-  assert.match(await readFile(openedArgs[2], 'utf8'), /exec .*codex.*'resume' 'session-123'/)
+  assert.equal(terminalResult.sessionName, "任务名称包含单引号'与空格")
+  assert.equal(terminalResult.sessionNameApplied, true)
+  const openedScript = await readFile(openedArgs[2], 'utf8')
+  assert.ok(openedScript.includes(sessionNameCommand))
+  assert.match(openedScript, /exec .*codex.*'resume' 'session-123'/)
 
   const unavailableTerminalAdapter = createTerminalAdapter({
     tempRoot: path.join(tempDir, 'unavailable-terminal-adapter'),
@@ -451,6 +475,7 @@ try {
     body: JSON.stringify({
       toolType: 'codex',
       sessionKey: 'session-123',
+      sessionName: '实现会话名称设置',
       workspacePath,
       modelProvider: 'provider-name'
     })
@@ -459,6 +484,8 @@ try {
   const launchBody = await launchResponse.json()
   assert.equal(launchBody.toolType, 'codex')
   assert.equal(launchBody.terminalName, 'iTerm2')
+  assert.equal(launchBody.sessionName, '实现会话名称设置')
+  assert.equal(launchBody.sessionNameApplied, true)
   assert.equal(launchBody.message, '已请求 iTerm2 打开会话')
 
   const inspectResponse = await fetch(`${baseUrl}/v1/session/inspect`, {

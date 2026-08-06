@@ -16,6 +16,7 @@ const TOOL_TYPE_ALIASES = {
 }
 
 const CONTROL_CHAR_PATTERN = /[\0\r\n]/
+const CODEX_DISABLE_TERMINAL_TITLE = 'tui.terminal_title=[]'
 
 const normalizeText = (value, fieldName, maxLength, required = true) => {
   const normalized = typeof value === 'string' ? value.trim() : ''
@@ -62,6 +63,7 @@ const buildToolArgs = ({ tool, sessionKey, modelProvider }) => {
   if (modelProvider) {
     args.push('-c', `model_provider=${modelProvider}`)
   }
+  args.push('-c', CODEX_DISABLE_TERMINAL_TITLE)
   return args
 }
 
@@ -80,6 +82,7 @@ export const createSessionLauncher = ({
     async launch(request) {
       const tool = normalizeToolType(request?.toolType)
       const sessionKey = normalizeText(request?.sessionKey, 'Session', 128)
+      const sessionName = normalizeText(request?.sessionName, '会话名称', 80, false)
       const modelProvider = normalizeText(request?.modelProvider, '模型提供方', 64, false)
       const inputWorkspacePath = normalizeWorkspacePath(request?.workspacePath)
 
@@ -107,7 +110,8 @@ export const createSessionLauncher = ({
       const result = await terminalAdapter.open({
         executable,
         args,
-        workspacePath
+        workspacePath,
+        sessionName
       })
       return {
         toolType: tool,

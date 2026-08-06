@@ -16,6 +16,7 @@ export type AiLauncherStatus = {
 export type AiLauncherRequest = {
   toolType: ToolTypeCode
   sessionKey: string
+  sessionName: string
   workspacePath: string
   modelProvider?: string
 }
@@ -104,6 +105,8 @@ export const launchAiSession = (request: AiLauncherRequest) => requestLauncher<{
   message: string
   toolType: string
   terminalName: string
+  sessionName: string
+  sessionNameApplied: boolean
   commandPreview: string
   workspacePath: string
 }>('/launch', {

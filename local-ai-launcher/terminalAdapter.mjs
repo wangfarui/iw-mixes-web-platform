@@ -10,13 +10,21 @@ const ITERM2_NAME = 'iTerm2'
 
 const shellQuote = (value) => `'${String(value).replaceAll("'", "'\"'\"'")}'`
 
-export const buildTerminalScript = ({ executable, args, workspacePath, commandPath, tempDir }) => {
+export const buildTerminalScript = ({
+  executable,
+  args,
+  workspacePath,
+  commandPath,
+  tempDir,
+  sessionName = ''
+}) => {
   const command = [executable, ...args].map(shellQuote).join(' ')
   return [
     '#!/bin/zsh',
     `rm -f -- ${shellQuote(commandPath)}`,
     `rmdir -- ${shellQuote(tempDir)} 2>/dev/null || true`,
     `cd -- ${shellQuote(workspacePath)} || exit 1`,
+    ...(sessionName ? [`printf '\\033]0;%s\\007' ${shellQuote(sessionName)}`] : []),
     `exec ${command}`,
     ''
   ].join('\n')
@@ -50,6 +58,8 @@ export const createTerminalAdapter = ({
     }
     return {
       terminalName: ITERM2_NAME,
+      sessionName: spec.sessionName || '',
+      sessionNameApplied: Boolean(spec.sessionName),
       commandPreview: [spec.executable, ...spec.args].join(' '),
       workspacePath: spec.workspacePath
     }
