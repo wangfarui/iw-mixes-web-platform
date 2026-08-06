@@ -16,14 +16,10 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 const app = createApp(App)
 
-router.beforeEach((to, from, next) => {
-    if (to.path == '/login') {
-        //说明要去登录页面，登录页面可以直接去
-        //这个就表示继续去下个页面
-        next();
-        return;
-    }
-    if (to.meta.public === true) {
+router.beforeEach((to, _from, next) => {
+    if (to.path == '/login' || to.meta.public === true) {
+        // 版本轮询只在需要登录的业务页面运行。
+        versionPollingService.stopVersionPolling();
         next();
         return;
     }
@@ -36,7 +32,7 @@ router.beforeEach((to, from, next) => {
         }
         next();
     } else {
-        //说明用户未登录，去登录
+        versionPollingService.stopVersionPolling();
         next({path: '/login'});
     }
 })

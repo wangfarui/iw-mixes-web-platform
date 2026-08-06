@@ -24,6 +24,7 @@
     "test:address-generator": "node scripts/testAddressGenerator.mjs",
     "test:ai-launcher": "node scripts/testAiLauncher.mjs",
     "test:tool-usage": "node scripts/testToolUsage.mjs",
+    "test:version-polling": "node scripts/testVersionPolling.mjs",
     "test:remote-share": "node scripts/testRemoteShareProtocol.mjs",
     "ai-launcher:install": "node scripts/aiLauncher.mjs install",
     "ai-launcher:uninstall": "node scripts/aiLauncher.mjs uninstall",

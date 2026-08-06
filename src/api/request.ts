@@ -19,6 +19,17 @@ const showError = (config: AxiosRequestConfig | undefined, message: string): voi
     }
 }
 
+const handleUnauthorized = (config: AxiosRequestConfig | undefined): void => {
+    const hadToken = Boolean(window.sessionStorage.getItem('iwtoken'))
+    window.sessionStorage.removeItem('iwtoken')
+    if (hadToken) {
+        showError(config, "登录状态失效，请重新登录")
+    }
+    if (router.currentRoute.value.path !== '/login') {
+        void router.replace('/login')
+    }
+}
+
 const service = axios.create({
     timeout: 30000,
     baseURL: VITE_BUILD_ENV == 'prod' ? '//api.itwray.com' : ''
@@ -46,9 +57,7 @@ service.interceptors.response.use(success => {
     if (code == 200) {
         // 未授权
         if (success.data.code == 401) {
-            window.sessionStorage.removeItem('iwtoken')
-            showError(success.config, "登录状态失效，请重新登录")
-            router.replace('/login');
+            handleUnauthorized(success.config)
             return Promise.reject(success.data.message);
         }
         //说明请求成功
@@ -64,9 +73,8 @@ service.interceptors.response.use(success => {
     }
 }, error => {
     if (error.response?.status == 401) {
-        window.sessionStorage.removeItem('iwtoken')
-        //说明未登录
-        router.replace('/login');
+        handleUnauthorized(error.config)
+        return Promise.reject(error);
     }
     //HTTP 状态码不是 200，就会进入到这个回调中
     showError(error.config, "请求失败")
