@@ -565,6 +565,7 @@ const loadCurrentGroup = async (keepSelected: boolean) => {
       if (target) target.count = tasks.length
     } else {
       const groupResponse = await getTaskGroupList(currentGroupId.value)
+      const expandOnlySection = groupResponse.data.length === 1 && groupResponse.data[0]?.groupName === '未分组'
       nextSections = await Promise.all(groupResponse.data.map(async (group) => {
         const taskResponse = await getTaskList(String(group.id))
         return {
@@ -573,7 +574,7 @@ const loadCurrentGroup = async (keepSelected: boolean) => {
           taskNum: group.taskNum,
           tasks: normalizeTasks(taskResponse.data),
           loading: false,
-          expanded: true
+          expanded: expandOnlySection
         }
       }))
     }
