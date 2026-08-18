@@ -858,7 +858,7 @@ let actionColumnResizeObserver: ResizeObserver | undefined
 const filters = reactive({
   keyword: '',
   toolType: '',
-  taskStatus: '',
+  taskStatus: '进行中',
   projectName: '',
   workspaceKeyword: ''
 })
