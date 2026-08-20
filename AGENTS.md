@@ -79,7 +79,7 @@ Web 端开发重点是：清晰的路由、稳定的表格/表单/详情交互�
 - Axios 默认 `Content-Type: application/json;charset=utf-8`。
 - 非生产环境 `baseURL` 为空，走 Vite dev server proxy。
 - 生产环境 `baseURL` 是 `//api.itwray.com`。
-- token 存在 `window.sessionStorage.iwtoken`，请求 header 为 `iwtoken`。
+- token 和用户名通过认证会话模块存入 `localStorage` 供多个 Tab 共享，请求 header 为 `iwtoken`；各 Tab 的登录后返回地址独立存入 `sessionStorage`。
 - 响应 `code == 200` 成功，`code == 401` 清 token 并跳转 `/login`，其他 code 用 Element Plus message 提示。
 
 Vite proxy 在 `vite.config.ts`：

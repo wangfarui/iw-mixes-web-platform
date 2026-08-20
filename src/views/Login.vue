@@ -108,6 +108,8 @@ import {ElMessage} from "element-plus";
 
 import {useDictStore} from "@/stores/dict";
 import versionPollingService from '@/services/versionPollingService'
+import authSession from '@/services/authSession'
+import {takePostLoginTarget} from '@/router/auth'
 
 const dictStore = useDictStore();
 
@@ -232,17 +234,16 @@ function submitInviteCode() {
 
 // 登录成功后的操作
 function loginSuccessAfter(data) {
-  //1. 先把用户信息保存起来，后面用
-  //这里保存的数据格式是 key-value 形式的，value 只能是字符串，不能是 JSON 对象
-  window.sessionStorage.setItem("name", data.data.name);
-  window.sessionStorage.setItem("iwtoken", data.data.tokenValue);
-  //2. 跳转
-  router.push({path: '/'})
+  authSession.saveLoginSession({
+    token: data.data.tokenValue,
+    userName: data.data.name
+  })
+  void router.replace(takePostLoginTarget(router))
 
-  // 3. 加载字典缓存
+  // 加载字典缓存
   refreshDictCache();
 
-  // 4. 启动全局版本号轮询机制
+  // 启动全局版本号轮询机制
   versionPollingService.startVersionPolling();
 }
 

@@ -11,19 +11,33 @@ import router from './router'
 import versionPollingService from '@/services/versionPollingService'
 import { refreshDictCache } from '@/api/login'
 import { reportToolUsage } from '@/services/toolUsageReporter'
+import authSession from '@/services/authSession'
+import {takePostLoginTarget} from '@/router/auth'
 // @ts-ignore
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 const app = createApp(App)
 
 router.beforeEach((to, _from, next) => {
-    if (to.path == '/login' || to.meta.public === true) {
+    if (to.meta.public === true) {
         // 版本轮询只在需要登录的业务页面运行。
         versionPollingService.stopVersionPolling();
         next();
         return;
     }
-    if (window.sessionStorage.getItem("iwtoken")) {
+
+    const hasToken = Boolean(authSession.getToken())
+    if (to.path === '/login') {
+        versionPollingService.stopVersionPolling();
+        if (hasToken) {
+            next(takePostLoginTarget(router));
+        } else {
+            next();
+        }
+        return;
+    }
+
+    if (hasToken) {
         //说明用户已经登录
         // 检查并启动版本号轮询
         if (!versionPollingService.isPollingActive()) {
@@ -33,7 +47,8 @@ router.beforeEach((to, _from, next) => {
         next();
     } else {
         versionPollingService.stopVersionPolling();
-        next({path: '/login'});
+        authSession.rememberReturnPath(to.fullPath)
+        next({path: '/login', replace: true});
     }
 })
 

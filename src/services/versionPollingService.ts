@@ -1,8 +1,9 @@
 import { getDictVersion, refreshDictCache } from '@/api/login'
 import { createVersionPollingService } from '@/services/versionPollingServiceCore'
+import authSession from '@/services/authSession'
 
 const versionPollingService = createVersionPollingService({
-  hasToken: () => Boolean(window.sessionStorage.getItem('iwtoken')),
+  hasToken: () => Boolean(authSession.getToken()),
   getVersion: async () => {
     const response = await getDictVersion()
     return response.data

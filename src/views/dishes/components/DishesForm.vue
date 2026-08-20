@@ -194,13 +194,14 @@ import {useDictStore} from "@/stores/dict";
 const dictStore = useDictStore();
 
 import type {UploadProps} from 'element-plus'
+import authSession from '@/services/authSession'
 
 const dishesStore = useDishesStore()
 
 const fullscreenLoading = ref(false)
 const formRef = ref<FormInstance>()
 const uploadAction = ref('')
-const iwHeaders = {"iwtoken": window.sessionStorage.getItem("iwtoken")}
+const iwHeaders = {"iwtoken": authSession.getToken()}
 
 if (import.meta.env.VITE_BUILD_ENV === 'dev') {
   uploadAction.value = 'http://localhost:18000/auth-service/file/upload'

@@ -2,6 +2,7 @@
 import axios, { type AxiosRequestConfig } from "axios";
 import {ElMessage} from "element-plus";
 import router from "@/router";
+import authSession from '@/services/authSession'
 
 axios.defaults.headers['Content-Type'] = 'application/json;charset=utf-8'
 
@@ -20,12 +21,23 @@ const showError = (config: AxiosRequestConfig | undefined, message: string): voi
 }
 
 const handleUnauthorized = (config: AxiosRequestConfig | undefined): void => {
-    const hadToken = Boolean(window.sessionStorage.getItem('iwtoken'))
-    window.sessionStorage.removeItem('iwtoken')
+    const currentToken = authSession.getToken()
+    const requestToken = config?.headers?.iwtoken
+    if (currentToken && typeof requestToken === 'string' && requestToken !== currentToken) {
+        return
+    }
+
+    const currentRoute = router.currentRoute.value
+    if (currentRoute.path !== '/login' && currentRoute.meta.public !== true) {
+        authSession.rememberReturnPath(currentRoute.fullPath)
+    }
+
+    const hadToken = Boolean(currentToken)
+    authSession.clearLoginSession()
     if (hadToken) {
         showError(config, "登录状态失效，请重新登录")
     }
-    if (router.currentRoute.value.path !== '/login') {
+    if (currentRoute.path !== '/login') {
         void router.replace('/login')
     }
 }
@@ -38,8 +50,7 @@ const service = axios.create({
 //这个是请求拦截器，如果是使用 JWT 或者其他令牌登录的话，那么可以在请求拦截器中统一添加令牌
 service.interceptors.request.use(
     (config) => {
-        // 从sessionStorage中获取iwtoken的值
-        const iwtoken = window.sessionStorage.getItem("iwtoken");
+        const iwtoken = authSession.getToken();
         if (iwtoken) {
             // 设置默认的header参数
             config.headers["iwtoken"] = iwtoken;

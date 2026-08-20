@@ -4,6 +4,7 @@ import type {
     NetworkDiagnosticsCheckDto,
     NetworkDiagnosticsResultVo
 } from '@/types/networkDiagnostics'
+import authSession from '@/services/authSession'
 
 const VITE_BUILD_ENV = import.meta.env.VITE_BUILD_ENV
 
@@ -16,7 +17,7 @@ const networkDiagnosticsRequest = axios.create({
 })
 
 networkDiagnosticsRequest.interceptors.request.use((config) => {
-    const iwtoken = window.sessionStorage.getItem('iwtoken')
+    const iwtoken = authSession.getToken()
     if (iwtoken) {
         config.headers.iwtoken = iwtoken
     }

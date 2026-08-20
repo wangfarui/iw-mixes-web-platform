@@ -228,6 +228,7 @@ import {
 } from '@element-plus/icons-vue'
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
 import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";
+import authSession from '@/services/authSession'
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
 import versionPollingService from '@/services/versionPollingService'
@@ -273,7 +274,7 @@ const handleMenuSelect = (index: string) => {
 }
 
 onMounted(() => {
-  user.name = window.sessionStorage.getItem("name");
+  user.name = authSession.getUserName();
 })
 
 function editPassword() {
@@ -368,9 +369,10 @@ const cancelForm = (formEl: FormInstance | undefined) => {
 }
 
 function logout() {
-  window.sessionStorage.removeItem("iwtoken");
+  authSession.clearLoginSession();
+  authSession.clearReturnPath();
   versionPollingService.stopVersionPolling();
-  router.push({path: '/login'})
+  void router.replace({path: '/login'})
 }
 
 // 修改密码时获取验证码
