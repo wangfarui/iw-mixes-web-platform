@@ -1,14 +1,26 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # 初始化变量
-SOURCE_DIR="/Users/wangfarui/workspaces/wfr/iw-mixes_ai/iw-mixes-web-platform" # 源服务器目录
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # 本地项目目录
 SOURCE_FILE="dist" # 拷贝的文件或目录
 TARGET_DIR="iw-mixes-web-platform" # 目标服务器目录
 
-# 1. 连接到远程服务器并进行操作
+# 1. 构建最新的前端代码；构建失败时停止发布
+cd "$SOURCE_DIR"
+echo "开始构建前端代码..."
+npm run build
+
+if [ ! -d "$SOURCE_FILE" ]; then
+    echo "构建产物 $SOURCE_FILE 不存在，停止发布." >&2
+    exit 1
+fi
+
+# 2. 连接到远程服务器并进行操作
 ssh aliyun183 << EOF
 
-# 2. 删除目标服务器目录
+# 3. 删除目标服务器目录
 cd /usr/share/nginx || exit 1
 if [ -d "$TARGET_DIR" ]; then
     rm -rf "$TARGET_DIR"
@@ -19,6 +31,7 @@ fi
 
 EOF
 
-# 3. 切换到本地目录并拷贝源服务器目录到远程服务器的目标服务器目录下
-cd $SOURCE_DIR || exit 1
-scp -r $SOURCE_FILE aliyun183:/usr/share/nginx/$TARGET_DIR
+# 4. 拷贝构建产物到远程服务器的目标目录下
+scp -r "$SOURCE_FILE" "aliyun183:/usr/share/nginx/$TARGET_DIR"
+
+echo "前端代码构建并发布完成."

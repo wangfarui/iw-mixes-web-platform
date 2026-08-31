@@ -147,6 +147,14 @@ try {
     modelProvider: '',
     resumeCommand: `codex resume ${codexSessionId}`
   })
+  const selectCommand = `codex resume, then select 支持文件内容 Command F 搜索 (${codexSessionId})`
+  assert.deepEqual(parseResumeCommand(selectCommand), {
+    toolType: 'codex',
+    sessionKey: codexSessionId,
+    modelProvider: '',
+    titleHint: '支持文件内容 Command F 搜索',
+    resumeCommand: selectCommand
+  })
   const quotedWorkspacePath = `'${workspacePath.split("'").join("'\"'\"'")}'`
   const copiedScript = `cd -- ${quotedWorkspacePath} && codex resume '${codexSessionId}' -c model_provider='local-provider'`
   assert.deepEqual(parseResumeCommand(copiedScript), {
@@ -179,6 +187,11 @@ try {
     lastActiveAt: '2026-07-23T09:05:00.000Z',
     warnings: []
   })
+  const inspectedSelectSession = await sessionInspector.inspect({
+    resumeCommand: selectCommand
+  })
+  assert.equal(inspectedSelectSession.titleHint, '支持文件内容 Command F 搜索')
+  assert.equal(inspectedSelectSession.sessionKey, codexSessionId)
   assert.deepEqual(await sessionInspector.collectEvidence({
     resumeCommand: `codex resume ${codexSessionId}`
   }), {

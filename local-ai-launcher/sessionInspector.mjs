@@ -9,6 +9,10 @@ const CODEX_COMMAND_PATTERN = new RegExp(
   `^codex\\s+resume\\s+(?:"(${SESSION_ID_PATTERN})"|'(${SESSION_ID_PATTERN})'|(${SESSION_ID_PATTERN}))(?:\\s+-c\\s+model_provider=(?:"([^"\\r\\n]{1,64})"|'([^'\\r\\n]{1,64})'|([^\\s\\r\\n]{1,64})))?$`,
   'i'
 )
+const CODEX_SELECT_COMMAND_PATTERN = new RegExp(
+  `^codex\\s+resume\\s*,\\s*then\\s+select\\s+(.+?)\\s*\\((${SESSION_ID_PATTERN})\\)$`,
+  'i'
+)
 const CONTROL_CHAR_PATTERN = /[\0\r\n]/
 
 const createInspectorError = (message, code) => Object.assign(new Error(message), { code })
@@ -72,10 +76,25 @@ export const parseResumeCommand = (resumeCommand) => {
     throw createInspectorError('当前仅支持识别 Codex resume 命令', 'UNSUPPORTED_TOOL')
   }
 
+  const selectMatch = codexCommand.match(CODEX_SELECT_COMMAND_PATTERN)
+  if (selectMatch) {
+    const titleHint = clampText(selectMatch[1], 80)
+    if (!titleHint) {
+      throw createInspectorError('命令格式应为 codex resume <session-id> 或 codex resume, then select <名称> (<session-id>)', 'INVALID_COMMAND')
+    }
+    return {
+      toolType: 'codex',
+      sessionKey: selectMatch[2].toLowerCase(),
+      modelProvider: '',
+      titleHint,
+      resumeCommand: normalized
+    }
+  }
+
   const match = codexCommand.match(CODEX_COMMAND_PATTERN)
   if (!match) {
     throw createInspectorError(
-      '命令格式应为 codex resume <session-id>，可选追加 -c model_provider=<provider>',
+      '命令格式应为 codex resume <session-id>，或 codex resume, then select <名称> (<session-id>)；标准格式可选追加 -c model_provider=<provider>',
       'INVALID_COMMAND'
     )
   }
@@ -270,6 +289,7 @@ export const createSessionInspector = ({
         indexEntry?.thread_name || sessionData.firstUserMessage || sessionData.lastUserMessage || command.sessionKey,
         80
       ),
+      ...(command.titleHint ? { titleHint: command.titleHint } : {}),
       description: buildLocalDescription(sessionData.firstUserMessage, sessionData.lastUserMessage),
       modelName: sessionData.modelName.trim(),
       modelProvider: command.modelProvider || sessionData.modelProvider.trim(),

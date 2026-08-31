@@ -1370,6 +1370,9 @@ const inspectResumeCommand = async () => {
   inspectingSession.value = true
   try {
     const draft = await inspectAiSession(resumeCommand)
+    if (!formState.title.trim() && draft.titleHint?.trim()) {
+      formState.title = draft.titleHint.trim()
+    }
     if (!formState.projectName.trim()) {
       formState.projectName = draft.projectName
     }

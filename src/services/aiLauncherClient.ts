@@ -24,6 +24,7 @@ export type AiLauncherRequest = {
 export type AiLauncherSessionDraft = {
   toolType: 'codex'
   title: string
+  titleHint?: string
   description: string
   modelName: string
   modelProvider: string

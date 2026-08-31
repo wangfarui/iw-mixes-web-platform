@@ -2,6 +2,7 @@ import {createRouter, createWebHistory} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import Login from "@/views/Login.vue";
 import toolRoutes from "@/router/tools";
+import zhaogangRoute from "@/router/zhaogang";
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -15,6 +16,7 @@ const router = createRouter({
             }
         },
         toolRoutes,
+        zhaogangRoute,
         {
             path: '/',
             name: 'home',

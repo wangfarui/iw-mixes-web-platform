@@ -57,9 +57,19 @@ router.afterEach((to, _from, failure) => {
         return;
     }
 
-    const pageTitle = typeof to.meta.title === 'string' ? to.meta.title.trim() : ''
-    const titleSuffix = to.matched.some((route) => route.meta.toolRoot === true) ? '工具箱' : 'IW'
-    document.title = pageTitle ? `${pageTitle} | ${titleSuffix}` : titleSuffix
+    const isZhaogangRoute = to.path === '/zhaogang' || to.path.startsWith('/zhaogang/')
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (favicon) {
+        favicon.href = isZhaogangRoute ? '/zhaogang-cat.svg' : '/wray.svg'
+    }
+
+    if (isZhaogangRoute) {
+        document.title = '找钢工作台'
+    } else {
+        const pageTitle = typeof to.meta.title === 'string' ? to.meta.title.trim() : ''
+        const titleSuffix = to.matched.some((route) => route.meta.toolRoot === true) ? '工具箱' : 'IW'
+        document.title = pageTitle ? `${pageTitle} | ${titleSuffix}` : titleSuffix
+    }
 
     const toolKey = to.meta.toolKey
     if (typeof toolKey === 'string') {
