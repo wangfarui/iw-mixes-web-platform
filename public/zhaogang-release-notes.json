@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "currentReleaseId": "zg-2026-09-02-02",
+  "releases": [
+    {
+      "id": "zg-2026-09-02-02",
+      "version": "1.1.0",
+      "publishedAt": "2026-09-02T19:00:00+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "新增 K8s 功能菜单"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-02-01",
+      "version": "1.0.0",
+      "publishedAt": "2026-09-02T18:00:00+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "找钢工作台功能上线"
+        }
+      ]
+    }
+  ]
+}

@@ -47,28 +47,22 @@
 
     <div v-if="!collapsed" class="release-list-viewport">
       <el-table v-if="releasePlans.length" :data="releasePlans" height="100%" border>
-        <el-table-column label="项目" min-width="190">
+        <el-table-column label="构建计划 / 项目" min-width="300">
           <template #default="scope">
             <div class="release-name-cell">
-              <strong>{{ scope.row.projectDisplayName || scope.row.projectName }}</strong>
-              <span>{{ scope.row.projectName }}</span>
+              <el-tooltip :content="scope.row.planName" placement="top" :disabled="!planNameOverflow[scope.row.id]">
+                <span :ref="setPlanNameElement(scope.row.id)" class="release-plan-name"><strong>{{ scope.row.planName }}</strong></span>
+              </el-tooltip>
+              <span class="release-project-name">{{ scope.row.projectDisplayName || scope.row.projectName }}</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="构建计划" min-width="210">
-          <template #default="scope">
-            <div class="release-name-cell">
-              <strong>{{ scope.row.planName }}</strong>
-              <span>#{{ scope.row.planId }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="最近构建" min-width="230">
+        <el-table-column label="最近构建" min-width="205">
           <template #default="scope">
             <div v-if="runtime[scope.row.id]?.loading" class="status-loading">正在读取 CODING 状态</div>
             <div v-else-if="runtime[scope.row.id]?.error" class="status-error">
               <span>{{ runtime[scope.row.id]?.error }}</span>
-              <el-button link type="primary" @click="refreshPlan(scope.row)">重试</el-button>
+              <el-button link type="primary" @click="refreshSinglePlan(scope.row)">重试</el-button>
             </div>
             <div v-else class="build-status-cell">
               <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
@@ -81,6 +75,20 @@
               <span v-else>{{ buildCapabilityText(scope.row) }}</span>
             </div>
           </template>
+        </el-table-column>
+        <el-table-column label="构建环境" width="90" align="center">
+          <template #default="scope">{{ latestBuild(scope.row)?.environment || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="Pods" width="90" align="center">
+          <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
+        </el-table-column>
+        <el-table-column label="服务状态" width="125" align="center" class-name="release-status-column">
+          <template #default="scope">
+            <el-tag :type="k8sStatusTagType(runtime[scope.row.id]?.k8s)" effect="light">{{ k8sStatusText(runtime[scope.row.id]?.k8s) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Pod创建时间" min-width="180" show-overflow-tooltip>
+          <template #default="scope">{{ k8sCreatedAt(runtime[scope.row.id]?.k8s) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="scope">
@@ -114,7 +122,7 @@
     v-else
     v-model="drawerVisible"
     class="release-drawer"
-    size="min(860px, 100%)"
+    size="min(1180px, 100%)"
     :with-header="false"
     destroy-on-close
   >
@@ -142,20 +150,22 @@
 
       <div class="release-list-viewport">
         <el-table v-if="releasePlans.length" :data="releasePlans" height="100%" border>
-          <el-table-column label="构建计划 / 项目" min-width="400">
+          <el-table-column label="构建计划 / 项目" min-width="330">
             <template #default="scope">
               <div class="release-name-cell">
-                <strong>{{ scope.row.planName }}</strong>
-                <span>{{ scope.row.projectDisplayName || scope.row.projectName }}</span>
+                <el-tooltip :content="scope.row.planName" placement="top" :disabled="!planNameOverflow[scope.row.id]">
+                  <span :ref="setPlanNameElement(scope.row.id)" class="release-plan-name"><strong>{{ scope.row.planName }}</strong></span>
+                </el-tooltip>
+                <span class="release-project-name">{{ scope.row.projectDisplayName || scope.row.projectName }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="最近构建" min-width="300">
+          <el-table-column label="最近构建" min-width="255">
             <template #default="scope">
               <div v-if="runtime[scope.row.id]?.loading" class="status-loading">正在读取 CODING 状态</div>
               <div v-else-if="runtime[scope.row.id]?.error" class="status-error">
                 <span>{{ runtime[scope.row.id]?.error }}</span>
-                <el-button link type="primary" @click="refreshPlan(scope.row)">重试</el-button>
+                <el-button link type="primary" @click="refreshSinglePlan(scope.row)">重试</el-button>
               </div>
               <div v-else class="build-status-cell">
                 <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
@@ -168,6 +178,20 @@
                 <span v-else>{{ buildCapabilityText(scope.row) }}</span>
               </div>
             </template>
+          </el-table-column>
+          <el-table-column label="构建环境" width="90" align="center">
+            <template #default="scope">{{ latestBuild(scope.row)?.environment || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="Pods" width="90" align="center">
+            <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
+          </el-table-column>
+          <el-table-column label="服务状态" width="125" align="center" class-name="release-status-column">
+            <template #default="scope">
+              <el-tag :type="k8sStatusTagType(runtime[scope.row.id]?.k8s)" effect="light">{{ k8sStatusText(runtime[scope.row.id]?.k8s) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="Pod创建时间" min-width="180" show-overflow-tooltip>
+            <template #default="scope">{{ k8sCreatedAt(runtime[scope.row.id]?.k8s) }}</template>
           </el-table-column>
           <el-table-column label="操作" width="150" fixed="right">
             <template #default="scope">
@@ -273,13 +297,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUpdated, reactive, ref, watch, type ComponentPublicInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, ArrowUp, Delete, Expand, Fold, Link, Plus, Refresh, VideoPlay } from '@element-plus/icons-vue'
 import {
   getZhaogangPlanDetail, getZhaogangPlans, getZhaogangProjects, searchZhaogangBranches, triggerZhaogangBuild
 } from '@/api/zhaogang'
 import { addTeamIterationReleasePlan, removeTeamIterationReleasePlan } from '@/api/zhaogangIteration'
+import { queryReleaseK8sStatuses, type ReleaseK8sStatus } from '@/services/zhaogangReleaseK8s'
 import type {
   ZhaogangBranch, ZhaogangBuild, ZhaogangBuildPlan, ZhaogangPlanDetail, ZhaogangProject, ZhaogangSessionStatus
 } from '@/types/zhaogang'
@@ -301,6 +326,8 @@ interface PlanRuntime {
   loading: boolean
   detail?: ZhaogangPlanDetail
   error?: string
+  k8s?: ReleaseK8sStatus
+  k8sLoading?: boolean
 }
 
 const sessionRef = inject<Ref<ZhaogangSessionStatus | null>>('zhaogangSession')
@@ -326,16 +353,39 @@ const branchOptions = ref<ZhaogangBranch[]>([])
 const branchLoading = ref(false)
 const branchManuallySelected = ref(false)
 const triggering = ref(false)
+const planNameOverflow = reactive<Record<number, boolean>>({})
+const planNameElements = new Map<number, HTMLElement>()
 let branchSearchTimer: number | undefined
 let resizeStartY = 0
 let resizeStartHeight = 0
 let stateReady = false
+let missingRefreshInFlight: Promise<void> | undefined
 
 const planKey = (projectId: number, planId: number) => `${projectId}:${planId}`
 const storageKey = computed(() => `zhaogang:iteration-release-panel:${sessionRef?.value?.userId || 'anonymous'}`)
 const panelStyle = computed(() => collapsed.value ? undefined : { height: `${panelHeight.value}px` })
 const existingPlanKeys = computed(() => new Set(props.releasePlans.map(item => planKey(item.projectId, item.planId))))
 const activePlanDetail = computed(() => activeReleasePlan.value ? runtime[activeReleasePlan.value.id]?.detail : undefined)
+
+const setPlanNameElement = (planId: number) => (element: Element | ComponentPublicInstance | null) => {
+  if (element instanceof HTMLElement) {
+    planNameElements.set(planId, element)
+    void nextTick(updatePlanNameOverflow)
+  } else planNameElements.delete(planId)
+}
+
+const updatePlanNameOverflow = () => {
+  const activeIds = new Set(props.releasePlans.map(item => item.id))
+  planNameElements.forEach((element, planId) => {
+    if (!activeIds.has(planId)) planNameElements.delete(planId)
+  })
+  props.releasePlans.forEach(plan => {
+    const element = planNameElements.get(plan.id)
+    const overflowing = Boolean(element && element.scrollWidth > element.clientWidth)
+    if (planNameOverflow[plan.id] !== overflowing) planNameOverflow[plan.id] = overflowing
+  })
+}
+const handlePlanNameResize = () => { void nextTick(updatePlanNameOverflow) }
 
 const maxPanelHeight = () => Math.max(220, Math.min(560, window.innerHeight - 360))
 const clampPanelHeight = (height: number) => Math.max(180, Math.min(maxPanelHeight(), height))
@@ -421,14 +471,51 @@ const refreshPlan = async (releasePlan: TeamIterationReleasePlan) => {
   }
 }
 
-const refreshMissingPlans = async () => {
-  await Promise.all(props.releasePlans.filter(item => !runtime[item.id]?.detail && !runtime[item.id]?.loading)
-    .map(refreshPlan))
+const refreshK8sPlans = async (releasePlans: TeamIterationReleasePlan[]) => {
+  const targets = releasePlans.map(releasePlan => ({
+    id: releasePlan.id,
+    planName: releasePlan.planName,
+    environment: latestBuild(releasePlan)?.environment
+  }))
+  releasePlans.forEach(releasePlan => {
+    runtime[releasePlan.id] = { ...runtime[releasePlan.id], k8sLoading: true }
+  })
+  const statuses = await queryReleaseK8sStatuses(targets)
+  releasePlans.forEach(releasePlan => {
+    runtime[releasePlan.id] = {
+      ...runtime[releasePlan.id],
+      k8s: statuses[releasePlan.id],
+      k8sLoading: false
+    }
+  })
+}
+
+const refreshSinglePlan = async (releasePlan: TeamIterationReleasePlan) => {
+  await refreshPlan(releasePlan)
+  await refreshK8sPlans([releasePlan])
+}
+
+const refreshMissingPlans = () => {
+  if (missingRefreshInFlight) return missingRefreshInFlight
+  const task = (async () => {
+    await Promise.all(props.releasePlans.filter(item => !runtime[item.id]?.detail && !runtime[item.id]?.loading)
+      .map(refreshPlan))
+    if (props.releasePlans.length) await refreshK8sPlans(props.releasePlans)
+  })()
+  missingRefreshInFlight = task
+  const clearInFlight = () => {
+    if (missingRefreshInFlight === task) missingRefreshInFlight = undefined
+  }
+  void task.then(clearInFlight, clearInFlight)
+  return task
 }
 
 const refreshAll = async () => {
   refreshingAll.value = true
-  try { await Promise.all(props.releasePlans.map(refreshPlan)) }
+  try {
+    await Promise.all(props.releasePlans.map(refreshPlan))
+    await refreshK8sPlans(props.releasePlans)
+  }
   finally { refreshingAll.value = false }
 }
 
@@ -464,6 +551,50 @@ const buildTagType = (status?: string): 'success' | 'warning' | 'danger' | 'info
   return 'info'
 }
 
+const k8sStatusText = (status?: ReleaseK8sStatus) => {
+  if (!status) return '正在查询'
+  if (status.state === 'READY' && status.deployment) return deploymentStatus(status.deployment)
+  return {
+    READY: '正常',
+    NO_BUILD: '暂无最近构建',
+    UNKNOWN_ENVIRONMENT: '无法识别构建环境',
+    UNKNOWN_SERVICE: '无法识别服务',
+    NOT_FOUND: '未找到对应服务',
+    AGENT_OFFLINE: 'Agent 未启动',
+    TOKEN_MISSING: '对应环境 Token 未配置',
+    QUERYING: '正在查询',
+    QUERY_FAILED: 'K8s 查询失败'
+  }[status.state] || 'K8s 查询失败'
+}
+
+const deploymentStatus = (deployment: { podCount: number; replicas: number }) =>
+  deployment.podCount === deployment.replicas ? '正常' : deployment.podCount < deployment.replicas ? '异常' : '启动中'
+
+const k8sStatusTagType = (status?: ReleaseK8sStatus): 'success' | 'warning' | 'danger' | 'info' => {
+  if (status?.state === 'READY' && status.deployment) {
+    const value = deploymentStatus(status.deployment)
+    return value === '正常' ? 'success' : value === '启动中' ? 'warning' : 'danger'
+  }
+  if (status?.state === 'QUERYING') return 'warning'
+  if (status?.state === 'NO_BUILD' || status?.state === 'NOT_FOUND') return 'info'
+  return 'danger'
+}
+
+const k8sPodsText = (status?: ReleaseK8sStatus) => {
+  const deployment = status?.deployment
+  return deployment ? `${deployment.podCount} / ${deployment.replicas}` : '—'
+}
+
+const formatDate = (value?: string) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (number: number) => String(number).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+const k8sCreatedAt = (status?: ReleaseK8sStatus) => formatDate(status?.deployment?.lastPodCreatedAt)
+
 const openAddDialog = async () => {
   Object.assign(addForm, { projectId: undefined, planId: undefined })
   plans.value = []
@@ -493,7 +624,7 @@ const addReleasePlan = async () => {
     emit('added', releasePlan)
     addDialogVisible.value = false
     ElMessage.success('发布项目已添加')
-    await refreshPlan(releasePlan)
+    await refreshSinglePlan(releasePlan)
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '发布项目添加失败') }
   finally { adding.value = false }
 }
@@ -509,7 +640,7 @@ const removeReleasePlan = async (releasePlan: TeamIterationReleasePlan) => {
 }
 
 const handleCommand = (command: string, releasePlan: TeamIterationReleasePlan) => {
-  if (command === 'refresh') void refreshPlan(releasePlan)
+  if (command === 'refresh') void refreshSinglePlan(releasePlan)
   else if (command === 'open-coding') openCodingReleasePage(releasePlan)
   else if (command === 'remove') void removeReleasePlan(releasePlan)
 }
@@ -525,7 +656,7 @@ const defaultBranchFor = (environment: string, plan: ZhaogangBuildPlan) => {
 }
 
 const openBuildDialog = async (releasePlan: TeamIterationReleasePlan) => {
-  if (!runtime[releasePlan.id]?.detail) await refreshPlan(releasePlan)
+  if (!runtime[releasePlan.id]?.detail) await refreshSinglePlan(releasePlan)
   const detail = runtime[releasePlan.id]?.detail
   if (!detail) return
   if (!detail.plan.quickBuildSupported) {
@@ -577,6 +708,7 @@ const triggerBuild = async () => {
       current.plan.latestBuild = build
       current.builds = [build, ...current.builds.filter(item => item.id !== build.id)]
     }
+    await refreshK8sPlans([releasePlan])
     buildDialogVisible.value = false
     ElMessage.success('已触发 CODING 构建')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '构建触发失败') }
@@ -592,15 +724,25 @@ watch(() => props.releasePlans.map(item => item.id).join(','), () => {
   Object.keys(runtime).forEach(key => { if (!activeIds.has(Number(key))) delete runtime[Number(key)] })
   if (!collapsed.value) void refreshMissingPlans()
 })
+watch(() => props.releasePlans.map(item => `${item.id}:${item.planName}`).join('|'), () => {
+  void nextTick(updatePlanNameOverflow)
+})
 
 onMounted(() => {
   restorePanelState()
   if (!collapsed.value) void refreshMissingPlans()
+  void nextTick(updatePlanNameOverflow)
+  window.addEventListener('resize', handlePlanNameResize)
+})
+
+onUpdated(() => {
+  void nextTick(updatePlanNameOverflow)
 })
 
 onBeforeUnmount(() => {
   window.clearTimeout(branchSearchTimer)
   window.removeEventListener('pointermove', resizePanel)
+  window.removeEventListener('resize', handlePlanNameResize)
 })
 
 defineExpose({ openDrawer })
@@ -625,11 +767,14 @@ defineExpose({ openDrawer })
 .release-list-viewport { min-height: 0; flex: 1 1 auto; padding: 0 12px 12px; overflow: hidden; }
 .release-list-viewport :deep(.el-empty) { height: 100%; padding: 6px 0; }
 .release-name-cell { display: grid; min-width: 0; gap: 4px; }
-.release-name-cell strong { overflow: hidden; color: #2c3a4f; text-overflow: ellipsis; white-space: nowrap; }
-.release-name-cell span, .build-status-cell span, .status-loading { color: #8994a5; font-size: 12px; }
+.release-plan-name { display: block; min-width: 0; overflow: hidden; color: #2c3a4f; text-overflow: ellipsis; white-space: nowrap; }
+.release-plan-name strong { color: inherit; }
+.release-project-name, .build-status-cell span, .status-loading { color: #8994a5; font-size: 12px; }
 .build-status-cell { display: grid; justify-items: start; gap: 5px; }
 .build-status-cell > span { line-height: 1.35; white-space: normal; }
 .status-error { display: flex; align-items: center; gap: 6px; color: #c45656; font-size: 12px; }
+.release-list-viewport :deep(.el-table .cell) { overflow: hidden; text-overflow: ellipsis; }
+.release-list-viewport :deep(.release-status-column .cell) { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .release-row-actions { justify-content: flex-start; gap: 5px; white-space: nowrap; }
 .release-row-actions :deep(.el-button) { margin: 0; }
 .full-control { width: 100%; }

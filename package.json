@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --mode prod",
+    "prebuild": "npm run check:zg-k8s-agent && npm run check:zhaogang-release-notes",
     "build-check": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build --mode prod",
@@ -27,12 +28,16 @@
     "test:version-polling": "node scripts/testVersionPolling.mjs",
     "test:auth-session": "node scripts/testAuthSession.mjs",
     "test:zhaogang-iteration": "node scripts/testZhaogangIteration.mjs",
+    "test:zhaogang-release-k8s": "node scripts/testZhaogangReleaseK8s.mjs",
+    "test:zhaogang-release-notes": "node scripts/testZhaogangReleaseNotes.mjs",
     "test:remote-share": "node scripts/testRemoteShareProtocol.mjs",
     "ai-launcher:install": "node scripts/aiLauncher.mjs install",
     "ai-launcher:uninstall": "node scripts/aiLauncher.mjs uninstall",
     "ai-launcher:status": "node scripts/aiLauncher.mjs status",
     "ai-launcher:pair": "node scripts/aiLauncher.mjs pair",
-    "type-check": "vue-tsc --build --force"
+    "type-check": "vue-tsc --build --force",
+    "check:zg-k8s-agent": "node scripts/checkZgK8sAgentRelease.mjs",
+    "check:zhaogang-release-notes": "node scripts/checkZhaogangReleaseNotes.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

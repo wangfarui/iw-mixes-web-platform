@@ -46,6 +46,18 @@ const zhaogangRoute: RouteRecordRaw = {
       meta: { public: true, title: '日历', zhaogangView: 'calendar' }
     },
     {
+      path: 'services',
+      name: '找钢 K8s',
+      component: () => import('@/views/zhaogang/service/ZhaogangServiceView.vue'),
+      meta: { public: true, title: 'K8s', zhaogangView: 'services' }
+    },
+    {
+      path: 'services/install',
+      name: '找钢服务使用教程',
+      component: () => import('@/views/zhaogang/service/ZhaogangServiceInstallView.vue'),
+      meta: { public: true, title: 'Agent 使用教程', zhaogangView: 'services' }
+    },
+    {
       path: 'settings',
       name: '找钢工作台设置',
       component: () => import('@/views/zhaogang/ZhaogangEmptyRoute.vue'),

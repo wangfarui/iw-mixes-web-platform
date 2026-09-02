@@ -9,7 +9,16 @@
         </div>
       </div>
       <div v-if="session" class="account-summary">
-        <el-tag type="success" effect="light" round>CODING 已连接</el-tag>
+        <button
+          v-if="releaseCheck"
+          type="button"
+          class="header-release-tag"
+          :aria-label="`打开更新日志，当前版本 v${releaseCheck.currentRelease.version}${releaseCheck.receipt.read ? '' : '，有新版本更新'}`"
+          @click="openReleaseHistory"
+        >
+          <span>v{{ releaseCheck.currentRelease.version }}</span>
+          <span v-if="!releaseCheck.receipt.read" class="header-release-tag__dot" aria-label="有新版本更新" />
+        </button>
         <el-avatar :size="34" :src="session.avatar">{{ session.userName?.slice(0, 1) }}</el-avatar>
         <span>{{ session.userName }}</span>
       </div>
@@ -111,6 +120,10 @@
           <el-icon><Calendar /></el-icon>
           <span class="workspace-nav-label">日历</span>
         </button>
+        <button :class="{ active: activeTab === 'services' }" type="button" aria-label="K8s" :title="navCollapsed ? 'K8s' : undefined" @click="navigateTab('services')">
+          <el-icon><Monitor /></el-icon>
+          <span class="workspace-nav-label">K8s</span>
+        </button>
         <button :class="{ active: activeTab === 'settings' }" type="button" aria-label="设置" :title="navCollapsed ? '设置' : undefined" @click="navigateTab('settings')">
           <el-icon><Setting /></el-icon>
           <span class="workspace-nav-label">设置</span>
@@ -131,7 +144,7 @@
           @open="openTokenCreation"
           @dismiss="permissionPrompt = null"
         />
-        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'calendar'">
+        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'calendar' || activeTab === 'services'">
           <router-view v-slot="{ Component }">
             <Suspense>
               <component :is="Component" />
@@ -230,7 +243,9 @@
                   <el-tag :type="buildTagType(plan.latestBuild?.status)" effect="light">{{ buildStatus(plan.latestBuild?.status) }}</el-tag>
                   <small v-if="plan.latestBuild?.statusDetail">{{ plan.latestBuild.statusDetail }}</small>
                 </div>
-                <p>{{ buildBranch(plan) }} · {{ plan.latestBuild?.triggerUser || '暂无构建人' }}</p>
+                <p>
+                  {{ buildBranch(plan) }} · {{ plan.latestBuild?.triggerUser || '暂无构建人' }}<template v-if="plan.latestBuild?.startedAt"> · {{ plan.latestBuild.startedAt }}</template>
+                </p>
               </button>
             </div>
 
@@ -298,6 +313,7 @@
                     <el-radio-button value="iteration">迭代</el-radio-button>
                     <el-radio-button value="calendar">日历</el-radio-button>
                     <el-radio-button value="worklog">工时</el-radio-button>
+                    <el-radio-button value="services">K8s</el-radio-button>
                   </el-radio-group>
                 </el-form-item>
                 <el-form-item label="计划默认视图">
@@ -335,7 +351,7 @@
       </section>
     </section>
 
-    <el-drawer v-model="detailVisible" size="min(620px, 100%)" :with-header="false" destroy-on-close>
+    <el-drawer v-model="detailVisible" size="min(780px, 100%)" :with-header="false" destroy-on-close>
       <div v-if="detailLoading" class="drawer-loading"><el-skeleton :rows="8" animated /></div>
       <template v-else-if="planDetail">
         <div class="drawer-heading">
@@ -367,6 +383,43 @@
             </div>
           </div>
         </div>
+        <section class="service-status-section">
+          <div class="service-status-heading">
+            <h3>服务状态</h3>
+            <el-button text :icon="Refresh" :loading="detailK8sLoading" @click="refreshPlanK8sStatus">刷新服务状态</el-button>
+          </div>
+          <div class="service-status-table" role="table" aria-label="三个环境服务状态">
+            <div class="service-status-row service-status-row--header" role="row">
+              <span role="columnheader">环境</span>
+              <span role="columnheader">Pods</span>
+              <span role="columnheader">服务状态</span>
+              <span role="columnheader">Pod创建时间</span>
+              <span role="columnheader">K8s</span>
+            </div>
+            <div v-for="environment in releaseK8sEnvironments" :key="environment" class="service-status-row" role="row">
+              <strong role="cell">{{ environment.toUpperCase() }}</strong>
+              <span role="cell">{{ k8sPodsText(detailK8sStatuses?.statuses[environment]) }}</span>
+              <span role="cell" class="service-status-value" :title="detailK8sStatuses?.statuses[environment]?.message || undefined">
+                <el-tag :type="k8sStatusTagType(detailK8sStatuses?.statuses[environment], detailK8sLoading)" effect="light">
+                  {{ k8sStatusText(detailK8sStatuses?.statuses[environment], detailK8sLoading) }}
+                </el-tag>
+              </span>
+              <span role="cell">{{ k8sCreatedAt(detailK8sStatuses?.statuses[environment]) }}</span>
+              <span role="cell">
+                <el-button
+                  text
+                  circle
+                  type="primary"
+                  :icon="TopRight"
+                  :disabled="!detailK8sStatuses?.statuses[environment]?.deployment"
+                  :aria-label="`打开 ${environment.toUpperCase()} K8s`"
+                  :title="`打开 ${environment.toUpperCase()} K8s`"
+                  @click="openK8sDashboard(environment)"
+                />
+              </span>
+            </div>
+          </div>
+        </section>
         <h3>最近构建记录</h3>
         <el-empty v-if="!planDetail.builds.length" description="暂无构建记录" :image-size="80" />
         <div v-else class="build-history">
@@ -387,6 +440,13 @@
         </div>
       </template>
     </el-drawer>
+
+    <ZhaogangReleaseHistoryDrawer
+      v-if="releaseCheck"
+      v-model="releaseHistoryVisible"
+      :releases="releaseCheck.manifest.releases"
+      :current-release-id="releaseCheck.manifest.currentReleaseId"
+    />
 
     <el-dialog v-model="buildDialogVisible" title="立即构建" width="min(480px, calc(100% - 32px))" :close-on-click-modal="false">
       <p v-if="planDetail" class="dialog-plan-name">{{ planDetail.plan.name }}</p>
@@ -443,7 +503,7 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Calendar, Delete, DocumentCopy, Expand, Fold, Link, Loading, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Calendar, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 import ToolboxIcon from '@/assets/icons/toolbox.svg'
 import {
   bindZhaogangToken,
@@ -462,11 +522,22 @@ import {
   type ZhaogangPermissionPromptDetail
 } from '@/services/zhaogangPermissionPrompt'
 import { defaultZhaogangPreferences, loadZhaogangPreferences, resetZhaogangPreferences, saveZhaogangPreferences } from '@/services/zhaogangPreferences'
+import { acknowledgeCurrentZhaogangRelease, loadCurrentZhaogangRelease, zhaogangReleaseLocalPrefix } from '@/services/zhaogangReleaseNotes'
+import {
+  queryPlanK8sStatuses,
+  releaseK8sEnvironments,
+  zhaogangK8sDashboardUrl,
+  type PlanK8sStatuses,
+  type ReleaseK8sStatus
+} from '@/services/zhaogangReleaseK8s'
 import type { ZhaogangBranch, ZhaogangBuildPlan, ZhaogangPlanDetail, ZhaogangPlanPageSize, ZhaogangPlanTableColumnKey, ZhaogangPreferences, ZhaogangProject, ZhaogangSessionStatus } from '@/types/zhaogang'
+import type { ZgK8sEnvironment } from '@/types/zhaogangService'
+import type { ZhaogangReleaseCheck } from '@/types/zhaogangRelease'
 import WorklogDashboard from './components/worklog/WorklogDashboard.vue'
 import ZhaogangPermissionPrompt from './components/ZhaogangPermissionPrompt.vue'
+import ZhaogangReleaseHistoryDrawer from './components/ZhaogangReleaseHistoryDrawer.vue'
 
-type TabKey = 'release' | 'team' | 'iteration' | 'calendar' | 'worklog' | 'settings'
+type TabKey = 'release' | 'team' | 'iteration' | 'calendar' | 'worklog' | 'services' | 'settings'
 type ViewMode = 'table' | 'card'
 type BuildabilityFilter = 'buildable' | 'unbuildable' | 'all'
 type PlanWithBuild = ZhaogangBuildPlan
@@ -510,6 +581,9 @@ const pageSize = ref<ZhaogangPlanPageSize>(15)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const planDetail = ref<ZhaogangPlanDetail | null>(null)
+const detailK8sLoading = ref(false)
+const detailK8sStatuses = ref<PlanK8sStatuses | null>(null)
+let detailK8sRequestSequence = 0
 const buildDialogVisible = ref(false)
 const buildForm = ref({ environment: '', branch: '' })
 const branchOptions = ref<ZhaogangBranch[]>([])
@@ -523,6 +597,8 @@ const replaceTokenError = ref('')
 const copyingToken = ref(false)
 const rotationPromptVisible = ref(false)
 const permissionPrompt = ref<ZhaogangPermissionPromptDetail | null>(null)
+const releaseCheck = ref<ZhaogangReleaseCheck | null>(null)
+const releaseHistoryVisible = ref(false)
 provide('zhaogangSession', session)
 provide('zhaogangPreferences', preferences)
 
@@ -537,7 +613,7 @@ const showPermissionPrompt = (event: Event) => {
 
 const routeTab = (): TabKey => {
   const view = route.meta.zhaogangView
-  return view === 'team' || view === 'iteration' || view === 'calendar' || view === 'worklog' || view === 'settings'
+  return view === 'team' || view === 'iteration' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'settings'
     ? view
     : 'release'
 }
@@ -556,6 +632,8 @@ const navigateTab = async (tab: TabKey) => {
       ? '/zhaogang/iterations'
       : tab === 'calendar'
         ? '/zhaogang/calendar'
+      : tab === 'services'
+        ? '/zhaogang/services'
       : `/zhaogang/${tab === 'worklog' ? 'worklogs' : 'settings'}`
   if (route.path !== path) await router.push(path)
 }
@@ -563,6 +641,30 @@ const navigateTab = async (tab: TabKey) => {
 const openTools = () => {
   const toolsTab = window.open(router.resolve('/tools').href, '_blank')
   if (toolsTab) toolsTab.opener = null
+}
+
+const openReleaseHistory = () => {
+  releaseHistoryVisible.value = true
+  if (!session.value || !releaseCheck.value || releaseCheck.value.receipt.read) return
+  const userId = session.value.userId
+  const releaseId = releaseCheck.value.currentRelease.id
+  const optimisticReceipt = { read: true, readAt: new Date().toISOString() }
+  releaseCheck.value = { ...releaseCheck.value, receipt: optimisticReceipt }
+  void acknowledgeCurrentZhaogangRelease(userId, releaseId).then((receipt) => {
+    if (session.value?.userId !== userId || releaseCheck.value?.currentRelease.id !== releaseId) return
+    releaseCheck.value = { ...releaseCheck.value, receipt }
+  })
+}
+
+const checkRelease = async () => {
+  if (!session.value) return
+  const result = await loadCurrentZhaogangRelease(session.value.userId)
+  if (!session.value || !result) return
+  releaseCheck.value = result
+}
+
+const handleReleaseStorage = (event: StorageEvent) => {
+  if (event.key?.startsWith(zhaogangReleaseLocalPrefix) && session.value) void checkRelease()
 }
 
 const formattedLastSyncedAt = computed(() => {
@@ -721,6 +823,7 @@ const bindToken = async () => {
     favorites.value = loadZhaogangFavorites(session.value.userId)
     applyUserPreferences(session.value.userId)
     ElMessage.success('CODING 令牌已绑定')
+    void checkRelease()
     await loadCatalog()
   } catch (error) {
     bindError.value = error instanceof Error ? error.message : '令牌检查失败，请重新创建后再试'
@@ -736,6 +839,7 @@ const restoreSession = async () => {
     rotationPromptVisible.value = session.value.tokenRotationRequired
     favorites.value = loadZhaogangFavorites(session.value.userId)
     applyUserPreferences(session.value.userId)
+    void checkRelease()
     await loadCatalog()
   } catch {
     session.value = null
@@ -750,9 +854,17 @@ const goToTokenRotation = async () => {
   replaceTokenVisible.value = true
 }
 
+const resetPlanK8sStatus = () => {
+  detailK8sRequestSequence += 1
+  detailK8sLoading.value = false
+  detailK8sStatuses.value = null
+}
+
 const disconnect = async () => {
   await clearZhaogangSession().catch(() => undefined)
   session.value = null
+  releaseCheck.value = null
+  releaseHistoryVisible.value = false
   rotationPromptVisible.value = false
   projects.value = []
   buildPlans.value = []
@@ -781,6 +893,7 @@ const replaceToken = async () => {
     favorites.value = loadZhaogangFavorites(nextSession.userId)
     applyUserPreferences(nextSession.userId, false)
     replaceTokenVisible.value = false
+    void checkRelease()
     await loadCatalog()
     ElMessage.success('CODING 令牌已更换')
   } catch (error) {
@@ -907,10 +1020,12 @@ const openPlan = async (plan: ZhaogangBuildPlan) => {
   detailVisible.value = true
   detailLoading.value = true
   planDetail.value = null
+  resetPlanK8sStatus()
   try {
     planDetail.value = await getZhaogangPlanDetail(plan.projectId, plan.id)
     const listPlan = buildPlans.value.find((item) => item.projectId === plan.projectId && item.id === plan.id)
     if (listPlan && planDetail.value.builds[0]) listPlan.latestBuild = planDetail.value.builds[0]
+    void refreshPlanK8sStatus()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '构建详情加载失败')
     detailVisible.value = false
@@ -919,8 +1034,43 @@ const openPlan = async (plan: ZhaogangBuildPlan) => {
   }
 }
 
+const refreshPlanK8sStatus = async () => {
+  const currentPlan = planDetail.value?.plan
+  if (!currentPlan) return
+  const requestSequence = ++detailK8sRequestSequence
+  detailK8sLoading.value = true
+  try {
+    const statuses = await queryPlanK8sStatuses(currentPlan.name)
+    if (requestSequence === detailK8sRequestSequence && planDetail.value?.plan.projectId === currentPlan.projectId && planDetail.value.plan.id === currentPlan.id) {
+      detailK8sStatuses.value = statuses
+    }
+  } catch (error) {
+    if (requestSequence === detailK8sRequestSequence) {
+      detailK8sStatuses.value = {
+        deploymentName: null,
+        statuses: Object.fromEntries(
+          releaseK8sEnvironments.map((environment) => [environment, {
+            state: 'QUERY_FAILED',
+            environment,
+            message: error instanceof Error ? error.message : 'K8s 查询失败'
+          }])
+        ) as Record<ZgK8sEnvironment, ReleaseK8sStatus>
+      }
+    }
+  } finally {
+    if (requestSequence === detailK8sRequestSequence) detailK8sLoading.value = false
+  }
+}
+
 const openCoding = (plan: ZhaogangBuildPlan) => {
   window.open(`https://g-iijw5014.coding.net/p/${encodeURIComponent(plan.projectName)}/ci/job?id=${plan.id}`, '_blank', 'noopener')
+}
+
+const openK8sDashboard = (environment: ZgK8sEnvironment) => {
+  const status = detailK8sStatuses.value?.statuses[environment]
+  if (!status?.deployment) return
+  const url = zhaogangK8sDashboardUrl(environment, status.deployment.namespace, status.deployment.name)
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 const defaultBranchFor = (environment: string, plan: ZhaogangBuildPlan) => {
@@ -995,9 +1145,52 @@ const buildTagType = (status?: string): 'success' | 'warning' | 'danger' | 'info
 }
 const buildBranch = (plan: PlanWithBuild) => [plan.latestBuild?.branch || plan.defaultBranch || '—', plan.latestBuild?.commit].filter(Boolean).join(' · ')
 
+const deploymentStatus = (deployment: { podCount: number; replicas: number }) =>
+  deployment.podCount === deployment.replicas ? '正常' : deployment.podCount < deployment.replicas ? '异常' : '启动中'
+
+const k8sStatusText = (status?: ReleaseK8sStatus, loading = false) => {
+  if (loading && (!status || status.state === 'QUERYING')) return '正在查询'
+  if (status?.state === 'READY' && status.deployment) return deploymentStatus(status.deployment)
+  return {
+    NO_BUILD: '暂无最近构建',
+    UNKNOWN_ENVIRONMENT: '无法识别构建环境',
+    UNKNOWN_SERVICE: '无法识别服务',
+    NOT_FOUND: '未找到对应服务',
+    AGENT_OFFLINE: 'Agent 未启动',
+    TOKEN_MISSING: '对应环境 Token 未配置',
+    QUERYING: '正在查询',
+    QUERY_FAILED: 'K8s 查询失败',
+    READY: '正常'
+  }[status?.state || 'QUERY_FAILED'] || 'K8s 查询失败'
+}
+
+const k8sStatusTagType = (status?: ReleaseK8sStatus, loading = false): 'success' | 'warning' | 'danger' | 'info' => {
+  if (loading && (!status || status.state === 'QUERYING')) return 'warning'
+  if (status?.state === 'READY' && status.deployment) {
+    const value = deploymentStatus(status.deployment)
+    return value === '正常' ? 'success' : value === '启动中' ? 'warning' : 'danger'
+  }
+  if (status?.state === 'QUERYING') return 'warning'
+  if (status?.state === 'NO_BUILD' || status?.state === 'NOT_FOUND') return 'info'
+  return 'danger'
+}
+
+const k8sPodsText = (status?: ReleaseK8sStatus) => status?.deployment ? `${status.deployment.podCount} / ${status.deployment.replicas}` : '—'
+
+const formatDate = (value?: string) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (number: number) => String(number).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+const k8sCreatedAt = (status?: ReleaseK8sStatus) => formatDate(status?.deployment?.lastPodCreatedAt)
+
 let catalogPollTimer: number | undefined
 onMounted(() => {
   window.addEventListener(ZHAOGANG_PERMISSION_EVENT, showPermissionPrompt)
+  window.addEventListener('storage', handleReleaseStorage)
   void restoreSession()
   catalogPollTimer = window.setInterval(() => {
     if (session.value && activeTab.value === 'release' && document.visibilityState === 'visible' && !pageSyncLoading.value) {
@@ -1007,6 +1200,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener(ZHAOGANG_PERMISSION_EVENT, showPermissionPrompt)
+  window.removeEventListener('storage', handleReleaseStorage)
   window.clearInterval(catalogPollTimer)
   window.clearTimeout(pageSyncDebounceTimer)
   window.clearTimeout(branchSearchTimer)
@@ -1018,16 +1212,21 @@ onBeforeUnmount(() => {
 .page-header { display: flex; box-sizing: border-box; height: 68px; min-height: 68px; align-items: center; justify-content: space-between; padding: 0 32px; background: #fff; border-bottom: 1px solid #e7ebf2; }
 .brand, .account-summary, .release-toolbar, .toolbar-left, .toolbar-right, .pagination-row, .drawer-heading, .build-row, .bind-actions { display: flex; align-items: center; }
 .route-loading-state { display: flex; min-height: 300px; align-items: center; justify-content: center; gap: 10px; color: #718097; font-size: 14px; }.route-loading-icon { color: #2878ed; animation: route-loading-spin 1s linear infinite; } @keyframes route-loading-spin { to { transform: rotate(360deg); } }
-.brand { gap: 12px; }.brand-mark { display: grid; width: 38px; height: 38px; place-items: center; color: #fff; background: linear-gradient(135deg, #276de9, #5e94f1); border-radius: 11px; font-size: 13px; font-weight: 700; }.brand h1 { margin: 0; font-size: 19px; }.brand p { margin: 3px 0 0; color: #8490a4; font-size: 12px; }.account-summary { gap: 9px; color: #526078; font-size: 14px; }
-.loading-shell, .onboarding-shell { width: min(1480px, calc(100% - 48px)); margin: 0 auto; }.loading-shell { padding: 80px 25%; }.onboarding-shell { padding: 74px 0; }.onboarding-copy { max-width: 660px; margin: 0 auto 32px; text-align: center; }.onboarding-copy h2 { margin: 13px 0 10px; font-size: 32px; }.onboarding-copy p { margin: 0; color: #748198; line-height: 1.7; }
+.brand { gap: 12px; }.brand-mark { display: grid; width: 38px; height: 38px; place-items: center; color: #fff; background: linear-gradient(135deg, #276de9, #5e94f1); border-radius: 11px; font-size: 13px; font-weight: 700; }.brand h1 { margin: 0; font-size: 19px; }.brand p { margin: 3px 0 0; color: #8490a4; font-size: 12px; }.account-summary { gap: 9px; color: #526078; font-size: 14px; }.header-release-tag { position: relative; display: inline-flex; height: 28px; align-items: center; padding: 0 10px; color: #31527e; background: #f1f5fb; border: 1px solid #d8e3f2; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }.header-release-tag:hover { color: #2468e8; border-color: #9bbcf7; background: #edf3ff; }.header-release-tag:focus-visible { outline: 2px solid #7aa7f5; outline-offset: 2px; }.header-release-tag__dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background: #f04444; border: 2px solid #fff; border-radius: 50%; }
+.loading-shell, .onboarding-shell { width: min(1480px, calc(100% - 48px)); margin: 0 auto; }.loading-shell { padding: 80px 25%; }.onboarding-shell { padding: 74px 0; }.onboarding-copy { width: min(100%, 660px); margin: 0 auto 32px; text-align: center; }.onboarding-copy h2 { margin: 13px 0 10px; overflow-wrap: anywhere; font-size: 32px; }.onboarding-copy p { margin: 0; color: #748198; line-height: 1.7; }
 .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }.step-card { position: relative; min-height: 184px; padding: 22px; background: #fff; border: 1px solid #e5eaf2; border-radius: 14px; box-shadow: 0 8px 22px rgba(43, 67, 105, .04); }.step-card > span { display: grid; width: 27px; height: 27px; place-items: center; color: #2468e8; background: #eaf1ff; border-radius: 50%; font-size: 13px; font-weight: 700; }.step-card h3 { margin: 16px 0 7px; }.step-card p { color: #718097; font-size: 13px; line-height: 1.6; }.permission-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }.permission-list :deep(.el-tag) { height: auto; padding: 4px 7px; font-size: 11px; white-space: normal; }
 .bind-card { max-width: 780px; margin: 24px auto 0; border-color: #e5eaf2; }.bind-card-title strong, .bind-card-title small { display: block; }.bind-card-title small { margin-top: 5px; color: #8490a4; }.bind-actions { justify-content: space-between; gap: 12px; margin-top: 14px; }.bind-error { color: #dc4c4c; font-size: 13px; }
 .workspace-shell { display: grid; box-sizing: border-box; width: 100%; height: calc(100vh - 68px); min-height: 0; margin: 0; overflow: hidden; grid-template-columns: 112px minmax(0, 1fr); background: #fff; border-right: 1px solid #e7ebf2; border-left: 1px solid #e7ebf2; transition: grid-template-columns .2s ease; }.workspace-nav { display: flex; min-height: 0; flex-direction: column; padding: 17px 12px; overflow-y: auto; background: #fff; border-right: 1px solid #e7ebf2; transition: padding .2s ease; }.workspace-nav-collapse { display: flex; height: 30px; align-items: center; justify-content: center; padding: 0 3px; margin-bottom: 8px; }.workspace-nav button { display: flex; width: 100%; align-items: center; gap: 9px; padding: 11px 12px; margin-bottom: 5px; color: #66748a; background: transparent; border: 0; border-radius: 8px; cursor: pointer; text-align: left; }.workspace-nav button > .el-icon { flex: 0 0 auto; font-size: 16px; }.workspace-nav button.active { color: #2468e8; background: #edf3ff; }.workspace-nav .workspace-nav-toggle { width: 30px; height: 30px; justify-content: center; gap: 0; padding: 0; margin: 0; color: #8490a4; background: transparent; border: 0; border-radius: 7px; }.workspace-nav .workspace-nav-toggle > .el-icon { font-size: 17px; }.workspace-nav .workspace-nav-toggle:hover { color: #2468e8; background: #edf3ff; }.workspace-nav .workspace-nav-tools { margin-top: auto; margin-bottom: 0; }.workspace-content { box-sizing: border-box; min-width: 0; min-height: 0; padding: 27px; overflow-y: auto; background: #f8faff; }.workspace-content.workspace-content--release { display: flex; flex-direction: column; padding: 0; overflow: hidden; }.workspace-content.workspace-content--iteration-detail { overflow: hidden; }
 .release-toolbar { flex: 0 0 auto; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 11px; background: #fff; border: 1px solid #e5eaf2; border-bottom: 0; border-radius: 12px 12px 0 0; }.toolbar-left { gap: 6px; flex-wrap: wrap; }.toolbar-right { justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-left: auto; }.sync-time { color: #8490a4; font-size: 12px; white-space: nowrap; }.sync-time.is-syncing { color: #2468e8; }.service-search { width: 230px; }.project-filter { width: 150px; }.buildability-filter { width: 120px; }.partial-alert { flex: 0 0 auto; margin: 0; }.plan-list-viewport { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #fff; }.plan-table { width: 100%; height: 100%; border: 1px solid #e5eaf2; border-radius: 0; }.plan-list-empty { height: 100%; margin: 0; border: 1px solid #e5eaf2; }.plan-name { display: grid; gap: 4px; }.plan-name strong { color: #26344a; font-weight: 600; }.plan-name small { color: #8b96a7; }.favorite-button { padding: 0; color: #e5a126; font-size: 20px; }.pagination-row { box-sizing: border-box; flex: 0 0 auto; justify-content: space-between; min-height: 64px; padding: 12px 16px; color: #7b879a; background: #f8faff; border-top: 1px solid #e5eaf2; font-size: 13px; }
 .plan-cards { display: grid; box-sizing: border-box; height: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 12px; padding: 14px; overflow-y: auto; background: #fff; border: 1px solid #e5eaf2; border-radius: 0; }.plan-card { min-width: 0; padding: 16px; color: inherit; text-align: left; background: #fbfcff; border: 1px solid #e8edf5; border-radius: 10px; cursor: pointer; }.plan-card:hover { border-color: #9bbcf7; box-shadow: 0 8px 16px rgba(53, 96, 173, .09); }.plan-card > div { display: flex; justify-content: space-between; gap: 8px; }.plan-card > .build-status-cell { display: block; }.plan-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.card-star { color: #e5a126; font-size: 18px; }.plan-card small { display: block; margin: 7px 0 14px; color: #8b96a7; }.plan-card .build-status-cell small { margin: 4px 0 0; }.plan-card p { margin: 13px 0 0; color: #6e7c92; font-size: 12px; }
 .settings-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.settings-section { min-width: 0; padding: 20px; background: #fff; border: 1px solid #e4e9f1; border-radius: 8px; }.token-rotation-alert { margin-bottom: 16px; }.rotation-prompt-copy { margin: 0; color: #4f5e74; line-height: 1.7; }.settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #edf0f5; }.settings-heading h3 { margin: 0; font-size: 17px; }.settings-heading p { margin: 6px 0 0; color: #7d899c; font-size: 13px; line-height: 1.5; }.connection-profile { display: flex; align-items: center; gap: 12px; padding: 18px 0 14px; }.connection-profile strong, .connection-profile span { display: block; }.connection-profile span { margin-top: 4px; color: #8490a4; font-size: 13px; }.connection-details { margin: 0 0 18px; }.connection-details > div { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid #edf0f5; }.connection-details dt { color: #7c899c; font-size: 13px; }.connection-details dd { min-width: 0; margin: 0; color: #344158; font-weight: 600; text-align: right; }.connection-details code { display: inline-block; max-width: 100%; padding: 4px 7px; overflow: hidden; color: #31527e; background: #f1f5fb; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }.settings-actions { display: flex; gap: 9px; flex-wrap: wrap; }.preferences-form { padding-top: 18px; }.preferences-form :deep(.el-form-item) { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #edf0f5; }.preferences-form :deep(.el-form-item__label) { color: #4f5e74; }.local-data-section { grid-column: 1 / -1; }.local-data-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 17px; }.local-data-row strong, .local-data-row span { display: block; }.local-data-row span { margin-top: 5px; color: #8490a4; font-size: 13px; }
-.drawer-heading { justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #e8edf4; }.drawer-heading > div:first-child { min-width: 0; }.drawer-heading h2 { max-width: 430px; margin: 0; overflow-wrap: anywhere; color: #233047; font-size: 20px; }.drawer-heading p { margin: 7px 0 0; color: #8290a5; font-size: 13px; }.drawer-heading-side { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 14px; }.drawer-heading-actions, .drawer-build-action { display: flex; align-items: center; }.drawer-heading-actions { gap: 4px; }.drawer-build-action { gap: 8px; }.drawer-icon-button { width: 36px; height: 36px; margin: 0; font-size: 20px; }.drawer-favorite-button { color: #8793a6; }.drawer-favorite-button.active { color: #e5a126; }.build-history { overflow: hidden; border: 1px solid #e7ebf2; border-radius: 9px; }.build-row { display: grid; grid-template-columns: 150px minmax(165px, 1fr) minmax(190px, 1.1fr); gap: 12px; align-items: center; padding: 13px; border-bottom: 1px solid #e8edf4; }.build-row > div { min-width: 0; }.build-row:last-child { border-bottom: 0; }.build-primary, .build-secondary, .build-status-cell small { display: block; }.build-primary, .build-secondary { overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }.build-primary { color: #233047; }.build-secondary { margin-top: 4px; color: #8a96a8; }.build-status-cell { min-width: 0; }.build-status-cell small { margin-top: 4px; color: #8a96a8; font-size: 12px; line-height: 1.4; white-space: normal; }.drawer-loading { padding: 10px; }.dialog-plan-name { margin: -8px 0 19px; color: #8390a4; font-size: 13px; }.dialog-control { width: 100%; }
+.drawer-heading { justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #e8edf4; }.drawer-heading > div:first-child { min-width: 0; }.drawer-heading h2 { max-width: 430px; margin: 0; overflow-wrap: anywhere; color: #233047; font-size: 20px; }.drawer-heading p { margin: 7px 0 0; color: #8290a5; font-size: 13px; }.drawer-heading-side { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 14px; }.drawer-heading-actions, .drawer-build-action { display: flex; align-items: center; }.drawer-heading-actions { gap: 4px; }.drawer-build-action { gap: 8px; }.drawer-icon-button { width: 36px; height: 36px; margin: 0; font-size: 20px; }.drawer-favorite-button { color: #8793a6; }.drawer-favorite-button.active { color: #e5a126; }.service-status-section { margin: 20px 0 24px; }.service-status-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }.service-status-heading h3 { margin: 0; }.service-status-table { overflow: hidden; border: 1px solid #e7ebf2; border-radius: 9px; }.service-status-row { display: grid; grid-template-columns: 90px 100px 190px minmax(180px, 1fr) 55px; gap: 12px; min-height: 52px; align-items: center; padding: 8px 13px; border-bottom: 1px solid #e8edf4; }.service-status-row:last-child { border-bottom: 0; }.service-status-row--header { min-height: 38px; color: #8490a4; background: #f8faff; font-size: 12px; }.service-status-row > span, .service-status-row > strong { min-width: 0; }.service-status-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.build-history { overflow: hidden; border: 1px solid #e7ebf2; border-radius: 9px; }.build-row { display: grid; grid-template-columns: 150px minmax(165px, 1fr) minmax(190px, 1.1fr); gap: 12px; align-items: center; padding: 13px; border-bottom: 1px solid #e8edf4; }.build-row > div { min-width: 0; }.build-row:last-child { border-bottom: 0; }.build-primary, .build-secondary, .build-status-cell small { display: block; }.build-primary, .build-secondary { overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }.build-primary { color: #233047; }.build-secondary { margin-top: 4px; color: #8a96a8; }.build-status-cell { min-width: 0; }.build-status-cell small { margin-top: 4px; color: #8a96a8; font-size: 12px; line-height: 1.4; white-space: normal; }.drawer-loading { padding: 10px; }.dialog-plan-name { margin: -8px 0 19px; color: #8390a4; font-size: 13px; }.dialog-control { width: 100%; }
 @media (min-width: 901px) { .workspace-shell--nav-collapsed { grid-template-columns: 64px minmax(0, 1fr); }.workspace-shell--nav-collapsed .workspace-nav { padding-right: 8px; padding-left: 8px; }.workspace-shell--nav-collapsed .workspace-nav-collapse { justify-content: center; padding-right: 0; padding-left: 0; }.workspace-shell--nav-collapsed .workspace-nav-label { display: none; }.workspace-shell--nav-collapsed .workspace-nav button:not(.workspace-nav-toggle) { justify-content: center; gap: 0; padding-right: 0; padding-left: 0; } }
 @media (max-width: 900px) { .steps-grid, .plan-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }.workspace-shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }.workspace-nav { flex-direction: row; gap: 7px; padding: 10px 14px; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid #e7ebf2; }.workspace-nav-collapse { display: none; }.workspace-nav button { width: auto; margin: 0; white-space: nowrap; }.workspace-nav .workspace-nav-tools { margin-left: auto; }.settings-layout { grid-template-columns: 1fr; }.local-data-section { grid-column: auto; } }
-@media (max-width: 640px) { .page-header { padding: 0 16px; }.account-summary > span:not(.el-tag), .account-summary :deep(.el-button) { display: none; }.loading-shell, .onboarding-shell, .workspace-shell { width: 100%; }.onboarding-shell { padding: 38px 16px; }.steps-grid, .plan-cards { grid-template-columns: 1fr; }.workspace-content { padding: 17px 12px; }.content-heading { align-items: flex-start; }.content-heading h2 { font-size: 21px; }.release-toolbar { align-items: stretch; }.toolbar-left, .toolbar-right { width: 100%; }.toolbar-right { justify-content: flex-start; margin-left: 0; }.service-search { flex: 1; min-width: 160px; width: auto; }.project-filter, .buildability-filter { flex: 1; min-width: 120px; width: auto; }.pagination-row { align-items: flex-start; flex-direction: column; gap: 10px; }.build-row { grid-template-columns: 1fr; gap: 6px; }.local-data-row { align-items: flex-start; flex-direction: column; gap: 7px; }.settings-section { padding: 16px; }.preferences-form :deep(.el-form-item) { display: block; }.preferences-form :deep(.el-form-item__label) { width: 100% !important; justify-content: flex-start; }.preferences-form :deep(.el-form-item__content) { margin-left: 0 !important; } }
+@media (max-width: 640px) { .page-header { padding: 0 16px; }.account-summary > span:not(.el-tag), .account-summary :deep(.el-button) { display: none; }.loading-shell, .workspace-shell { width: 100%; }.onboarding-shell { width: calc(100% - 32px); padding: 38px 16px; }.steps-grid, .plan-cards { grid-template-columns: 1fr; }.workspace-content { padding: 17px 12px; }.content-heading { align-items: flex-start; }.content-heading h2 { font-size: 21px; }.release-toolbar { align-items: stretch; }.toolbar-left, .toolbar-right { width: 100%; }.toolbar-right { justify-content: flex-start; margin-left: 0; }.service-search { flex: 1; min-width: 160px; width: auto; }.project-filter, .buildability-filter { flex: 1; min-width: 120px; width: auto; }.pagination-row { align-items: flex-start; flex-direction: column; gap: 10px; }.build-row { grid-template-columns: 1fr; gap: 6px; }.service-status-heading { align-items: stretch; flex-direction: column; gap: 8px; }.service-status-row { grid-template-columns: 72px 84px minmax(120px, 1fr) 42px; gap: 8px; padding: 8px 9px; }.service-status-row > span:nth-child(4), .service-status-row--header > span:nth-child(4) { display: none; }.service-status-row > span:last-child { text-align: center; }.local-data-row { align-items: flex-start; flex-direction: column; gap: 7px; }.settings-section { padding: 16px; }.preferences-form :deep(.el-form-item) { display: block; }.preferences-form :deep(.el-form-item__label) { width: 100% !important; justify-content: flex-start; }.preferences-form :deep(.el-form-item__content) { margin-left: 0 !important; } }
+.service-status-row { grid-template-columns: 30px 40px 180px 150px 50px; justify-content: space-between; column-gap: 0; }
+.service-status-row:not(.service-status-row--header) { font-size: 14px; }
+.service-status-value { font-size: 14px; }
+.service-status-value :deep(.el-tag) { font-size: 14px; }
+@media (max-width: 640px) { .service-status-row { grid-template-columns: 40px 50px minmax(120px, 1fr) 40px; justify-content: initial; column-gap: 8px; } }
 </style>

@@ -19,7 +19,7 @@ export type ZhaogangPlanTableColumnKey = 'service' | 'status' | 'branch' | 'buil
 export type ZhaogangPlanPageSize = 10 | 15 | 20 | 50
 
 export interface ZhaogangPreferences {
-  defaultTab: 'release' | 'team' | 'iteration' | 'calendar' | 'worklog'
+  defaultTab: 'release' | 'team' | 'iteration' | 'calendar' | 'worklog' | 'services'
   releaseTab: 'all' | 'favorites'
   planView: 'table' | 'card'
   rememberProjectFilter: boolean
@@ -81,6 +81,7 @@ export interface ZhaogangBuild {
   triggerUser: string
   duration: string
   startedAt: string
+  environment: string
 }
 
 export interface ZhaogangPlanDetail {

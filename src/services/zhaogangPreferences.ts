@@ -33,7 +33,7 @@ export const loadZhaogangPreferences = (userId: number): ZhaogangPreferences => 
     const value = raw ? JSON.parse(raw) as Partial<ZhaogangPreferences> : {}
     return {
       defaultTab: value.defaultTab === 'worklog' || value.defaultTab === 'calendar'
-        || value.defaultTab === 'iteration' || value.defaultTab === 'team'
+        || value.defaultTab === 'iteration' || value.defaultTab === 'team' || value.defaultTab === 'services'
         ? value.defaultTab
         : defaults.defaultTab,
       releaseTab: value.releaseTab === 'favorites' ? 'favorites' : defaults.releaseTab,

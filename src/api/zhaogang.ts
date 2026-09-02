@@ -18,6 +18,8 @@ import type {
   ZhaogangWorklogEntries,
   ZhaogangWorklogAbsence
 } from '@/types/zhaogang'
+import type { ZhaogangReleaseReceipt } from '@/types/zhaogangRelease'
+import type { ZgK8sEnvironment } from '@/types/zhaogangService'
 import { dispatchZhaogangPermissionPrompt, permissionPromptFrom } from '@/services/zhaogangPermissionPrompt'
 
 const API_ROOT = `${import.meta.env.VITE_BUILD_ENV === 'prod' ? '//api.itwray.com' : ''}/external-service/api/zhaogang`
@@ -72,6 +74,33 @@ export const getZhaogangSession = () => zhaogangRequest<ZhaogangSessionStatus>('
 export const getZhaogangToken = () => zhaogangRequest<ZhaogangTokenValue>('/session/token', { method: 'POST' })
 
 export const clearZhaogangSession = () => zhaogangRequest<void>('/session', { method: 'DELETE' })
+
+export const getZhaogangReleaseReceipt = (releaseId: string) => zhaogangRequest<ZhaogangReleaseReceipt>(
+  `/release-notes/${encodeURIComponent(releaseId)}/receipt`
+)
+
+export const acknowledgeZhaogangRelease = (releaseId: string) => zhaogangRequest<ZhaogangReleaseReceipt>(
+  `/release-notes/${encodeURIComponent(releaseId)}/receipt`, { method: 'PUT' }
+)
+
+export interface ZhaogangK8sTokenStatus {
+  environments: ZgK8sEnvironment[]
+  configured: Record<ZgK8sEnvironment, boolean>
+}
+
+export const getZhaogangK8sTokenStatus = () => zhaogangRequest<ZhaogangK8sTokenStatus>('/k8s-tokens')
+
+export const saveZhaogangK8sToken = (environment: ZgK8sEnvironment, token: string) => zhaogangRequest<ZhaogangK8sTokenStatus>(
+  '/k8s-tokens', { method: 'POST', body: JSON.stringify({ environment, token }) }
+)
+
+export const getZhaogangK8sToken = (environment: ZgK8sEnvironment) => zhaogangRequest<ZhaogangTokenValue>(
+  `/k8s-tokens/${environment}`
+)
+
+export const deleteZhaogangK8sToken = (environment: ZgK8sEnvironment) => zhaogangRequest<ZhaogangK8sTokenStatus>(
+  `/k8s-tokens/${environment}`, { method: 'DELETE' }
+)
 
 export const getZhaogangProjects = () => zhaogangRequest<ZhaogangProject[]>('/projects')
 
