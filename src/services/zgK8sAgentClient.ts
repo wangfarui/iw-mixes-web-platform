@@ -3,6 +3,7 @@ import type {
   ZgK8sAgentSession,
   ZgK8sAgentUpdateInfo,
   ZgK8sAgentUpdateStatus,
+  ZgK8sAgentManifest,
   ZgK8sAgentErrorCode,
   ZgK8sDeploymentPage,
   ZgK8sEnvironment,
@@ -15,6 +16,7 @@ const PORT_KEY = 'zhaogang:zg-k8s-agent-port'
 const DEFAULT_PORT = 28731
 const DOWNLOAD_PATH = '/downloads/zg-k8s-agent/'
 const DOWNLOAD_INDEX = `${DOWNLOAD_PATH}index.html`
+const DOWNLOAD_MANIFEST = `${DOWNLOAD_PATH}latest.json`
 
 type AgentPlatform = 'darwin-arm64' | 'darwin-amd64' | 'windows-arm64' | 'windows-amd64'
 export type ZgK8sAgentSystem = 'windows' | 'macos'
@@ -36,6 +38,38 @@ export const saveZgK8sAgentPort = (port: number): number => {
 }
 
 export const zgK8sAgentDownloadPath = DOWNLOAD_INDEX
+
+const compareAgentVersion = (left: string, right: string) => {
+  const parse = (value: string) => value.replace(/^v/i, '').split('.').map(part => Number.parseInt(part, 10) || 0)
+  const a = parse(left)
+  const b = parse(right)
+  for (let index = 0; index < 3; index += 1) {
+    if ((a[index] || 0) !== (b[index] || 0)) return (a[index] || 0) > (b[index] || 0) ? 1 : -1
+  }
+  return 0
+}
+
+const fetchZgK8sAgentManifest = async (): Promise<ZgK8sAgentManifest | null> => {
+  try {
+    const response = await fetch(DOWNLOAD_MANIFEST, { cache: 'no-store' })
+    if (!response.ok) return null
+    const manifest = await response.json() as Partial<ZgK8sAgentManifest>
+    return typeof manifest.version === 'string' && manifest.version ? manifest as ZgK8sAgentManifest : null
+  } catch {
+    return null
+  }
+}
+
+export const checkZgK8sAgentWebUpdate = async (currentVersion: string) => {
+  const manifest = await fetchZgK8sAgentManifest()
+  if (!manifest || compareAgentVersion(manifest.version, currentVersion) <= 0) return null
+  return {
+    currentVersion,
+    latestVersion: manifest.version,
+    updateAvailable: true,
+    releaseNotes: manifest.releaseNotes || '建议更新到最新 Agent。'
+  }
+}
 
 const detectAgentPlatform = async (requestedSystem?: ZgK8sAgentSystem): Promise<AgentPlatform | null> => {
   const navigatorLike = window.navigator as Navigator & { userAgentData?: UserAgentDataLike }
@@ -75,7 +109,7 @@ export const resolveZgK8sAgentDownloadUrl = async (requestedSystem?: ZgK8sAgentS
   const platform = await detectAgentPlatform(requestedSystem)
   if (!platform) return DOWNLOAD_INDEX
   try {
-    const response = await fetch(`${DOWNLOAD_PATH}latest.json`, { cache: 'no-store' })
+    const response = await fetch(DOWNLOAD_MANIFEST, { cache: 'no-store' })
     if (!response.ok) return DOWNLOAD_INDEX
     const manifest = await response.json() as { platforms?: Record<string, { url?: string; downloadUrl?: string }> }
     const release = manifest.platforms?.[platform]
@@ -88,7 +122,12 @@ export const resolveZgK8sAgentDownloadUrl = async (requestedSystem?: ZgK8sAgentS
 }
 
 export const zgK8sAgentStartProtocol = () => {
-  window.location.href = 'zg-k8s-agent://start'
+  const link = document.createElement('a')
+  link.href = 'zg-k8s-agent://start'
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  window.setTimeout(() => link.remove(), 1000)
 }
 
 export const zgK8sAgentClient = (port = getZgK8sAgentPort()) => {

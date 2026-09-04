@@ -1,7 +1,26 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-09-04-02",
+  "currentReleaseId": "zg-2026-09-04-03",
   "releases": [
+    {
+      "id": "zg-2026-09-04-03",
+      "version": "1.2.3",
+      "publishedAt": "2026-09-04T20:59:21+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "优化 K8s Agent 启动流程，启动成功后提示并自动刷新服务页面"
+        },
+        {
+          "type": "FIX",
+          "text": "修复本地 Web 页面无法发现新版 zg-k8s-agent 的问题"
+        },
+        {
+          "type": "FIX",
+          "text": "修复 macOS Agent 启动后显示程序坞图标的问题"
+        }
+      ]
+    },
     {
       "id": "zg-2026-09-04-02",
       "version": "1.2.2",

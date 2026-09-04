@@ -46,7 +46,7 @@
       :title="agentError"
       ><template #default
         ><div class="alert-actions">
-          <el-button link type="primary" @click="startAgent"
+          <el-button link type="primary" :loading="startingAgent" @click="startAgent"
             >启动 zg-k8s-agent</el-button
           ><el-button link type="primary" @click="openDownload"
             >下载 Agent</el-button
@@ -73,7 +73,7 @@
       ><template #default
         ><span>{{ updateInfo.releaseNotes || "建议更新到最新版本。" }}</span
         ><el-button link type="primary" :loading="updating" @click="updateAgent"
-          >立即更新</el-button
+          >{{ manualUpdateRequired ? "下载新版" : "立即更新" }}</el-button
         ></template
       ></el-alert
     ><template v-if="health"
@@ -270,6 +270,7 @@ import {
   saveZhaogangK8sToken,
 } from "@/api/zhaogang";
 import {
+  checkZgK8sAgentWebUpdate,
   getZgK8sAgentPort,
   resolveZgK8sAgentDownloadUrl,
   saveZgK8sAgentPort,
@@ -338,6 +339,8 @@ const pageSize = ref(20);
 const total = ref(0);
 const updatedAt = ref("");
 const updating = ref(false);
+const startingAgent = ref(false);
+const manualUpdateRequired = ref(false);
 const autostartEnabled = ref(false);
 const updateInfo = ref<ZgK8sAgentUpdateInfo | null>(null);
 const router = useRouter();
@@ -369,6 +372,8 @@ const updatedText = computed(() =>
 );
 const environmentLabel = (value: ZgK8sEnvironment) =>
   value === "prd" ? "生产 PRD" : value === "uat" ? "预发 UAT" : "测试 TEST";
+const isMacOSAgent = () =>
+  /mac|darwin/i.test(`${window.navigator.platform} ${window.navigator.userAgent}`);
 const readNamespaceCache = (): Record<string, string> => {
   try {
     return JSON.parse(
@@ -417,6 +422,7 @@ const checkAgent = async () => {
   agentError.value = "";
   updateCheckError.value = "";
   updateInfo.value = null;
+  manualUpdateRequired.value = false;
   try {
     health.value = await client().health();
     autostartEnabled.value = health.value.autostartEnabled;
@@ -425,6 +431,16 @@ const checkAgent = async () => {
     } catch (error) {
       updateCheckError.value = updateCheckMessage(error);
     }
+    if (!updateInfo.value?.updateAvailable) {
+      const localUpdate = await checkZgK8sAgentWebUpdate(health.value.version);
+      if (localUpdate) {
+        updateInfo.value = localUpdate;
+        manualUpdateRequired.value = true;
+        updateCheckError.value = "";
+      }
+    }
+    if (updateInfo.value?.updateAvailable && isMacOSAgent() && health.value.backgroundAgent !== true)
+      manualUpdateRequired.value = true;
     const status = await getZhaogangK8sTokenStatus();
     tokenStatus.value = mergeZhaogangK8sTokenConfigured(
       status.configured,
@@ -616,7 +632,41 @@ const openDashboard = (deploymentName: string) =>
     "_blank",
     "noopener,noreferrer",
   );
-const startAgent = () => zgK8sAgentStartProtocol();
+const startAgent = async () => {
+  if (startingAgent.value) return;
+  startingAgent.value = true;
+  agentError.value = "";
+  const deadline = Date.now() + 10000;
+  let started = false;
+  try {
+    zgK8sAgentStartProtocol();
+    while (Date.now() < deadline) {
+      await wait(400);
+      try {
+        const refreshed = await client().health();
+        health.value = refreshed;
+        autostartEnabled.value = refreshed.autostartEnabled;
+        started = true;
+        break;
+      } catch {
+        // The protocol handler may need a few seconds to start the local process.
+      }
+    }
+    if (!started) {
+      agentError.value = "已发送 Agent 启动请求，但暂未检测到本机服务，请稍后重试";
+      ElMessage.warning(agentError.value);
+      return;
+    }
+    ElMessage.success("zg-k8s-agent 启动成功，页面即将刷新");
+    window.setTimeout(() => window.location.reload(), 700);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Agent 启动失败";
+    agentError.value = message;
+    ElMessage.error(message);
+  } finally {
+    startingAgent.value = false;
+  }
+};
 const openInstallGuide = () => {
   const target = window.open(
     router.resolve("/zhaogang/services/install").href,
@@ -649,6 +699,11 @@ const updateAgent = async () => {
   updating.value = true;
   updateCheckError.value = "";
   try {
+    if (manualUpdateRequired.value) {
+      await openDownload();
+      ElMessage.info("已开始下载新版 Agent，请安装后重新打开本页面");
+      return;
+    }
     await client().startUpdate();
     const deadline = Date.now() + 120000;
     let status: ZgK8sAgentUpdateStatus | null = null;

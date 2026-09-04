@@ -15,6 +15,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>zg-k8s-agent</string>
 <key>CFBundleExecutable</key><string>zg-k8s-agent</string>
 <key>CFBundlePackageType</key><string>APPL</string>
+<key>LSUIElement</key><true/>
 <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>zg-k8s-agent</string></array></dict></array>
 </dict></plist>
 PLIST

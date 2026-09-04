@@ -1,12 +1,12 @@
 {
   "agentName": "zg-k8s-agent",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "protocolVersion": 1,
-  "releaseNotes": "Deployment 列表支持分页，Pod 详情按服务展开加载。",
+  "releaseNotes": "macOS Agent 改为后台代理运行，启动后不再显示程序坞图标。",
   "platforms": {
-    "darwin-arm64": { "url": "zg-k8s-agent-darwin-arm64.bin", "downloadUrl": "zg-k8s-agent-darwin-arm64.zip", "sha256": "16376123d703f6e6492c214cc33ffd51e09ade1da3b675d2dbac9c61b96235ca" },
-    "darwin-amd64": { "url": "zg-k8s-agent-darwin-amd64.bin", "downloadUrl": "zg-k8s-agent-darwin-amd64.zip", "sha256": "ea2b11aab024a0d79260810fe082a1259791533bb030a021738349d6112d8da2" },
-    "windows-amd64": { "url": "zg-k8s-agent-windows-amd64.runtime.exe", "downloadUrl": "zg-k8s-agent-windows-amd64.exe", "sha256": "5f1d5c19bbb6a0b653b2f75efe159e61471d8e08692ae7e2f918185864312d5f" },
-    "windows-arm64": { "url": "zg-k8s-agent-windows-arm64.runtime.exe", "downloadUrl": "zg-k8s-agent-windows-arm64.exe", "sha256": "c247c3a4414c6147db7b5413719886e2056bc4eea76a79373d78dc306604eaa4" }
+    "darwin-arm64": { "url": "zg-k8s-agent-darwin-arm64.bin", "downloadUrl": "zg-k8s-agent-darwin-arm64.zip", "sha256": "5724cbfd686c9b6720523b9b05292b08ae3af0d3b47afdc456ec8e61d14f2c33" },
+    "darwin-amd64": { "url": "zg-k8s-agent-darwin-amd64.bin", "downloadUrl": "zg-k8s-agent-darwin-amd64.zip", "sha256": "74f3fb9bda4729bfb62da101c3a9190081db3efafb2dc25fe507e46ddba8dc12" },
+    "windows-amd64": { "url": "zg-k8s-agent-windows-amd64.runtime.exe", "downloadUrl": "zg-k8s-agent-windows-amd64.exe", "sha256": "5a3ffecebc365ddbff52afec8dbe960840e4baf373b457b084e6bd4c516beaf6" },
+    "windows-arm64": { "url": "zg-k8s-agent-windows-arm64.runtime.exe", "downloadUrl": "zg-k8s-agent-windows-arm64.exe", "sha256": "b6337a103ab711220468dc2bfbd75ea188af1e60fb5b79e12656ade9b6453b84" }
   }
 }

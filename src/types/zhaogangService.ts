@@ -7,6 +7,7 @@ export interface ZgK8sAgentHealth {
   autostartEnabled: boolean
   host: string
   port: number
+  backgroundAgent?: boolean
   environments?: Record<string, boolean>
 }
 
@@ -72,6 +73,11 @@ export interface ZgK8sAgentUpdateInfo {
   latestVersion: string
   updateAvailable: boolean
   releaseNotes: string
+}
+
+export interface ZgK8sAgentManifest {
+  version: string
+  releaseNotes?: string
 }
 
 export interface ZgK8sAgentUpdateStatus {
