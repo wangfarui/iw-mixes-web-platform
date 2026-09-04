@@ -62,6 +62,10 @@ const zhaogangRoute: RouteRecordRaw = {
       name: '找钢工作台设置',
       component: () => import('@/views/zhaogang/ZhaogangEmptyRoute.vue'),
       meta: { public: true, title: '设置', zhaogangView: 'settings' }
+    },
+    {
+      path: ':pathMatch(.*)*',
+      redirect: '/zhaogang'
     }
   ]
 }

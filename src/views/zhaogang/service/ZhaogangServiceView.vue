@@ -277,6 +277,7 @@ import {
   zgK8sAgentStartProtocol,
 } from "@/services/zgK8sAgentClient";
 import { zhaogangK8sDashboardUrl } from "@/services/zhaogangReleaseK8s";
+import { mergeZhaogangK8sTokenConfigured } from "@/services/zhaogangK8sTokenState";
 import type {
   ZgK8sAgentHealth,
   ZgK8sAgentUpdateStatus,
@@ -425,7 +426,10 @@ const checkAgent = async () => {
       updateCheckError.value = updateCheckMessage(error);
     }
     const status = await getZhaogangK8sTokenStatus();
-    tokenStatus.value = status.configured;
+    tokenStatus.value = mergeZhaogangK8sTokenConfigured(
+      status.configured,
+      health.value.environments,
+    );
     await loadEnvironment();
   } catch (error) {
     health.value = null;
@@ -466,6 +470,10 @@ const loadEnvironment = async () => {
     const cached = readNamespaceCache();
     const namespaces = await client().namespaces(target);
     if (sequence !== environmentLoadSequence || target !== environment.value) return;
+    tokenStatus.value = mergeZhaogangK8sTokenConfigured(
+      tokenStatus.value,
+      health.value?.environments,
+    );
     namespace.value =
       cached[target] || namespaces[0]?.name || "application";
     if (!namespaces.some((item) => item.name === namespace.value))

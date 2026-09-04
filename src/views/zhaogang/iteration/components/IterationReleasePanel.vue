@@ -40,13 +40,35 @@
         ><el-icon><Expand /></el-icon></el-button>
       </div>
       <div v-if="!collapsed" class="release-panel-actions">
+        <el-input
+          v-model="planKeyword"
+          clearable
+          :prefix-icon="Search"
+          class="release-plan-search"
+          placeholder="搜索构建计划名称"
+          aria-label="搜索构建计划名称"
+        />
+        <el-switch v-model="autoRefreshEnabled" active-text="定时刷新" />
+        <el-select
+          v-model="refreshInterval"
+          :disabled="!autoRefreshEnabled"
+          class="release-refresh-interval"
+          aria-label="定时刷新间隔"
+        >
+          <el-option
+            v-for="item in refreshIntervalOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
         <el-button :icon="Refresh" :loading="refreshingAll" @click="refreshAll">刷新状态</el-button>
         <el-button v-if="canEdit" type="primary" :icon="Plus" @click="openAddDialog">添加发布项目</el-button>
       </div>
     </header>
 
     <div v-if="!collapsed" class="release-list-viewport">
-      <el-table v-if="releasePlans.length" :data="releasePlans" height="100%" border>
+      <el-table v-if="filteredReleasePlans.length" :data="filteredReleasePlans" height="100%" border>
         <el-table-column label="构建计划 / 项目" min-width="300">
           <template #default="scope">
             <div class="release-name-cell">
@@ -59,15 +81,20 @@
         </el-table-column>
         <el-table-column label="最近构建" min-width="205">
           <template #default="scope">
-            <div v-if="runtime[scope.row.id]?.loading" class="status-loading">正在读取 CODING 状态</div>
-            <div v-else-if="runtime[scope.row.id]?.error" class="status-error">
+            <div v-if="runtime[scope.row.id]?.loading && !runtime[scope.row.id]?.detail" class="status-loading">正在读取 CODING 状态</div>
+            <div v-else-if="runtime[scope.row.id]?.error && !runtime[scope.row.id]?.detail" class="status-error">
               <span>{{ runtime[scope.row.id]?.error }}</span>
               <el-button link type="primary" @click="refreshSinglePlan(scope.row)">重试</el-button>
             </div>
             <div v-else class="build-status-cell">
-              <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
-                {{ buildStatus(latestBuild(scope.row)?.status) }}
-              </el-tag>
+              <div class="status-tag-row">
+                <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
+                  {{ buildStatus(latestBuild(scope.row)?.status) }}
+                </el-tag>
+                <el-tooltip v-if="runtime[scope.row.id]?.error" :content="runtime[scope.row.id]?.error" placement="top">
+                  <el-icon class="refresh-warning" aria-label="最近一次刷新失败"><WarningFilled /></el-icon>
+                </el-tooltip>
+              </div>
               <template v-if="latestBuild(scope.row)">
                 <span>{{ latestBuild(scope.row)?.branch || '-' }} · {{ latestBuild(scope.row)?.commit || '-' }}</span>
                 <span>{{ latestBuild(scope.row)?.triggerUser || '-' }} · {{ latestBuild(scope.row)?.startedAt || '-' }}</span>
@@ -80,11 +107,16 @@
           <template #default="scope">{{ latestBuild(scope.row)?.environment || '—' }}</template>
         </el-table-column>
         <el-table-column label="Pods" width="90" align="center">
-          <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
+          <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading && !runtime[scope.row.id]?.k8s" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
         </el-table-column>
         <el-table-column label="服务状态" width="125" align="center" class-name="release-status-column">
           <template #default="scope">
-            <el-tag :type="k8sStatusTagType(runtime[scope.row.id]?.k8s)" effect="light">{{ k8sStatusText(runtime[scope.row.id]?.k8s) }}</el-tag>
+            <div class="status-tag-row status-tag-row--centered">
+              <el-tag :type="k8sStatusTagType(runtime[scope.row.id]?.k8s)" effect="light">{{ k8sStatusText(runtime[scope.row.id]?.k8s) }}</el-tag>
+              <el-tooltip v-if="runtime[scope.row.id]?.k8sRefreshError" :content="runtime[scope.row.id]?.k8sRefreshError" placement="top">
+                <el-icon class="refresh-warning" aria-label="最近一次服务状态刷新失败"><WarningFilled /></el-icon>
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="Pod创建时间" min-width="180" show-overflow-tooltip>
@@ -114,7 +146,7 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-else description="暂无发布项目" :image-size="66" />
+      <el-empty v-else :description="releasePlans.length ? '暂无匹配的构建计划' : '暂无发布项目'" :image-size="66" />
     </div>
   </section>
 
@@ -143,13 +175,35 @@
           </div>
         </div>
         <div class="release-panel-actions">
+          <el-input
+            v-model="planKeyword"
+            clearable
+            :prefix-icon="Search"
+            class="release-plan-search"
+            placeholder="搜索构建计划名称"
+            aria-label="搜索构建计划名称"
+          />
+          <el-switch v-model="autoRefreshEnabled" active-text="定时刷新" />
+          <el-select
+            v-model="refreshInterval"
+            :disabled="!autoRefreshEnabled"
+            class="release-refresh-interval"
+            aria-label="定时刷新间隔"
+          >
+            <el-option
+              v-for="item in refreshIntervalOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
           <el-button :icon="Refresh" :loading="refreshingAll" @click="refreshAll">刷新状态</el-button>
           <el-button v-if="canEdit" type="primary" :icon="Plus" @click="openAddDialog">添加发布项目</el-button>
         </div>
       </header>
 
       <div class="release-list-viewport">
-        <el-table v-if="releasePlans.length" :data="releasePlans" height="100%" border>
+        <el-table v-if="filteredReleasePlans.length" :data="filteredReleasePlans" height="100%" border>
           <el-table-column label="构建计划 / 项目" min-width="330">
             <template #default="scope">
               <div class="release-name-cell">
@@ -162,15 +216,20 @@
           </el-table-column>
           <el-table-column label="最近构建" min-width="255">
             <template #default="scope">
-              <div v-if="runtime[scope.row.id]?.loading" class="status-loading">正在读取 CODING 状态</div>
-              <div v-else-if="runtime[scope.row.id]?.error" class="status-error">
+              <div v-if="runtime[scope.row.id]?.loading && !runtime[scope.row.id]?.detail" class="status-loading">正在读取 CODING 状态</div>
+              <div v-else-if="runtime[scope.row.id]?.error && !runtime[scope.row.id]?.detail" class="status-error">
                 <span>{{ runtime[scope.row.id]?.error }}</span>
                 <el-button link type="primary" @click="refreshSinglePlan(scope.row)">重试</el-button>
               </div>
               <div v-else class="build-status-cell">
-                <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
-                  {{ buildStatus(latestBuild(scope.row)?.status) }}
-                </el-tag>
+                <div class="status-tag-row">
+                  <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
+                    {{ buildStatus(latestBuild(scope.row)?.status) }}
+                  </el-tag>
+                  <el-tooltip v-if="runtime[scope.row.id]?.error" :content="runtime[scope.row.id]?.error" placement="top">
+                    <el-icon class="refresh-warning" aria-label="最近一次刷新失败"><WarningFilled /></el-icon>
+                  </el-tooltip>
+                </div>
                 <template v-if="latestBuild(scope.row)">
                   <span>{{ latestBuild(scope.row)?.branch || '-' }} · {{ latestBuild(scope.row)?.commit || '-' }}</span>
                   <span>{{ latestBuild(scope.row)?.triggerUser || '-' }} · {{ latestBuild(scope.row)?.startedAt || '-' }}</span>
@@ -183,11 +242,16 @@
             <template #default="scope">{{ latestBuild(scope.row)?.environment || '—' }}</template>
           </el-table-column>
           <el-table-column label="Pods" width="90" align="center">
-            <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
+            <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading && !runtime[scope.row.id]?.k8s" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
           </el-table-column>
           <el-table-column label="服务状态" width="125" align="center" class-name="release-status-column">
             <template #default="scope">
-              <el-tag :type="k8sStatusTagType(runtime[scope.row.id]?.k8s)" effect="light">{{ k8sStatusText(runtime[scope.row.id]?.k8s) }}</el-tag>
+              <div class="status-tag-row status-tag-row--centered">
+                <el-tag :type="k8sStatusTagType(runtime[scope.row.id]?.k8s)" effect="light">{{ k8sStatusText(runtime[scope.row.id]?.k8s) }}</el-tag>
+                <el-tooltip v-if="runtime[scope.row.id]?.k8sRefreshError" :content="runtime[scope.row.id]?.k8sRefreshError" placement="top">
+                  <el-icon class="refresh-warning" aria-label="最近一次服务状态刷新失败"><WarningFilled /></el-icon>
+                </el-tooltip>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="Pod创建时间" min-width="180" show-overflow-tooltip>
@@ -217,7 +281,7 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-else description="暂无发布项目" :image-size="66" />
+        <el-empty v-else :description="releasePlans.length ? '暂无匹配的构建计划' : '暂无发布项目'" :image-size="66" />
       </div>
     </section>
   </el-drawer>
@@ -299,7 +363,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUpdated, reactive, ref, watch, type ComponentPublicInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, ArrowUp, Delete, Expand, Fold, Link, Plus, Refresh, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, Delete, Expand, Fold, Link, Plus, Refresh, Search, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
 import {
   getZhaogangPlanDetail, getZhaogangPlans, getZhaogangProjects, searchZhaogangBranches, triggerZhaogangBuild
 } from '@/api/zhaogang'
@@ -324,20 +388,31 @@ const emit = defineEmits<{
 
 interface PlanRuntime {
   loading: boolean
+  detailRefreshing?: boolean
   detail?: ZhaogangPlanDetail
   error?: string
   k8s?: ReleaseK8sStatus
   k8sLoading?: boolean
+  k8sRefreshError?: string
 }
 
 const sessionRef = inject<Ref<ZhaogangSessionStatus | null>>('zhaogangSession')
 type DisplayMode = 'bottom' | 'drawer'
+const refreshIntervalOptions = [
+  { label: '15 秒', value: 15 },
+  { label: '30 秒', value: 30 },
+  { label: '60 秒', value: 60 },
+  { label: '3 分钟', value: 180 }
+]
 const collapsed = ref(false)
 const displayMode = ref<DisplayMode>('bottom')
 const drawerVisible = ref(false)
 const panelHeight = ref(300)
 const resizing = ref(false)
 const refreshingAll = ref(false)
+const autoRefreshEnabled = ref(true)
+const refreshInterval = ref(30)
+const planKeyword = ref('')
 const runtime = reactive<Record<number, PlanRuntime>>({})
 const addDialogVisible = ref(false)
 const projectsLoading = ref(false)
@@ -360,12 +435,19 @@ let resizeStartY = 0
 let resizeStartHeight = 0
 let stateReady = false
 let missingRefreshInFlight: Promise<void> | undefined
+let autoRefreshTimer: number | undefined
+let refreshAllInFlight = false
 
 const planKey = (projectId: number, planId: number) => `${projectId}:${planId}`
 const storageKey = computed(() => `zhaogang:iteration-release-panel:${sessionRef?.value?.userId || 'anonymous'}`)
 const panelStyle = computed(() => collapsed.value ? undefined : { height: `${panelHeight.value}px` })
 const existingPlanKeys = computed(() => new Set(props.releasePlans.map(item => planKey(item.projectId, item.planId))))
 const activePlanDetail = computed(() => activeReleasePlan.value ? runtime[activeReleasePlan.value.id]?.detail : undefined)
+const filteredReleasePlans = computed(() => {
+  const keyword = planKeyword.value.trim().toLowerCase()
+  if (!keyword) return props.releasePlans
+  return props.releasePlans.filter(item => item.planName.toLowerCase().includes(keyword))
+})
 
 const setPlanNameElement = (planId: number) => (element: Element | ComponentPublicInstance | null) => {
   if (element instanceof HTMLElement) {
@@ -392,16 +474,28 @@ const clampPanelHeight = (height: number) => Math.max(180, Math.min(maxPanelHeig
 
 const restorePanelState = () => {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey.value) || '{}') as { collapsed?: boolean, height?: number, mode?: DisplayMode }
+    const stored = JSON.parse(localStorage.getItem(storageKey.value) || '{}') as {
+      autoRefresh?: boolean
+      collapsed?: boolean
+      height?: number
+      mode?: DisplayMode
+      refreshInterval?: number
+    }
     displayMode.value = stored.mode === 'bottom' || stored.mode === 'drawer'
       ? stored.mode
       : window.innerWidth <= 700 ? 'drawer' : 'bottom'
     collapsed.value = displayMode.value === 'bottom' && (window.innerWidth <= 700 || Boolean(stored.collapsed))
     if (Number.isFinite(stored.height)) panelHeight.value = clampPanelHeight(Number(stored.height))
+    autoRefreshEnabled.value = stored.autoRefresh !== false
+    refreshInterval.value = refreshIntervalOptions.some(item => item.value === Number(stored.refreshInterval))
+      ? Number(stored.refreshInterval)
+      : 30
   } catch {
     displayMode.value = window.innerWidth <= 700 ? 'drawer' : 'bottom'
     collapsed.value = false
     panelHeight.value = clampPanelHeight(300)
+    autoRefreshEnabled.value = true
+    refreshInterval.value = 30
   }
   stateReady = true
   emit('mode-change', displayMode.value)
@@ -409,7 +503,13 @@ const restorePanelState = () => {
 
 const savePanelState = () => {
   if (!stateReady) return
-  localStorage.setItem(storageKey.value, JSON.stringify({ mode: displayMode.value, collapsed: collapsed.value, height: panelHeight.value }))
+  localStorage.setItem(storageKey.value, JSON.stringify({
+    mode: displayMode.value,
+    collapsed: collapsed.value,
+    height: panelHeight.value,
+    autoRefresh: autoRefreshEnabled.value,
+    refreshInterval: refreshInterval.value
+  }))
 }
 
 const switchDisplayMode = (mode: DisplayMode) => {
@@ -456,20 +556,34 @@ const stopResize = () => {
 }
 
 const refreshPlan = async (releasePlan: TeamIterationReleasePlan) => {
-  if (runtime[releasePlan.id]?.loading) return
-  runtime[releasePlan.id] = { ...runtime[releasePlan.id], loading: true, error: undefined }
+  const current = runtime[releasePlan.id]
+  if (current?.loading || current?.detailRefreshing) return
+  const hasDetail = Boolean(current?.detail)
+  runtime[releasePlan.id] = {
+    ...current,
+    loading: !hasDetail,
+    detailRefreshing: hasDetail,
+    error: hasDetail ? current?.error : undefined
+  }
   try {
     runtime[releasePlan.id] = {
+      ...runtime[releasePlan.id],
       loading: false,
-      detail: await getZhaogangPlanDetail(releasePlan.projectId, releasePlan.planId)
+      detailRefreshing: false,
+      detail: await getZhaogangPlanDetail(releasePlan.projectId, releasePlan.planId),
+      error: undefined
     }
   } catch (error) {
     runtime[releasePlan.id] = {
+      ...runtime[releasePlan.id],
       loading: false,
+      detailRefreshing: false,
       error: error instanceof Error ? error.message : 'CODING 构建状态读取失败'
     }
   }
 }
+
+const k8sRefreshFailed = (status?: ReleaseK8sStatus) => status?.state === 'AGENT_OFFLINE' || status?.state === 'QUERY_FAILED'
 
 const refreshK8sPlans = async (releasePlans: TeamIterationReleasePlan[]) => {
   const targets = releasePlans.map(releasePlan => ({
@@ -482,10 +596,14 @@ const refreshK8sPlans = async (releasePlans: TeamIterationReleasePlan[]) => {
   })
   const statuses = await queryReleaseK8sStatuses(targets)
   releasePlans.forEach(releasePlan => {
+    const current = runtime[releasePlan.id]
+    const refreshed = statuses[releasePlan.id]
+    const preserveCurrent = Boolean(current?.k8s && k8sRefreshFailed(refreshed))
     runtime[releasePlan.id] = {
-      ...runtime[releasePlan.id],
-      k8s: statuses[releasePlan.id],
-      k8sLoading: false
+      ...current,
+      k8s: preserveCurrent ? current.k8s : refreshed,
+      k8sLoading: false,
+      k8sRefreshError: preserveCurrent ? refreshed?.message || 'K8s 服务状态刷新失败' : undefined
     }
   })
 }
@@ -510,13 +628,32 @@ const refreshMissingPlans = () => {
   return task
 }
 
-const refreshAll = async () => {
-  refreshingAll.value = true
+const refreshAllPlans = async (showProgress: boolean) => {
+  if (refreshAllInFlight) return
+  refreshAllInFlight = true
+  if (showProgress) refreshingAll.value = true
   try {
-    await Promise.all(props.releasePlans.map(refreshPlan))
-    await refreshK8sPlans(props.releasePlans)
+    const releasePlans = [...props.releasePlans]
+    if (!releasePlans.length) return
+    await Promise.all(releasePlans.map(refreshPlan))
+    await refreshK8sPlans(releasePlans)
   }
-  finally { refreshingAll.value = false }
+  finally {
+    refreshAllInFlight = false
+    if (showProgress) refreshingAll.value = false
+  }
+}
+
+const refreshAll = () => refreshAllPlans(true)
+const refreshAllSilently = () => refreshAllPlans(false)
+
+const scheduleAutoRefresh = () => {
+  window.clearInterval(autoRefreshTimer)
+  autoRefreshTimer = undefined
+  if (!autoRefreshEnabled.value) return
+  autoRefreshTimer = window.setInterval(() => {
+    void refreshAllSilently()
+  }, refreshInterval.value * 1000)
 }
 
 const latestBuild = (releasePlan: TeamIterationReleasePlan): ZhaogangBuild | undefined => {
@@ -716,6 +853,10 @@ const triggerBuild = async () => {
 }
 
 watch([collapsed, panelHeight], savePanelState)
+watch([autoRefreshEnabled, refreshInterval], () => {
+  savePanelState()
+  scheduleAutoRefresh()
+})
 watch(drawerVisible, visible => {
   if (visible && displayMode.value === 'drawer') void refreshMissingPlans()
 })
@@ -730,7 +871,9 @@ watch(() => props.releasePlans.map(item => `${item.id}:${item.planName}`).join('
 
 onMounted(() => {
   restorePanelState()
-  if (!collapsed.value) void refreshMissingPlans()
+  if (autoRefreshEnabled.value) void refreshAllSilently()
+  else if (!collapsed.value) void refreshMissingPlans()
+  scheduleAutoRefresh()
   void nextTick(updatePlanNameOverflow)
   window.addEventListener('resize', handlePlanNameResize)
 })
@@ -741,6 +884,7 @@ onUpdated(() => {
 
 onBeforeUnmount(() => {
   window.clearTimeout(branchSearchTimer)
+  window.clearInterval(autoRefreshTimer)
   window.removeEventListener('pointermove', resizePanel)
   window.removeEventListener('resize', handlePlanNameResize)
 })
@@ -763,7 +907,9 @@ defineExpose({ openDrawer })
 .release-panel-title span { display: block; margin-top: 3px; color: #8994a5; font-size: 12px; }
 .collapse-button { flex: 0 0 auto; margin: 0; color: #68778d; font-size: 17px; }
 .display-mode-button { flex: 0 0 auto; margin: 0; color: #68778d; font-size: 17px; }
-.release-panel-actions { gap: 8px; }
+.release-panel-actions { justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.release-plan-search { width: 220px; }
+.release-refresh-interval { width: 96px; }
 .release-list-viewport { min-height: 0; flex: 1 1 auto; padding: 0 12px 12px; overflow: hidden; }
 .release-list-viewport :deep(.el-empty) { height: 100%; padding: 6px 0; }
 .release-name-cell { display: grid; min-width: 0; gap: 4px; }
@@ -772,6 +918,9 @@ defineExpose({ openDrawer })
 .release-project-name, .build-status-cell span, .status-loading { color: #8994a5; font-size: 12px; }
 .build-status-cell { display: grid; justify-items: start; gap: 5px; }
 .build-status-cell > span { line-height: 1.35; white-space: normal; }
+.status-tag-row { display: flex; min-width: 0; align-items: center; gap: 5px; }
+.status-tag-row--centered { justify-content: center; }
+.refresh-warning { flex: 0 0 auto; color: #d69b32; cursor: help; }
 .status-error { display: flex; align-items: center; gap: 6px; color: #c45656; font-size: 12px; }
 .release-list-viewport :deep(.el-table .cell) { overflow: hidden; text-overflow: ellipsis; }
 .release-list-viewport :deep(.release-status-column .cell) { overflow: visible; text-overflow: clip; white-space: nowrap; }
@@ -783,8 +932,12 @@ defineExpose({ openDrawer })
 .release-panel-drawer { width: 100%; min-height: 100%; border: 0; border-radius: 0; box-shadow: none; }
 .release-panel-drawer .release-list-viewport { padding-bottom: 14px; }
 @media (max-width: 700px) {
-  .release-panel-header { align-items: flex-start; padding-right: 10px; padding-left: 10px; }
-  .release-panel-actions { justify-content: flex-end; flex-wrap: wrap; }
+  .release-panel-header { align-items: stretch; flex-direction: column; padding-right: 10px; padding-left: 10px; }
+  .release-panel-title { width: 100%; }
+  .release-panel-actions { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .release-plan-search { width: 100%; grid-column: 1 / -1; }
+  .release-refresh-interval { width: 100%; }
+  .release-panel-actions :deep(.el-button) { width: 100%; margin-left: 0; }
   .release-list-viewport { padding-right: 8px; padding-left: 8px; }
 }
 </style>

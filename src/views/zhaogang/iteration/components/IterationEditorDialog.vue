@@ -3,7 +3,7 @@
     <el-form label-position="top">
       <div class="form-grid">
         <el-form-item label="迭代标题" required><el-input v-model="form.name" maxlength="128" placeholder="输入迭代标题" /></el-form-item>
-        <el-form-item label="版本号"><el-input v-model="form.version" maxlength="64" placeholder="可选" /></el-form-item>
+        <el-form-item label="迭代状态" required><el-select v-model="form.stage" class="full-control"><el-option v-for="stage in stageOptions" :key="stage.value" :label="stage.label" :value="stage.value" /></el-select></el-form-item>
         <el-form-item label="开始日期"><el-date-picker v-model="form.startDate" value-format="YYYY-MM-DD" type="date" class="full-control" /></el-form-item>
         <el-form-item label="计划上线日期"><el-date-picker v-model="form.plannedReleaseDate" value-format="YYYY-MM-DD" type="date" class="full-control" /></el-form-item>
       </div>
@@ -35,7 +35,7 @@ import { computed, inject, reactive, ref, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createTeamIteration, getTeamIterationMemberOptions } from '@/api/zhaogangIteration'
 import type { ZhaogangSessionStatus } from '@/types/zhaogang'
-import type { TeamIterationRole, TeamIterationTeamOption } from '@/types/zhaogangIteration'
+import type { TeamIterationRole, TeamIterationStage, TeamIterationTeamOption } from '@/types/zhaogangIteration'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean], created: [id: number] }>()
@@ -48,7 +48,11 @@ const teamOptions = ref<TeamIterationTeamOption[]>([])
 const selectedTeamIds = ref<number[]>([])
 const selectedByTeam = reactive<Record<number, number[]>>({})
 const draftRoles = reactive<Record<string, TeamIterationRole[]>>({})
-const form = reactive({ name: '', version: '', startDate: '', plannedReleaseDate: '' })
+const form = reactive({ name: '', stage: 'NOT_STARTED' as TeamIterationStage, startDate: '', plannedReleaseDate: '' })
+const stageOptions: Array<{ value: TeamIterationStage, label: string }> = [
+  { value: 'NOT_STARTED', label: '未开始' }, { value: 'DEVELOPING', label: '开发中' },
+  { value: 'TESTING', label: '测试中' }, { value: 'RELEASED', label: '已上线' }
+]
 const roleOptions: Array<{ value: TeamIterationRole, label: string }> = [
   { value: 'PRODUCT', label: '产品' }, { value: 'BACKEND', label: '后端' }, { value: 'FRONTEND', label: '前端' }, { value: 'QA', label: '测试' }
 ]
@@ -68,7 +72,7 @@ const canSubmit = computed(() => Boolean(form.name.trim() && drafts.value.length
 
 watch(visible, async value => {
   if (!value) return
-  Object.assign(form, { name: '', version: '', startDate: '', plannedReleaseDate: '' })
+  Object.assign(form, { name: '', stage: 'NOT_STARTED', startDate: '', plannedReleaseDate: '' })
   selectedTeamIds.value = []
   Object.keys(selectedByTeam).forEach(key => delete selectedByTeam[Number(key)])
   Object.keys(draftRoles).forEach(key => delete draftRoles[key])
@@ -89,7 +93,7 @@ const submit = async () => {
   if (!canSubmit.value) return
   submitting.value = true
   try {
-    const detail = await createTeamIteration({ requestId: requestId(), name: form.name.trim(), version: form.version.trim() || undefined, startDate: form.startDate || undefined, plannedReleaseDate: form.plannedReleaseDate || undefined, members: drafts.value.map(item => ({ teamId: item.teamId, userId: item.user.userId, roles: item.roles })) })
+    const detail = await createTeamIteration({ requestId: requestId(), name: form.name.trim(), stage: form.stage, startDate: form.startDate || undefined, plannedReleaseDate: form.plannedReleaseDate || undefined, members: drafts.value.map(item => ({ teamId: item.teamId, userId: item.user.userId, roles: item.roles })) })
     visible.value = false
     emit('created', detail.id)
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '迭代创建失败') }

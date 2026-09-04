@@ -330,6 +330,9 @@
                     <el-option label="测试" value="QA" />
                   </el-select>
                 </el-form-item>
+                <el-form-item label="新增子事项">
+                  <el-switch v-model="preferences.autoSyncCreatedChildIssue" active-text="默认同步 CODING" @change="savePreferences" />
+                </el-form-item>
                 <el-form-item label="记住项目筛选">
                   <el-switch v-model="preferences.rememberProjectFilter" @change="changeRememberProjectFilter" />
                 </el-form-item>

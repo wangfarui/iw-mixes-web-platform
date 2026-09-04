@@ -27,6 +27,7 @@ export interface ZhaogangPreferences {
   planPageSize: ZhaogangPlanPageSize
   planTableColumnWidths: Partial<Record<ZhaogangPlanTableColumnKey, number>>
   codingRole: TeamIterationRole | null
+  autoSyncCreatedChildIssue: boolean
 }
 
 export interface ZhaogangProject {

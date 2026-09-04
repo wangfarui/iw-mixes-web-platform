@@ -155,7 +155,7 @@ export interface TeamIterationPage<T> {
 export interface TeamIterationCreateCommand {
   requestId: string
   name: string
-  version?: string
+  stage: TeamIterationStage
   startDate?: string
   plannedReleaseDate?: string
   members: TeamIterationMemberInput[]
@@ -164,7 +164,7 @@ export interface TeamIterationCreateCommand {
 export interface TeamIterationUpdateCommand {
   versionNo: number
   name: string
-  version?: string
+  stage: TeamIterationStage
   startDate?: string
   plannedReleaseDate?: string
 }
@@ -179,6 +179,7 @@ export interface TeamIterationCreateChildIssueCommand {
   taskType?: string
   onlineBug?: boolean
   bugPriority?: string
+  syncToCoding?: boolean
 }
 
 export interface TeamIterationUpdateIssueCommand {

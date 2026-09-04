@@ -23,7 +23,8 @@ export const defaultZhaogangPreferences = (): ZhaogangPreferences => ({
   projectFilterId: null,
   planPageSize: 15,
   planTableColumnWidths: { service: 320 },
-  codingRole: null
+  codingRole: null,
+  autoSyncCreatedChildIssue: false
 })
 
 export const loadZhaogangPreferences = (userId: number): ZhaogangPreferences => {
@@ -48,7 +49,10 @@ export const loadZhaogangPreferences = (userId: number): ZhaogangPreferences => 
       planTableColumnWidths: normalizePlanTableColumnWidths(value.planTableColumnWidths),
       codingRole: value.codingRole === 'PRODUCT' || value.codingRole === 'BACKEND' || value.codingRole === 'FRONTEND' || value.codingRole === 'QA'
         ? value.codingRole
-        : defaults.codingRole
+        : defaults.codingRole,
+      autoSyncCreatedChildIssue: typeof value.autoSyncCreatedChildIssue === 'boolean'
+        ? value.autoSyncCreatedChildIssue
+        : defaults.autoSyncCreatedChildIssue
     }
   } catch {
     return defaults

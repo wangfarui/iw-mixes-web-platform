@@ -1,7 +1,68 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-09-02-02",
+  "currentReleaseId": "zg-2026-09-04-02",
   "releases": [
+    {
+      "id": "zg-2026-09-04-02",
+      "version": "1.2.2",
+      "publishedAt": "2026-09-04T14:35:20+08:00",
+      "items": [
+        {
+          "type": "FIX",
+          "text": "修复 K8s 页面已加载服务时仍显示 Token 未配置的问题"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-04-01",
+      "version": "1.2.1",
+      "publishedAt": "2026-09-04T14:03:39+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "迭代发布项目自动刷新改为静默更新，刷新期间保留现有构建和服务状态，避免列表反复跳动"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "构建或服务状态刷新失败时保留上次成功结果，并提供轻量提示"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-03-01",
+      "version": "1.2.0",
+      "publishedAt": "2026-09-03T16:49:14+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "迭代发布项目新增定时刷新，默认每 30 秒刷新并支持多档时间间隔"
+        },
+        {
+          "type": "FEATURE",
+          "text": "迭代发布项目支持按构建计划名称实时模糊筛选"
+        },
+        {
+          "type": "FEATURE",
+          "text": "迭代事项支持按事项类型和 CODING 状态组合筛选"
+        },
+        {
+          "type": "FEATURE",
+          "text": "新增子事项支持按个人设置或本次操作选择创建后同步 CODING"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "新建和编辑迭代统一维护迭代状态，不再录入版本号"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "新增子事项刷新列表后保留用户手动展开和收起的事项"
+        },
+        {
+          "type": "FIX",
+          "text": "修复迭代事项树展开按钮点击无响应的问题"
+        }
+      ]
+    },
     {
       "id": "zg-2026-09-02-02",
       "version": "1.1.0",

@@ -29,6 +29,7 @@
     "test:auth-session": "node scripts/testAuthSession.mjs",
     "test:zhaogang-iteration": "node scripts/testZhaogangIteration.mjs",
     "test:zhaogang-release-k8s": "node scripts/testZhaogangReleaseK8s.mjs",
+    "test:zhaogang-k8s-token-state": "node scripts/testZhaogangK8sTokenState.mjs",
     "test:zhaogang-release-notes": "node scripts/testZhaogangReleaseNotes.mjs",
     "test:remote-share": "node scripts/testRemoteShareProtocol.mjs",
     "ai-launcher:install": "node scripts/aiLauncher.mjs install",

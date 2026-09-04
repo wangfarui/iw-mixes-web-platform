@@ -23,9 +23,6 @@
           </div>
         </div>
         <div class="header-actions">
-          <el-select :model-value="detail.stage" :disabled="!detail.permissions.canEdit || saving" @change="changeStage">
-            <el-option v-for="stage in stageOptions" :key="stage.value" :label="stage.label" :value="stage.value" />
-          </el-select>
           <el-button :icon="UserFilled" @click="openMemberViewer">成员</el-button>
           <el-button v-if="releasePanelMode === 'drawer'" :icon="Expand" title="打开发布项目抽屉" @click="openReleaseDrawer">发布项目</el-button>
           <el-button v-if="detail.permissions.canEdit" :icon="Edit" @click="openEdit">编辑</el-button>
@@ -36,22 +33,47 @@
       <section class="detail-section issue-section">
         <header class="section-header">
           <div><h3>迭代事项</h3><span>{{ detail.issueCount }} 项</span></div>
-          <div v-if="detail.permissions.canEdit" class="section-actions">
-            <el-button type="danger" plain :icon="Delete" :loading="deletingIssues" :disabled="!selectedIssueIds.length" @click="removeSelectedIssues">批量移除</el-button>
-            <el-button type="primary" plain :icon="RefreshRight" :loading="syncingCoding" @click="syncCodingIssues">同步 CODING 事项</el-button>
-            <el-button type="primary" :icon="Link" @click="issueDialogVisible = true">关联 CODING 事项</el-button>
+          <div class="section-toolbar">
+            <el-select
+              v-model="issueStatusFilters"
+              multiple
+              clearable
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              :max-collapse-tags="1"
+              class="issue-status-filter"
+              placeholder="事项状态"
+              aria-label="按事项类型和状态筛选"
+            >
+              <el-option-group v-for="group in issueStatusFilterGroups" :key="group.issueType" :label="group.label">
+                <el-option
+                  v-for="option in group.options"
+                  :key="option.value"
+                  :label="`${group.label} / ${option.label}`"
+                  :value="option.value"
+                ><span>{{ option.label }}</span></el-option>
+              </el-option-group>
+            </el-select>
+            <span v-if="issueStatusFilters.length" class="filter-result">匹配 {{ issueStatusMatchCount }} 项</span>
+            <div v-if="detail.permissions.canEdit" class="section-actions">
+              <el-button type="danger" plain :icon="Delete" :loading="deletingIssues" :disabled="!selectedIssueIds.length" @click="removeSelectedIssues">批量移除</el-button>
+              <el-button type="primary" plain :icon="RefreshRight" :loading="syncingCoding" @click="syncCodingIssues">同步 CODING 事项</el-button>
+              <el-button type="primary" :icon="Link" @click="issueDialogVisible = true">关联 CODING 事项</el-button>
+            </div>
           </div>
         </header>
         <div class="issue-table-viewport">
           <el-table
-            v-if="detail.issues.length"
-            :data="detail.issues"
+            v-if="filteredIssues.length"
+            :data="filteredIssues"
             row-key="id"
             height="100%"
             border
-            default-expand-all
+            :expand-row-keys="visibleExpandedIssueKeys"
             :row-class-name="issueRowClass"
             :tree-props="{ children: 'children' }"
+            @expand-change="handleIssueExpandChange"
             @selection-change="handleIssueSelectionChange"
           >
           <el-table-column v-if="detail.permissions.canEdit" type="selection" width="48" fixed="left" />
@@ -141,7 +163,7 @@
             </template>
           </el-table-column>
           </el-table>
-          <el-empty v-else description="暂无迭代事项" />
+          <el-empty v-else :description="detail.issues.length ? '暂无匹配事项' : '暂无迭代事项'" />
         </div>
       </section>
 
@@ -160,7 +182,7 @@
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item label="迭代标题" required><el-input v-model="editForm.name" maxlength="128" /></el-form-item>
-          <el-form-item label="版本号"><el-input v-model="editForm.version" maxlength="64" /></el-form-item>
+          <el-form-item label="迭代状态" required><el-select v-model="editForm.stage" class="full-control"><el-option v-for="stage in stageOptions" :key="stage.value" :label="stage.label" :value="stage.value" /></el-select></el-form-item>
           <el-form-item label="开始日期"><el-date-picker v-model="editForm.startDate" value-format="YYYY-MM-DD" type="date" class="full-control" /></el-form-item>
           <el-form-item label="计划上线日期"><el-date-picker v-model="editForm.plannedReleaseDate" value-format="YYYY-MM-DD" type="date" class="full-control" /></el-form-item>
         </div>
@@ -211,7 +233,19 @@
     <el-dialog v-model="childDialogVisible" title="新增子事项" width="min(680px, calc(100% - 28px))">
       <el-form label-position="top">
         <el-form-item label="父事项"><el-input :model-value="childParent?.title" disabled /></el-form-item>
-        <el-form-item label="录入方式"><el-radio-group v-model="childMode"><el-radio-button value="CREATE">人工创建</el-radio-button><el-radio-button value="LINK">关联 CODING</el-radio-button></el-radio-group></el-form-item>
+        <div class="child-entry-row">
+          <el-form-item label="录入方式"><el-radio-group v-model="childMode"><el-radio-button value="CREATE">人工创建</el-radio-button><el-radio-button value="LINK">关联 CODING</el-radio-button></el-radio-group></el-form-item>
+          <el-form-item v-if="childMode === 'CREATE'" label="CODING 同步" class="child-sync-field">
+            <div class="child-sync-option">
+              <el-switch
+                v-model="childSyncToCoding"
+                :disabled="!childAutoSyncAvailability.enabled"
+                active-text="创建后同步 CODING"
+              />
+              <span v-if="!childAutoSyncAvailability.enabled" class="child-sync-reason">{{ childAutoSyncAvailability.reason }}</span>
+            </div>
+          </el-form-item>
+        </div>
         <template v-if="childMode === 'LINK'">
           <el-form-item label="CODING 事项链接（可多条）" required><el-input v-model="childCodingUrl" type="textarea" :rows="5" maxlength="5000" :placeholder="codingIssueUrlPlaceholder" /></el-form-item>
         </template>
@@ -258,7 +292,7 @@ import {
   addTeamIterationChildIssue, addTeamIterationCodingIssue, deleteTeamIteration, getTeamIteration,
   getTeamIterationIssueCreationOptions, getTeamIterationIssueStatusOptions, getTeamIterationMemberOptions, registerTeamIterationIssueWorklog,
   removeTeamIterationIssue, removeTeamIterationIssues, replaceTeamIterationMembers, retryTeamIterationIssueWorklog,
-  syncTeamIterationCodingIssues, syncTeamIterationIssue, transitionTeamIteration, updateTeamIteration, updateTeamIterationIssueStatus
+  syncTeamIterationCodingIssues, syncTeamIterationIssue, updateTeamIteration, updateTeamIterationIssueStatus
 } from '@/api/zhaogangIteration'
 import type {
   TeamIterationDetail, TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationIssueType, TeamIterationRole,
@@ -272,8 +306,15 @@ import {
   type CodingIssueAssociationFailure
 } from './codingIssueAssociationFeedback'
 import {
-  canAddChildIssues, canSyncWorkbenchIssueType, defaultManualChildIssueType, manualChildIssueTypes
+  canAddChildIssues, canSyncWorkbenchIssueType, childIssueAutoSyncAvailability,
+  defaultManualChildIssueType, manualChildIssueTypes
 } from './iterationIssueHierarchy'
+import {
+  buildIterationIssueStatusFilterGroups, filterIterationIssueTree, iterationIssueExpandRowKeys,
+  iterationIssueParentIds,
+  retainExpandedIterationIssueIds,
+  iterationIssueStatusMatchCount as countIterationIssueStatusMatches
+} from './iterationIssueStatusFilter'
 
 const route = useRoute()
 const router = useRouter()
@@ -286,6 +327,10 @@ const detail = ref<TeamIterationDetail>()
 const releasePanelRef = ref<{ openDrawer: () => void } | null>(null)
 const releasePanelMode = ref<'bottom' | 'drawer'>('bottom')
 const selectedIssues = ref<TeamIterationIssue[]>([])
+const issueStatusFilters = ref<string[]>([])
+const expandedIssueIds = ref<number[]>([])
+const filterExpandedIssueIds = ref<number[]>([])
+let expandedIterationId: number | undefined
 const editVisible = ref(false)
 const memberDialogVisible = ref(false)
 const memberEditing = ref(false)
@@ -299,6 +344,7 @@ const childDialogVisible = ref(false)
 const childParent = ref<TeamIterationIssue>()
 const childMode = ref<'CREATE' | 'LINK'>('CREATE')
 const childCodingUrl = ref('')
+const childSyncToCoding = ref(false)
 const creationOptionsLoading = ref(false)
 let creationOptionsRequestId = 0
 const creationOptions = reactive<TeamIterationIssueCreationOptions>({ issueType: 'SUB_TASK', developmentTeams: [], definitionsOfDone: [], taskTypes: [], bugPriorities: [] })
@@ -310,7 +356,7 @@ const teamOptions = ref<TeamIterationTeamOption[]>([])
 const selectedTeamIds = ref<number[]>([])
 const selectedByTeam = reactive<Record<number, number[]>>({})
 const draftRoles = reactive<Record<string, TeamIterationRole[]>>({})
-const editForm = reactive({ name: '', version: '', startDate: '', plannedReleaseDate: '' })
+const editForm = reactive({ name: '', stage: 'NOT_STARTED' as TeamIterationStage, startDate: '', plannedReleaseDate: '' })
 const childForm = reactive({ issueType: 'SUB_TASK' as TeamIterationIssueType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', onlineBug: false, bugPriority: '' })
 const worklogForm = reactive({ spendHours: 1, registeredAt: '' })
 const codingIssueUrlPlaceholder = '可粘贴多条链接，每条以 https:// 开始、detail 结尾\n例如：https://g-iijw5014.coding.net/p/.../issues/xxx/detail'
@@ -329,6 +375,11 @@ const childIssueTypeOptions = computed(() => {
   const allowed = childParent.value ? manualChildIssueTypes(childParent.value.issueType) : []
   return issueTypeOptions.filter(item => allowed.includes(item.value))
 })
+const childAutoSyncAvailability = computed(() => childIssueAutoSyncAvailability(
+  childParent.value,
+  childForm.issueType,
+  detail.value?.issues || []
+))
 const childSubmitEnabled = computed(() => {
   if (childMode.value === 'LINK') return extractCodingIssueUrls(childCodingUrl.value).length > 0
   if (!childForm.title.trim()) return false
@@ -349,6 +400,14 @@ const memberDrafts = computed(() => selectedTeamIds.value.flatMap(teamId => {
 }))
 const id = () => Number(route.params.iterationId)
 const selectedIssueIds = computed(() => selectedIssues.value.map(issue => issue.id))
+const issueStatusFilterGroups = computed(() => buildIterationIssueStatusFilterGroups(detail.value?.issues || []))
+const availableIssueStatusFilterValues = computed(() => new Set(issueStatusFilterGroups.value.flatMap(group => group.options.map(option => option.value))))
+const filteredIssues = computed(() => filterIterationIssueTree(detail.value?.issues || [], issueStatusFilters.value))
+const issueStatusMatchCount = computed(() => countIterationIssueStatusMatches(detail.value?.issues || [], issueStatusFilters.value))
+const visibleExpandedIssueKeys = computed(() => iterationIssueExpandRowKeys([
+  ...expandedIssueIds.value,
+  ...filterExpandedIssueIds.value
+]))
 
 const extractCodingIssueUrls = (value: string) => [...new Set(value.match(/https:\/\/[^\s]*?detail/g)?.map(url => url.trim()) || [])]
 
@@ -373,10 +432,20 @@ const showCodingIssueAssociationFailures = (failures: CodingIssueAssociationFail
 }
 
 const load = async () => {
+  const iterationId = id()
+  const preserveExpansion = expandedIterationId === iterationId
   loading.value = true
   selectedIssues.value = []
   try {
-    detail.value = await getTeamIteration(id())
+    const loadedDetail = await getTeamIteration(iterationId)
+    detail.value = loadedDetail
+    expandedIssueIds.value = preserveExpansion
+      ? retainExpandedIterationIssueIds(expandedIssueIds.value, loadedDetail.issues)
+      : iterationIssueParentIds(loadedDetail.issues)
+    filterExpandedIssueIds.value = preserveExpansion
+      ? retainExpandedIterationIssueIds(filterExpandedIssueIds.value, loadedDetail.issues)
+      : []
+    expandedIterationId = iterationId
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '迭代详情加载失败')
   } finally { loading.value = false }
@@ -384,7 +453,7 @@ const load = async () => {
 
 const openEdit = () => {
   if (!detail.value) return
-  Object.assign(editForm, { name: detail.value.name, version: detail.value.version || '', startDate: detail.value.startDate || '', plannedReleaseDate: detail.value.plannedReleaseDate || '' })
+  Object.assign(editForm, { name: detail.value.name, stage: detail.value.stage, startDate: detail.value.startDate || '', plannedReleaseDate: detail.value.plannedReleaseDate || '' })
   editVisible.value = true
 }
 
@@ -392,17 +461,9 @@ const saveEdit = async () => {
   if (!detail.value || !editForm.name.trim()) return
   saving.value = true
   try {
-    detail.value = await updateTeamIteration(id(), { versionNo: detail.value.versionNo, name: editForm.name.trim(), version: editForm.version.trim() || undefined, startDate: editForm.startDate || undefined, plannedReleaseDate: editForm.plannedReleaseDate || undefined })
+    detail.value = await updateTeamIteration(id(), { versionNo: detail.value.versionNo, name: editForm.name.trim(), stage: editForm.stage, startDate: editForm.startDate || undefined, plannedReleaseDate: editForm.plannedReleaseDate || undefined })
     editVisible.value = false
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '迭代保存失败') } finally { saving.value = false }
-}
-
-const changeStage = async (value: TeamIterationStage) => {
-  if (!detail.value || value === detail.value.stage) return
-  saving.value = true
-  try { detail.value = await transitionTeamIteration(id(), detail.value.versionNo, value) }
-  catch (error) { ElMessage.error(error instanceof Error ? error.message : '状态更新失败') }
-  finally { saving.value = false }
 }
 
 const openMemberViewer = () => { memberEditing.value = false; memberDialogVisible.value = true }
@@ -466,6 +527,14 @@ const openIssueEditor = (issue: TeamIterationIssue) => {
   issueEditVisible.value = true
 }
 
+const handleIssueExpandChange = (issue: TeamIterationIssue, expanded: boolean) => {
+  const expandedIds = new Set(expandedIssueIds.value)
+  if (expanded) expandedIds.add(issue.id)
+  else expandedIds.delete(issue.id)
+  expandedIssueIds.value = [...expandedIds]
+  if (!expanded) filterExpandedIssueIds.value = filterExpandedIssueIds.value.filter(issueId => issueId !== issue.id)
+}
+
 const issueSaved = () => { void load() }
 
 const releasePlanAdded = (releasePlan: TeamIterationReleasePlan) => {
@@ -523,6 +592,8 @@ const openChildEditor = (issue: TeamIterationIssue) => {
   const defaultType = defaultManualChildIssueType(issue.issueType)
   if (!defaultType) return
   Object.assign(childForm, { issueType: defaultType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', onlineBug: false, bugPriority: '' })
+  childSyncToCoding.value = Boolean(preferencesRef?.value.autoSyncCreatedChildIssue
+    && childIssueAutoSyncAvailability(issue, defaultType, detail.value?.issues || []).enabled)
   childDialogVisible.value = true
   void loadCreationOptions()
 }
@@ -544,17 +615,23 @@ const saveChildIssue = async () => {
         showCodingIssueAssociationFailures(result.failures)
       }
     } else {
-      await addTeamIterationChildIssue(id(), childParent.value.id, {
+      const syncRequested = childSyncToCoding.value
+      const created = await addTeamIterationChildIssue(id(), childParent.value.id, {
         issueType: childForm.issueType, title: childForm.title.trim(), description: childForm.description || undefined,
         developmentTeam: childForm.issueType === 'USER_STORY' ? childForm.developmentTeam : undefined,
         definitionOfDone: childForm.issueType === 'USER_STORY' ? childForm.definitionOfDone : undefined,
         estimatedHours: childForm.issueType === 'SUB_TASK' ? childForm.estimatedHours : undefined,
         taskType: childForm.issueType === 'SUB_TASK' ? childForm.taskType : undefined,
         onlineBug: childForm.issueType === 'DEFECT' ? childForm.onlineBug : undefined,
-        bugPriority: undefined
+        bugPriority: undefined,
+        syncToCoding: syncRequested
       })
       childDialogVisible.value = false
       await load()
+      if (!syncRequested) ElMessage.success('子事项已创建')
+      else if (created.syncStatus === 'SYNCED') ElMessage.success('子事项已创建并同步 CODING')
+      else if (created.syncStatus === 'UNKNOWN') ElMessage.warning(created.syncMessage || '子事项已创建，CODING 同步结果不确定，请先核对后再处理')
+      else ElMessage.warning(created.syncMessage || '子事项已创建，但自动同步 CODING 失败，可通过更多操作重试')
     }
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '子事项创建失败') }
   finally { saving.value = false }
@@ -602,9 +679,17 @@ const loadCreationOptions = async () => {
 
 watch(() => childForm.issueType, () => {
   Object.assign(childForm, { developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', onlineBug: false, bugPriority: '' })
+  if (!childAutoSyncAvailability.value.enabled) childSyncToCoding.value = false
   if (childDialogVisible.value && childMode.value === 'CREATE') void loadCreationOptions()
 })
 watch(childMode, mode => { if (mode === 'CREATE') void loadCreationOptions() })
+watch(availableIssueStatusFilterValues, availableValues => {
+  const retainedFilters = issueStatusFilters.value.filter(value => availableValues.has(value))
+  if (retainedFilters.length !== issueStatusFilters.value.length) issueStatusFilters.value = retainedFilters
+})
+watch(issueStatusFilters, filters => {
+  filterExpandedIssueIds.value = filters.length ? iterationIssueParentIds(filteredIssues.value) : []
+}, { deep: true })
 
 const localMinute = () => {
   const value = new Date()
@@ -777,6 +862,9 @@ watch(() => route.params.iterationId, load)
 .issue-table-viewport { min-height: 0; flex: 1 1 auto; overflow: hidden; }
 .issue-table-viewport :deep(.el-empty) { height: 100%; padding: 0; }
 .section-header { justify-content: space-between; margin-bottom: 14px; }
+.section-toolbar { justify-content: flex-end; flex-wrap: wrap; }
+.issue-status-filter { width: 280px; }
+.filter-result { color: #7b8798; font-size: 12px; white-space: nowrap; }
 .issue-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0; width: max-content; margin-left: auto; white-space: nowrap; }
 .issue-actions :deep(.el-button) { margin: 0; padding-right: 1px; padding-left: 1px; }
 .issue-actions :deep(.el-button > span) { margin-left: 2px; }
@@ -797,6 +885,10 @@ watch(() => route.params.iterationId, load)
 .issue-meta { display: grid; gap: 4px; color: #69768a; font-size: 12px; }
 .retry-link { width: fit-content; padding: 0; color: #d14949; font-size: 12px; background: transparent; border: 0; cursor: pointer; }
 .typed-fields { min-height: 44px; }
+.child-entry-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; }
+.child-sync-field { min-width: 260px; justify-self: end; }
+.child-sync-option { display: grid; gap: 5px; }
+.child-sync-reason { color: #8994a5; font-size: 12px; line-height: 1.4; }
 .issue-type-select { width: 180px; }
 .sub-task-field-row { display: grid; grid-template-columns: 140px minmax(0, 220px); gap: 16px; align-items: start; }
 .hours-control { width: 140px; }
@@ -814,6 +906,6 @@ watch(() => route.params.iterationId, load)
 .role-list { flex-wrap: wrap; }
 :global(.coding-association-result-dialog .el-message-box__message p) { overflow-wrap: anywhere; white-space: pre-wrap; }
 @media(max-width:1100px){.detail-header{flex-wrap:wrap}.header-actions{width:100%;justify-content:flex-end}}
-@media(max-width:640px){.detail-header{display:block}.detail-heading{gap:4px}.back-button{padding-right:4px;padding-left:0}.title-row h2{font-size:20px}.detail-meta{gap:4px 12px}.header-actions{width:auto;justify-content:flex-start;margin-top:12px}.issue-section{min-height:120px}.form-grid,.story-field-row,.sub-task-field-row{grid-template-columns:1fr}.hours-control,.task-type-control{width:100%}}
-@media(max-width:640px){.section-header{display:block}.section-actions{margin-top:10px;flex-wrap:wrap}}
+@media(max-width:640px){.detail-header{display:block}.detail-heading{gap:4px}.back-button{padding-right:4px;padding-left:0}.title-row h2{font-size:20px}.detail-meta{gap:4px 12px}.header-actions{width:auto;justify-content:flex-start;margin-top:12px}.issue-section{min-height:120px}.form-grid,.story-field-row,.sub-task-field-row,.child-entry-row{grid-template-columns:1fr}.child-sync-field{min-width:0;justify-self:stretch}.hours-control,.task-type-control{width:100%}}
+@media(max-width:640px){.section-header{display:block}.section-toolbar{align-items:stretch;flex-direction:column;margin-top:10px}.issue-status-filter{width:100%}.section-actions{flex-wrap:wrap}}
 </style>
