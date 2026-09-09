@@ -103,8 +103,23 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="构建环境" width="90" align="center">
-          <template #default="scope">{{ latestBuild(scope.row)?.environment || '—' }}</template>
+        <el-table-column label="构建环境" width="110" align="center">
+          <template #default="scope">
+            <el-select
+              :model-value="selectedEnvironmentFor(scope.row)"
+              size="small"
+              class="release-environment-select"
+              :aria-label="`选择 ${scope.row.planName} 的构建环境`"
+              @change="changeSelectedEnvironment(scope.row, $event)"
+            >
+              <el-option
+                v-for="environment in buildEnvironmentOptions"
+                :key="environment.value"
+                :label="environment.label"
+                :value="environment.value"
+              />
+            </el-select>
+          </template>
         </el-table-column>
         <el-table-column label="Pods" width="90" align="center">
           <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading && !runtime[scope.row.id]?.k8s" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
@@ -238,8 +253,23 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="构建环境" width="90" align="center">
-            <template #default="scope">{{ latestBuild(scope.row)?.environment || '—' }}</template>
+          <el-table-column label="构建环境" width="110" align="center">
+            <template #default="scope">
+              <el-select
+                :model-value="selectedEnvironmentFor(scope.row)"
+                size="small"
+                class="release-environment-select"
+                :aria-label="`选择 ${scope.row.planName} 的构建环境`"
+                @change="changeSelectedEnvironment(scope.row, $event)"
+              >
+                <el-option
+                  v-for="environment in buildEnvironmentOptions"
+                  :key="environment.value"
+                  :label="environment.label"
+                  :value="environment.value"
+                />
+              </el-select>
+            </template>
           </el-table-column>
           <el-table-column label="Pods" width="90" align="center">
             <template #default="scope"><span v-if="runtime[scope.row.id]?.k8sLoading && !runtime[scope.row.id]?.k8s" class="status-loading">查询中</span><span v-else>{{ k8sPodsText(runtime[scope.row.id]?.k8s) }}</span></template>
@@ -404,6 +434,12 @@ const refreshIntervalOptions = [
   { label: '60 秒', value: 60 },
   { label: '3 分钟', value: 180 }
 ]
+type BuildEnvironment = 'sit' | 'uat' | 'prd'
+const buildEnvironmentOptions: Array<{ label: string; value: BuildEnvironment }> = [
+  { label: 'SIT', value: 'sit' },
+  { label: 'UAT', value: 'uat' },
+  { label: 'PRD', value: 'prd' }
+]
 const collapsed = ref(false)
 const displayMode = ref<DisplayMode>('bottom')
 const drawerVisible = ref(false)
@@ -427,6 +463,7 @@ const buildForm = reactive({ environment: '', branch: '' })
 const branchOptions = ref<ZhaogangBranch[]>([])
 const branchLoading = ref(false)
 const branchManuallySelected = ref(false)
+const selectedEnvironmentByPlan = reactive<Record<number, BuildEnvironment>>({})
 const triggering = ref(false)
 const planNameOverflow = reactive<Record<number, boolean>>({})
 const planNameElements = new Map<number, HTMLElement>()
@@ -517,6 +554,7 @@ const switchDisplayMode = (mode: DisplayMode) => {
     if (mode === 'drawer') drawerVisible.value = true
     return
   }
+  resetSelectedEnvironments()
   displayMode.value = mode
   drawerVisible.value = mode === 'drawer'
   if (mode === 'drawer') collapsed.value = false
@@ -526,12 +564,14 @@ const switchDisplayMode = (mode: DisplayMode) => {
 }
 
 const openDrawer = () => {
+  resetSelectedEnvironments()
   if (displayMode.value !== 'drawer') switchDisplayMode('drawer')
   else drawerVisible.value = true
   void refreshMissingPlans()
 }
 
 const toggleCollapsed = () => {
+  if (collapsed.value) resetSelectedEnvironments()
   collapsed.value = !collapsed.value
   if (!collapsed.value) void refreshMissingPlans()
 }
@@ -586,19 +626,23 @@ const refreshPlan = async (releasePlan: TeamIterationReleasePlan) => {
 const k8sRefreshFailed = (status?: ReleaseK8sStatus) => status?.state === 'AGENT_OFFLINE' || status?.state === 'QUERY_FAILED'
 
 const refreshK8sPlans = async (releasePlans: TeamIterationReleasePlan[]) => {
-  const targets = releasePlans.map(releasePlan => ({
-    id: releasePlan.id,
-    planName: releasePlan.planName,
-    environment: latestBuild(releasePlan)?.environment
-  }))
+  const targetEnvironments = new Map<number, BuildEnvironment>()
+  const targets = releasePlans.map(releasePlan => {
+    const environment = selectedEnvironmentFor(releasePlan)
+    targetEnvironments.set(releasePlan.id, environment)
+    return { id: releasePlan.id, planName: releasePlan.planName, environment }
+  })
   releasePlans.forEach(releasePlan => {
     runtime[releasePlan.id] = { ...runtime[releasePlan.id], k8sLoading: true }
   })
   const statuses = await queryReleaseK8sStatuses(targets)
   releasePlans.forEach(releasePlan => {
+    if (selectedEnvironmentFor(releasePlan) !== targetEnvironments.get(releasePlan.id)) return
     const current = runtime[releasePlan.id]
     const refreshed = statuses[releasePlan.id]
-    const preserveCurrent = Boolean(current?.k8s && k8sRefreshFailed(refreshed))
+    const preserveCurrent = Boolean(
+      current?.k8s && current.k8s.environment === refreshed?.environment && k8sRefreshFailed(refreshed)
+    )
     runtime[releasePlan.id] = {
       ...current,
       k8s: preserveCurrent ? current.k8s : refreshed,
@@ -659,6 +703,43 @@ const scheduleAutoRefresh = () => {
 const latestBuild = (releasePlan: TeamIterationReleasePlan): ZhaogangBuild | undefined => {
   const detail = runtime[releasePlan.id]?.detail
   return detail?.plan.latestBuild || detail?.builds[0]
+}
+
+const normalizeBuildEnvironment = (environment?: string): BuildEnvironment | undefined => {
+  const normalized = environment?.trim().toLowerCase()
+  if (normalized === 'sit' || normalized === 'test') return 'sit'
+  if (normalized === 'uat') return 'uat'
+  if (normalized === 'prd' || normalized === 'prod' || normalized === 'production') return 'prd'
+  return undefined
+}
+
+const defaultEnvironmentFor = (releasePlan: TeamIterationReleasePlan): BuildEnvironment => {
+  const recentEnvironment = normalizeBuildEnvironment(latestBuild(releasePlan)?.environment)
+  if (recentEnvironment) return recentEnvironment
+  const plan = runtime[releasePlan.id]?.detail?.plan
+  const configuredEnvironment = plan?.environments
+    .map(normalizeBuildEnvironment)
+    .find((environment): environment is BuildEnvironment => Boolean(environment))
+  return configuredEnvironment || 'sit'
+}
+
+const selectedEnvironmentFor = (releasePlan: TeamIterationReleasePlan): BuildEnvironment =>
+  selectedEnvironmentByPlan[releasePlan.id] || defaultEnvironmentFor(releasePlan)
+
+const resetSelectedEnvironments = () => {
+  Object.keys(selectedEnvironmentByPlan).forEach(key => delete selectedEnvironmentByPlan[Number(key)])
+}
+
+const changeSelectedEnvironment = async (releasePlan: TeamIterationReleasePlan, environment: string) => {
+  const normalized = normalizeBuildEnvironment(environment)
+  if (!normalized) return
+  selectedEnvironmentByPlan[releasePlan.id] = normalized
+  runtime[releasePlan.id] = {
+    ...runtime[releasePlan.id],
+    k8s: undefined,
+    k8sRefreshError: undefined
+  }
+  await refreshK8sPlans([releasePlan])
 }
 
 const canBuild = (releasePlan: TeamIterationReleasePlan) => {
@@ -802,7 +883,11 @@ const openBuildDialog = async (releasePlan: TeamIterationReleasePlan) => {
   }
   activeReleasePlan.value = releasePlan
   const environments = detail.plan.environments
-  const environment = environments.find(item => item.toLowerCase() === 'sit') || environments[0] || ''
+  const defaultEnvironment = defaultEnvironmentFor(releasePlan)
+  const environment = environments.find(item => normalizeBuildEnvironment(item) === defaultEnvironment)
+    || environments.find(item => item.toLowerCase() === 'sit')
+    || environments[0]
+    || ''
   Object.assign(buildForm, { environment, branch: defaultBranchFor(environment, detail.plan) })
   branchManuallySelected.value = false
   branchOptions.value = []
@@ -845,6 +930,7 @@ const triggerBuild = async () => {
       current.plan.latestBuild = build
       current.builds = [build, ...current.builds.filter(item => item.id !== build.id)]
     }
+    delete selectedEnvironmentByPlan[releasePlan.id]
     await refreshK8sPlans([releasePlan])
     buildDialogVisible.value = false
     ElMessage.success('已触发 CODING 构建')
@@ -858,7 +944,10 @@ watch([autoRefreshEnabled, refreshInterval], () => {
   scheduleAutoRefresh()
 })
 watch(drawerVisible, visible => {
-  if (visible && displayMode.value === 'drawer') void refreshMissingPlans()
+  if (visible && displayMode.value === 'drawer') {
+    resetSelectedEnvironments()
+    void refreshMissingPlans()
+  }
 })
 watch(() => props.releasePlans.map(item => item.id).join(','), () => {
   const activeIds = new Set(props.releasePlans.map(item => item.id))
@@ -913,6 +1002,7 @@ defineExpose({ openDrawer })
 .release-list-viewport { min-height: 0; flex: 1 1 auto; padding: 0 12px 12px; overflow: hidden; }
 .release-list-viewport :deep(.el-empty) { height: 100%; padding: 6px 0; }
 .release-name-cell { display: grid; min-width: 0; gap: 4px; }
+.release-environment-select { width: 82px; }
 .release-plan-name { display: block; min-width: 0; overflow: hidden; color: #2c3a4f; text-overflow: ellipsis; white-space: nowrap; }
 .release-plan-name strong { color: inherit; }
 .release-project-name, .build-status-cell span, .status-loading { color: #8994a5; font-size: 12px; }

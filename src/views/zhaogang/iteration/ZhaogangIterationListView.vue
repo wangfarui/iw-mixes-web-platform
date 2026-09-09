@@ -36,13 +36,14 @@
             class="iteration-card-list"
             :data-stage="stage.value"
             :group="{ name: 'iteration-stages', pull: true, put: true }"
-            :sort="false"
+            :sort="true"
             :move="canMoveIteration"
             :animation="160"
             ghost-class="iteration-card-ghost"
             chosen-class="iteration-card-chosen"
             @start="onDragStart($event, stage.value)"
             @add="onDrop($event, stage.value)"
+            @update="onDrop($event, stage.value)"
             @end="onDragEnd"
           >
             <template #item="{ element: item }">
@@ -149,7 +150,7 @@ const canMoveIteration = (event: { to?: HTMLElement, draggedContext?: { element?
   if (!item || !item.permissions.canEdit || !targetItems) return false
   const targetStage = event.to?.dataset.stage as TeamIterationStage | undefined
     || stages.find(stage => columns[stage.value].items === targetItems)?.value
-  return Boolean(targetStage && targetStage !== item.stage)
+  return Boolean(targetStage)
 }
 
 const onDragStart = (event: DragEvent, stage: TeamIterationStage) => {
@@ -161,21 +162,27 @@ const onDragStart = (event: DragEvent, stage: TeamIterationStage) => {
 
 const onDrop = async (event: DragEvent, targetStage: TeamIterationStage) => {
   const context = dragContext
-  if (!context || context.sourceStage === targetStage) return
+  if (!context) return
   const { item, sourceStage, sourceIndex } = context
+  const targetItems = columns[targetStage].items
+  const movedIndex = event.newIndex ?? targetItems.findIndex(current => current.id === item.id)
+  const previousIterationId = movedIndex > 0 ? targetItems[movedIndex - 1]?.id : undefined
+  const nextIterationId = movedIndex >= 0 ? targetItems[movedIndex + 1]?.id : undefined
   transitioningIds.add(item.id)
   try {
-    const updated = await transitionTeamIteration(item.id, item.versionNo, targetStage)
+    const updated = await transitionTeamIteration(item.id, item.versionNo, targetStage,
+      previousIterationId, nextIterationId)
     Object.assign(item, updated)
-    columns[sourceStage].total = Math.max(0, columns[sourceStage].total - 1)
-    columns[targetStage].total += 1
-    ElMessage.success(`已更新为${stageLabel(targetStage)}`)
+    if (sourceStage !== targetStage) {
+      columns[sourceStage].total = Math.max(0, columns[sourceStage].total - 1)
+      columns[targetStage].total += 1
+      ElMessage.success(`已更新为${stageLabel(targetStage)}`)
+    } else ElMessage.success('排序已保存')
   } catch (error) {
-    const targetItems = columns[targetStage].items
-    const movedIndex = event.newIndex ?? targetItems.findIndex(current => current.id === item.id)
-    if (movedIndex >= 0) targetItems.splice(movedIndex, 1)
+    const currentIndex = targetItems.findIndex(current => current.id === item.id)
+    if (currentIndex >= 0) targetItems.splice(currentIndex, 1)
     columns[sourceStage].items.splice(Math.min(sourceIndex, columns[sourceStage].items.length), 0, item)
-    ElMessage.error(error instanceof Error ? error.message : '迭代状态更新失败')
+    ElMessage.error(error instanceof Error ? error.message : '迭代位置更新失败')
   } finally {
     transitioningIds.delete(item.id)
     dragContext = undefined
@@ -212,8 +219,7 @@ onMounted(async () => { await Promise.all([searchMembers(''), reloadBoard()]) })
 .column-header>div { display: flex; align-items: center; gap: 8px; }.column-header span:not(.stage-mark) { color: #8a96a8; font-size: 13px; }
 .stage-mark { width: 8px; height: 8px; border-radius: 50%; background: #9aa5b5; }.stage-mark.developing { background: #2878ed; }.stage-mark.testing { background: #e79b20; }.stage-mark.released { background: #28a06a; }
 .column-body { position: relative; min-height: 0; flex: 1; padding: 10px; overflow-y: auto; }
-.iteration-card-list { min-height: 8px; }
-.iteration-card-list:empty { min-height: 100%; }
+.iteration-card-list { min-height: 100%; }
 .column-body > :deep(.el-empty) { position: absolute; inset: 42% 0 auto; pointer-events: none; }
 .iteration-card { display: block; width: 100%; min-height: 124px; padding: 14px; margin-bottom: 10px; color: #26344a; text-align: left; background: #fff; border: 1px solid #e1e6ee; border-radius: 6px; cursor: pointer; }
 .iteration-card:not(:disabled) { cursor: grab; }.iteration-card:not(:disabled):active { cursor: grabbing; }
@@ -226,6 +232,6 @@ onMounted(async () => { await Promise.all([searchMembers(''), reloadBoard()]) })
 .iteration-card header strong { min-width: 0; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }.iteration-card header span { color: #66758b; font-size: 12px; white-space: nowrap; }
 .card-meta { margin-top: 18px; color: #7e8999; font-size: 12px; }.card-meta span { display: flex; align-items: center; gap: 4px; }
 .iteration-card footer { padding-top: 12px; margin-top: 12px; color: #8994a4; font-size: 11px; border-top: 1px solid #edf0f4; }
-.column-state { position: absolute; right: 0; bottom: 10px; left: 0; padding: 10px; color: #9aa4b3; font-size: 12px; text-align: center; }
+.column-state { position: absolute; right: 0; bottom: 10px; left: 0; padding: 10px; color: #9aa4b3; font-size: 12px; text-align: center; pointer-events: none; }
 @media(max-width:900px){.iteration-board-view{height:auto;min-height:calc(100vh - 120px)}.board-toolbar{align-items:stretch;flex-direction:column}.toolbar-filters,.toolbar-actions{flex-wrap:wrap}.board-scroll{min-height:620px}.toolbar-filters :deep(.el-select),.toolbar-filters :deep(.el-input){width:100%}}
 </style>

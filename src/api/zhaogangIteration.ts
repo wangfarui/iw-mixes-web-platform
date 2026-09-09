@@ -68,9 +68,10 @@ export const updateTeamIteration = (id: number, command: TeamIterationUpdateComm
   `/iterations/${id}`, { method: 'PUT', body: JSON.stringify(command) }
 ).then(normalizeDetail)
 
-export const transitionTeamIteration = (id: number, versionNo: number, targetStage: TeamIterationStage) =>
+export const transitionTeamIteration = (id: number, versionNo: number, targetStage: TeamIterationStage,
+  previousIterationId?: number, nextIterationId?: number) =>
   zhaogangRequest<TeamIterationDetail>(`/iterations/${id}/stage`, {
-    method: 'POST', body: JSON.stringify({ versionNo, targetStage })
+    method: 'POST', body: JSON.stringify({ versionNo, targetStage, previousIterationId, nextIterationId })
   }).then(normalizeDetail)
 
 export const replaceTeamIterationMembers = (id: number, versionNo: number, members: TeamIterationMemberInput[]) =>

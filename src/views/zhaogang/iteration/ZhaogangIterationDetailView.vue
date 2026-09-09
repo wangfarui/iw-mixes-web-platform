@@ -535,6 +535,11 @@ const handleIssueExpandChange = (issue: TeamIterationIssue, expanded: boolean) =
   if (!expanded) filterExpandedIssueIds.value = filterExpandedIssueIds.value.filter(issueId => issueId !== issue.id)
 }
 
+const expandIssueAfterChildAdded = (issueId: number) => {
+  if (!detail.value || !iterationIssueParentIds(detail.value.issues).includes(issueId)) return
+  expandedIssueIds.value = [...new Set([...expandedIssueIds.value, issueId])]
+}
+
 const issueSaved = () => { void load() }
 
 const releasePlanAdded = (releasePlan: TeamIterationReleasePlan) => {
@@ -600,12 +605,15 @@ const openChildEditor = (issue: TeamIterationIssue) => {
 
 const saveChildIssue = async () => {
   if (!childParent.value || !childSubmitEnabled.value) return
+  const parentIssueId = childParent.value.id
+  const shouldExpandParent = !visibleExpandedIssueKeys.value.includes(String(parentIssueId))
   saving.value = true
   try {
     if (childMode.value === 'LINK') {
       const urls = extractCodingIssueUrls(childCodingUrl.value)
-      const result = await associateCodingIssues(urls, childParent.value.id)
+      const result = await associateCodingIssues(urls, parentIssueId)
       await load()
+      if (result.successCount && shouldExpandParent) expandIssueAfterChildAdded(parentIssueId)
       if (!result.failures.length) {
         childCodingUrl.value = ''
         childDialogVisible.value = false
@@ -616,7 +624,7 @@ const saveChildIssue = async () => {
       }
     } else {
       const syncRequested = childSyncToCoding.value
-      const created = await addTeamIterationChildIssue(id(), childParent.value.id, {
+      const created = await addTeamIterationChildIssue(id(), parentIssueId, {
         issueType: childForm.issueType, title: childForm.title.trim(), description: childForm.description || undefined,
         developmentTeam: childForm.issueType === 'USER_STORY' ? childForm.developmentTeam : undefined,
         definitionOfDone: childForm.issueType === 'USER_STORY' ? childForm.definitionOfDone : undefined,
@@ -628,6 +636,7 @@ const saveChildIssue = async () => {
       })
       childDialogVisible.value = false
       await load()
+      if (shouldExpandParent) expandIssueAfterChildAdded(parentIssueId)
       if (!syncRequested) ElMessage.success('子事项已创建')
       else if (created.syncStatus === 'SYNCED') ElMessage.success('子事项已创建并同步 CODING')
       else if (created.syncStatus === 'UNKNOWN') ElMessage.warning(created.syncMessage || '子事项已创建，CODING 同步结果不确定，请先核对后再处理')

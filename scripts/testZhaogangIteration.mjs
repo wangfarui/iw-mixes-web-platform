@@ -153,9 +153,10 @@ await build({
 })
 
 let capturedRequest
+let responseData = null
 globalThis.fetch = async (url, init) => {
   capturedRequest = {url: String(url), init}
-  return new Response(JSON.stringify({code: 200, message: 'success', data: null}), {
+  return new Response(JSON.stringify({code: 200, message: 'success', data: responseData}), {
     status: 200,
     headers: {'Content-Type': 'application/json'}
   })
@@ -173,6 +174,14 @@ assert.equal(capturedRequest.init.method, 'POST')
 assert.deepEqual(JSON.parse(capturedRequest.init.body), {
   issueType: 'SUB_TASK', title: '实现接口', syncToCoding: true
 })
+responseData = {issues: [], members: [], releasePlans: [], issueCount: 0}
+await iterationApi.transitionTeamIteration(7, 3, 'TESTING', 5, 9)
+assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/stage')
+assert.equal(capturedRequest.init.method, 'POST')
+assert.deepEqual(JSON.parse(capturedRequest.init.body), {
+  versionNo: 3, targetStage: 'TESTING', previousIterationId: 5, nextIterationId: 9
+})
+responseData = null
 
 const detailSource = await readFile(
   path.join(root, 'src/views/zhaogang/iteration/ZhaogangIterationDetailView.vue'),
@@ -192,6 +201,9 @@ assert.match(detailSource, /const visibleExpandedIssueKeys = computed\(\(\) => i
 assert.match(detailSource, /@expand-change="handleIssueExpandChange"/)
 assert.doesNotMatch(detailSource, /default-expand-all/)
 assert.match(detailSource, /preserveExpansion[\s\S]*retainExpandedIterationIssueIds\(expandedIssueIds\.value, loadedDetail\.issues\)/)
+assert.match(detailSource, /const shouldExpandParent = !visibleExpandedIssueKeys\.value\.includes\(String\(parentIssueId\)\)/)
+assert.match(detailSource, /if \(result\.successCount && shouldExpandParent\) expandIssueAfterChildAdded\(parentIssueId\)/)
+assert.match(detailSource, /await load\(\)\s+if \(shouldExpandParent\) expandIssueAfterChildAdded\(parentIssueId\)/)
 assert.match(detailSource, /暂无匹配事项/)
 assert.doesNotMatch(detailSource, /:model-value="detail\.stage"/)
 assert.match(detailSource, /label="迭代状态" required><el-select v-model="editForm\.stage"/)
@@ -201,6 +213,19 @@ assert.match(detailSource, /v-model="childSyncToCoding"/)
 assert.match(detailSource, /:disabled="!childAutoSyncAvailability\.enabled"/)
 assert.match(detailSource, /syncToCoding: syncRequested/)
 assert.ok(detailSource.indexOf('class="child-entry-row"') < detailSource.indexOf('<template v-if="childMode === \'LINK\'">'))
+
+const boardSource = await readFile(
+  path.join(root, 'src/views/zhaogang/iteration/ZhaogangIterationListView.vue'),
+  'utf8'
+)
+assert.match(boardSource, /:sort="true"/)
+assert.match(boardSource, /@update="onDrop\(\$event, stage\.value\)"/)
+assert.match(boardSource, /previousIterationId[\s\S]*nextIterationId/)
+assert.match(boardSource, /sourceStage !== targetStage/)
+assert.match(boardSource, /排序已保存/)
+assert.doesNotMatch(boardSource, /targetStage !== item\.stage/)
+assert.match(boardSource, /\.iteration-card-list \{ min-height: 100%; \}/)
+assert.match(boardSource, /\.column-state \{[^}]*pointer-events: none;/)
 
 const workbenchSource = await readFile(
   path.join(root, 'src/views/zhaogang/ZhaogangWorkbench.vue'),
