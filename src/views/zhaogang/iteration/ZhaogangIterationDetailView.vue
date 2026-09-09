@@ -823,8 +823,8 @@ const canSync = (issue: TeamIterationIssue) => issue.source === 'WORKBENCH' && (
 const canModifyCoding = (issue: TeamIterationIssue) => Boolean(issue.issueCode) && (issue.source === 'CODING' || issue.syncStatus === 'SYNCED')
 const canRegisterWorklog = (issue: TeamIterationIssue) => issue.issueType === 'SUB_TASK' && canModifyCoding(issue)
 const localWorklogTotal = (issue: TeamIterationIssue) => issue.worklogs.reduce((sum, item) => sum + Number(item.spendHours || 0), 0)
-const worklogTotal = (issue: TeamIterationIssue) => Math.max(Number(issue.recordedHours || 0), localWorklogTotal(issue)).toFixed(2).replace(/\.00$/, '')
-const worklogCount = (issue: TeamIterationIssue) => Math.max(Number(issue.recordedWorklogCount || 0), issue.worklogs.length)
+const worklogTotal = (issue: TeamIterationIssue) => Number(issue.recordedHours ?? localWorklogTotal(issue)).toFixed(2).replace(/\.00$/, '')
+const worklogCount = (issue: TeamIterationIssue) => Number(issue.recordedWorklogCount ?? issue.worklogs.length)
 const failedWorklogs = (issue: TeamIterationIssue) => issue.worklogs.filter(item => item.syncStatus === 'FAILED')
 const issueLevels = computed(() => {
   const levels = new Map<number, number>()

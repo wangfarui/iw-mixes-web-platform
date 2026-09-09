@@ -213,6 +213,9 @@ assert.match(detailSource, /v-model="childSyncToCoding"/)
 assert.match(detailSource, /:disabled="!childAutoSyncAvailability\.enabled"/)
 assert.match(detailSource, /syncToCoding: syncRequested/)
 assert.ok(detailSource.indexOf('class="child-entry-row"') < detailSource.indexOf('<template v-if="childMode === \'LINK\'">'))
+assert.match(detailSource, /issue\.recordedHours \?\? localWorklogTotal\(issue\)/)
+assert.match(detailSource, /issue\.recordedWorklogCount \?\? issue\.worklogs\.length/)
+assert.doesNotMatch(detailSource, /Math\.max\(Number\(issue\.recordedHours/)
 
 const boardSource = await readFile(
   path.join(root, 'src/views/zhaogang/iteration/ZhaogangIterationListView.vue'),
