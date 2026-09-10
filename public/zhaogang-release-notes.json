@@ -1,7 +1,119 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-09-10-01",
+  "currentReleaseId": "zg-2026-09-10-09",
   "releases": [
+    {
+      "id": "zg-2026-09-10-09",
+      "version": "1.5.4",
+      "publishedAt": "2026-09-10T17:59:10+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "优化 AI Agent 配置展示，已保存的 API Key 使用前后截断脱敏，并补充执行位置说明"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-08",
+      "version": "1.5.3",
+      "publishedAt": "2026-09-10T17:50:53+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "设置页 AI 配置分类更名为 AI Agent，并将新配置的默认模型调整为 gpt-5.6-terra"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-07",
+      "version": "1.5.2",
+      "publishedAt": "2026-09-10T17:36:54+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "截图识别结果默认折叠已添加和截图重复记录，并支持按需展开查看"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-06",
+      "version": "1.5.1",
+      "publishedAt": "2026-09-10T17:18:54+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "添加发布项目弹窗按操作方式自动调整宽度，手动添加更紧凑，截图识别保持完整预览空间"
+        },
+        {
+          "type": "FIX",
+          "text": "构建计划匹配优先使用支持快捷构建的计划，避免同名不可执行计划导致错误歧义"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-05",
+      "version": "1.5.0",
+      "publishedAt": "2026-09-10T16:49:59+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "添加发布项目默认使用手动添加，截图识别改为先粘贴或上传并预览图片，再由用户确认开始识别"
+        },
+        {
+          "type": "FEATURE",
+          "text": "截图识别支持自定义源项目和源构建计划列名，并在当前浏览器中保留配置"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "优化 CODING 项目和构建计划匹配，支持项目名称大小写差异及常见服务计划后缀"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-04",
+      "version": "1.4.2",
+      "publishedAt": "2026-09-10T16:12:56+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "精简本机 Agent 设置面板，移除重复的版本说明和安装路径提示"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-03",
+      "version": "1.4.1",
+      "publishedAt": "2026-09-10T15:51:42+08:00",
+      "items": [
+        {
+          "type": "FIX",
+          "text": "修复旧版 Agent 正在运行时无法获取最新版本、无法从设置页发起升级的问题"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-10-02",
+      "version": "1.4.0",
+      "publishedAt": "2026-09-10T11:00:00+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "迭代发布项目支持粘贴或上传表格截图，识别并预览 CODING 项目与可快捷构建计划后批量添加"
+        },
+        {
+          "type": "FEATURE",
+          "text": "设置页新增 AI 识别配置和统一工作台 Agent 管理，支持服务端与本机 Agent 两种 AI 执行位置"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "本机 Agent 升级为 zg-workbench-agent 2.0.0，兼容旧 K8s 入口并自动迁移配置、自启和安装目录"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "设置页升级为顶部横向分类配置中心，空间充足时自动铺满、不足时横向滚动；K8s Token 改为状态列表并通过弹窗配置或更换"
+        }
+      ]
+    },
     {
       "id": "zg-2026-09-10-01",
       "version": "1.3.2",

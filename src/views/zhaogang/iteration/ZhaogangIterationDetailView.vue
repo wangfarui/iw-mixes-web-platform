@@ -174,6 +174,7 @@
         :can-edit="detail.permissions.canEdit"
         @added="releasePlanAdded"
         @removed="releasePlanRemoved"
+        @refresh="load"
         @mode-change="onReleasePanelModeChange"
       />
     </template>

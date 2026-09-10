@@ -3,11 +3,12 @@ import {
   getZhaogangK8sTokenStatus
 } from '@/api/zhaogang'
 import {
-  listAllZgK8sDeployments,
-  zgK8sAgentClient,
-  getZgK8sAgentPort,
-  type ZgK8sAgentClient
-} from '@/services/zgK8sAgentClient'
+  checkZgWorkbenchAgent,
+  getZgWorkbenchAgentPort,
+  listAllZgWorkbenchDeployments,
+  zgWorkbenchAgentClient,
+  type ZgWorkbenchAgentClient
+} from '@/services/zgWorkbenchAgentClient'
 import type {
   ZgK8sAgentHealth,
   ZgK8sDeployment,
@@ -78,7 +79,7 @@ const writeNamespaceCache = (value: Record<string, string>) => {
   window.localStorage.setItem(namespaceCacheKey, JSON.stringify(value))
 }
 
-const namespaceFor = async (client: ZgK8sAgentClient, environment: ZgK8sEnvironment) => {
+const namespaceFor = async (client: ZgWorkbenchAgentClient, environment: ZgK8sEnvironment) => {
   const cached = readNamespaceCache()
   const namespaces = await client.namespaces(environment)
   let namespace = cached[environment] || namespaces[0]?.name || 'application'
@@ -115,14 +116,21 @@ export const queryReleaseK8sStatuses = async (
   }
   if (!grouped.size) return result
 
-  let client: ZgK8sAgentClient
+  let client: ZgWorkbenchAgentClient
   try {
-    client = zgK8sAgentClient(options.port ?? getZgK8sAgentPort())
+    const agentState = await checkZgWorkbenchAgent()
+    if (!agentState.compatible) {
+      targets.forEach(target => {
+        if (result[target.id]?.state === 'QUERYING') result[target.id] = { state: 'AGENT_OFFLINE', message: agentState.message || '本机 Agent 未就绪，请前往设置处理' }
+      })
+      return result
+    }
+    client = zgWorkbenchAgentClient(options.port ?? getZgWorkbenchAgentPort())
     let health: ZgK8sAgentHealth
     try {
       health = await client.health()
     } catch (error) {
-      const message = error instanceof Error ? error.message : '未检测到 zg-k8s-agent，请确认程序已启动'
+      const message = error instanceof Error ? error.message : '未检测到工作台 Agent，请确认程序已启动'
       targets.forEach(target => {
         if (result[target.id]?.state === 'QUERYING') result[target.id] = { state: 'AGENT_OFFLINE', message }
       })
@@ -131,7 +139,7 @@ export const queryReleaseK8sStatuses = async (
     options.onHealth?.(health)
     if (!health.running) {
       targets.forEach(target => {
-        if (result[target.id]?.state === 'QUERYING') result[target.id] = { state: 'AGENT_OFFLINE', message: '未检测到 zg-k8s-agent，请确认程序已启动' }
+        if (result[target.id]?.state === 'QUERYING') result[target.id] = { state: 'AGENT_OFFLINE', message: '未检测到工作台 Agent，请确认程序已启动' }
       })
       return result
     }
@@ -161,7 +169,7 @@ export const queryReleaseK8sStatuses = async (
           if (!refreshed.environments?.[environment]) throw new Error('对应环境 Token 无法连接 Agent')
         }
         const namespace = await namespaceFor(client, environment)
-        const deployments = await listAllZgK8sDeployments(client, environment, namespace)
+        const deployments = await listAllZgWorkbenchDeployments(client, environment, namespace)
         const byName = new Map(deployments.map(item => [item.name, item]))
         environmentTargets.forEach(target => {
           const name = deploymentNameFromPlanName(target.planName)!

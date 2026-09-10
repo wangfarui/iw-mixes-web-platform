@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --mode prod",
-    "prebuild": "npm run check:zg-k8s-agent && npm run check:zhaogang-release-notes",
+    "prebuild": "npm run test:zg-workbench-agent-update && npm run check:zg-workbench-agent && npm run check:zhaogang-release-notes",
     "build-check": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build --mode prod",
@@ -29,7 +29,9 @@
     "test:auth-session": "node scripts/testAuthSession.mjs",
     "test:zhaogang-iteration": "node scripts/testZhaogangIteration.mjs",
     "test:zhaogang-release-k8s": "node scripts/testZhaogangReleaseK8s.mjs",
+    "test:zhaogang-release-import": "node scripts/testZhaogangReleaseImport.mjs",
     "test:zhaogang-k8s-token-state": "node scripts/testZhaogangK8sTokenState.mjs",
+    "test:zg-workbench-agent-update": "node scripts/testZgWorkbenchAgentUpdate.mjs",
     "test:zhaogang-permission-prompt": "node scripts/testZhaogangPermissionPrompt.mjs",
     "test:zhaogang-release-notes": "node scripts/testZhaogangReleaseNotes.mjs",
     "test:remote-share": "node scripts/testRemoteShareProtocol.mjs",
@@ -38,7 +40,7 @@
     "ai-launcher:status": "node scripts/aiLauncher.mjs status",
     "ai-launcher:pair": "node scripts/aiLauncher.mjs pair",
     "type-check": "vue-tsc --build --force",
-    "check:zg-k8s-agent": "node scripts/checkZgK8sAgentRelease.mjs",
+    "check:zg-workbench-agent": "node scripts/checkZgWorkbenchAgentRelease.mjs",
     "check:zhaogang-release-notes": "node scripts/checkZhaogangReleaseNotes.mjs"
   },
   "dependencies": {

@@ -266,5 +266,6 @@ assert.match(releasePanelSource, /loading: !hasDetail/)
 assert.match(releasePanelSource, /detailRefreshing: hasDetail/)
 assert.equal(releasePanelSource.match(/k8sLoading && !runtime\[scope\.row\.id\]\?\.k8s/g)?.length, 2)
 assert.match(releasePanelSource, /k8s: preserveCurrent \? current\.k8s : refreshed/)
+assert.match(releasePanelSource, /const environment = environments\.find\(item => normalizeBuildEnvironment\(item\) === 'sit'\)[\s\S]*?\|\| environments\[0\][\s\S]*?\|\| ''/)
 
 console.log('zhaogang iteration tests passed')

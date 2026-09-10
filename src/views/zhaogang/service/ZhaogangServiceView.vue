@@ -1,41 +1,8 @@
 <template>
   <section class="service-page">
     <header class="service-heading">
-      <div class="heading-actions">
-        <el-tag
-          v-if="health"
-          :type="agentOnline ? 'success' : 'warning'"
-          effect="light"
-        >{{ agentOnline ? "Agent 在线" : "Agent 等待连接" }}</el-tag
-        ><el-tag v-if="health?.version" type="info" effect="light">v{{ health.version }}</el-tag
-        ><el-tag v-if="health" :type="autostartEnabled ? 'success' : 'warning'" effect="light"
-          >{{ autostartEnabled ? "开机自启已开启" : "开机自启未开启" }}</el-tag
-        ><el-button v-if="health && !autostartEnabled" link type="warning" @click="toggleAutostart"
-          >设置开机自启</el-button
-        ><el-button :icon="QuestionFilled" @click="openInstallGuide">使用教程</el-button>
-      </div>
-      <div class="service-heading-right">
-        <div class="environment-state">
-          <el-tag
-            :type="tokenConfigured ? 'success' : 'warning'"
-            effect="plain"
-            >{{ tokenConfigured ? "Token 已配置" : "Token 未配置" }}</el-tag
-          >
-          <el-button
-            v-if="tokenConfigured"
-            link
-            type="primary"
-            @click="tokenEditing = true"
-            >更换 Token</el-button
-          ><el-button
-            v-if="tokenConfigured"
-            link
-            type="danger"
-            @click="removeToken"
-            >删除 Token</el-button
-          >
-        </div>
-      </div>
+      <div><h2>K8s 服务</h2><p>查看当前环境 Deployment 和 Pod 状态。</p></div>
+      <el-button v-if="tokenConfigured" link type="primary" @click="openAgentTokenSettings">前往设置管理 Token</el-button>
     </header>
     <el-alert
       v-if="agentError"
@@ -45,38 +12,9 @@
       class="service-alert"
       :title="agentError"
       ><template #default
-        ><div class="alert-actions">
-          <el-button link type="primary" :loading="startingAgent" @click="startAgent"
-            >启动 zg-k8s-agent</el-button
-          ><el-button link type="primary" @click="openDownload"
-            >下载 Agent</el-button
-          >
-        </div></template
+        ><el-button link type="primary" @click="openAgentSettings">前往设置处理 Agent</el-button></template
       ></el-alert
-    ><el-alert
-      v-if="updateCheckError"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="service-alert"
-      :title="updateCheckError"
-      ><template #default
-        ><el-button link type="primary" @click="openDownload">下载最新 Agent</el-button>
-      </template></el-alert
-    ><el-alert
-      v-if="updateInfo?.updateAvailable"
-      type="info"
-      :closable="false"
-      show-icon
-      class="service-alert"
-      :title="`zg-k8s-agent 有新版本 ${updateInfo.latestVersion}`"
-      ><template #default
-        ><span>{{ updateInfo.releaseNotes || "建议更新到最新版本。" }}</span
-        ><el-button link type="primary" :loading="updating" @click="updateAgent"
-          >{{ manualUpdateRequired ? "下载新版" : "立即更新" }}</el-button
-        ></template
-      ></el-alert
-    ><template v-if="health"
+    ><template v-if="agentReady"
       ><div class="environment-tabs">
         <el-radio-group
           v-model="environment"
@@ -117,14 +55,12 @@
         </div>
       </div>
       <el-card
-        v-if="!tokenConfigured || tokenEditing"
+        v-if="!tokenConfigured"
         shadow="never"
         class="token-card"
         ><template #header
           ><strong>{{
-            tokenConfigured
-              ? `更新 ${environmentLabel(environment)} Token`
-              : `配置 ${environmentLabel(environment)} Token`
+            `配置 ${environmentLabel(environment)} Token`
           }}</strong></template
         >
         <div class="token-form">
@@ -141,8 +77,6 @@
             :disabled="!tokenInput.trim()"
             @click="saveToken"
             >保存并连接</el-button
-          ><el-button v-if="tokenConfigured" @click="tokenEditing = false"
-            >取消</el-button
           >
         </div>
         <p class="muted-copy">
@@ -261,33 +195,27 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { QuestionFilled, Refresh, TopRight } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+import { Refresh, TopRight } from "@element-plus/icons-vue";
 import {
-  deleteZhaogangK8sToken,
   getZhaogangK8sToken,
   getZhaogangK8sTokenStatus,
   saveZhaogangK8sToken,
 } from "@/api/zhaogang";
 import {
-  checkZgK8sAgentWebUpdate,
-  getZgK8sAgentPort,
-  resolveZgK8sAgentDownloadUrl,
-  saveZgK8sAgentPort,
-  zgK8sAgentClient,
-  zgK8sAgentStartProtocol,
-} from "@/services/zgK8sAgentClient";
+  checkZgWorkbenchAgent,
+  getZgWorkbenchAgentPort,
+  saveZgWorkbenchAgentPort,
+  zgWorkbenchAgentClient,
+} from "@/services/zgWorkbenchAgentClient";
 import { zhaogangK8sDashboardUrl } from "@/services/zhaogangReleaseK8s";
 import { mergeZhaogangK8sTokenConfigured } from "@/services/zhaogangK8sTokenState";
 import type {
-  ZgK8sAgentHealth,
-  ZgK8sAgentUpdateStatus,
-  ZgK8sAgentUpdateInfo,
   ZgK8sDeployment,
   ZgK8sEnvironment,
   ZgK8sPod,
 } from "@/types/zhaogangService";
-import { ZgK8sAgentError } from "@/types/zhaogangService";
+import type { ZgWorkbenchAgentHealth } from "@/services/zgWorkbenchAgentClient";
 
 const environments: ZgK8sEnvironment[] = ["test", "uat", "prd"];
 const namespaceCacheKey = "zhaogang:k8s-namespaces";
@@ -310,8 +238,8 @@ const readRefreshIntervalPreference = () => {
 };
 const writeRefreshIntervalPreference = (value: number) =>
   window.localStorage.setItem(refreshIntervalCacheKey, String(value));
-const portInput = ref(getZgK8sAgentPort());
-const health = ref<ZgK8sAgentHealth | null>(null);
+const portInput = ref(getZgWorkbenchAgentPort());
+const health = ref<ZgWorkbenchAgentHealth | null>(null);
 const environment = ref<ZgK8sEnvironment>("test");
 const tokenStatus = ref<Record<ZgK8sEnvironment, boolean>>({
   test: false,
@@ -319,7 +247,6 @@ const tokenStatus = ref<Record<ZgK8sEnvironment, boolean>>({
   prd: false,
 });
 const tokenInput = ref("");
-const tokenEditing = ref(false);
 const tokenSaving = ref(false);
 const namespace = ref("");
 const deployments = ref<ZgK8sDeployment[]>([]);
@@ -328,7 +255,6 @@ const podLoading = ref<Record<string, boolean>>({});
 const expandedDeploymentNames = ref<string[]>([]);
 const keyword = ref("");
 const agentError = ref("");
-const updateCheckError = ref("");
 const errorMessage = ref("");
 const loading = ref(false);
 const environmentLoading = ref(false);
@@ -338,19 +264,14 @@ const page = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
 const updatedAt = ref("");
-const updating = ref(false);
-const startingAgent = ref(false);
-const manualUpdateRequired = ref(false);
-const autostartEnabled = ref(false);
-const updateInfo = ref<ZgK8sAgentUpdateInfo | null>(null);
 const router = useRouter();
 let pollTimer: number | undefined;
 let environmentLoadSequence = 0;
 let deploymentLoadSequence = 0;
 const client = () =>
-  zgK8sAgentClient(saveZgK8sAgentPort(Number(portInput.value)));
+  zgWorkbenchAgentClient(saveZgWorkbenchAgentPort(Number(portInput.value)));
 const tokenConfigured = computed(() => tokenStatus.value[environment.value]);
-const agentOnline = computed(() => Boolean(health.value?.running));
+const agentReady = computed(() => Boolean(health.value && health.value.running && !agentError.value));
 const environmentAuthenticated = (target = environment.value) =>
   Boolean(health.value?.environments?.[target]);
 const filteredDeployments = computed(() => {
@@ -372,8 +293,6 @@ const updatedText = computed(() =>
 );
 const environmentLabel = (value: ZgK8sEnvironment) =>
   value === "prd" ? "生产 PRD" : value === "uat" ? "预发 UAT" : "测试 TEST";
-const isMacOSAgent = () =>
-  /mac|darwin/i.test(`${window.navigator.platform} ${window.navigator.userAgent}`);
 const readNamespaceCache = (): Record<string, string> => {
   try {
     return JSON.parse(
@@ -412,49 +331,24 @@ const podTagType = (status: string) =>
       : status === "Pending"
         ? "warning"
         : "danger";
-const updateCheckMessage = (error: unknown) => {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("invalid character '<'") || message.includes("响应格式错误"))
-    return "Agent 更新清单暂不可用，请先发布最新 Agent 资源";
-  return message ? `暂时无法检查 Agent 更新：${message}` : "暂时无法检查 Agent 更新";
-};
 const checkAgent = async () => {
   agentError.value = "";
-  updateCheckError.value = "";
-  updateInfo.value = null;
-  manualUpdateRequired.value = false;
   try {
-    health.value = await client().health();
-    autostartEnabled.value = health.value.autostartEnabled;
-    try {
-      updateInfo.value = await client().checkUpdate();
-    } catch (error) {
-      updateCheckError.value = updateCheckMessage(error);
+    const state = await checkZgWorkbenchAgent();
+    health.value = state.health || null;
+    if (!state.compatible) {
+      agentError.value = state.message || "本机 Agent 未就绪，请前往设置处理";
+      return;
     }
-    if (!updateInfo.value?.updateAvailable) {
-      const localUpdate = await checkZgK8sAgentWebUpdate(health.value.version);
-      if (localUpdate) {
-        updateInfo.value = localUpdate;
-        manualUpdateRequired.value = true;
-        updateCheckError.value = "";
-      }
-    }
-    if (updateInfo.value?.updateAvailable && isMacOSAgent() && health.value.backgroundAgent !== true)
-      manualUpdateRequired.value = true;
     const status = await getZhaogangK8sTokenStatus();
     tokenStatus.value = mergeZhaogangK8sTokenConfigured(
       status.configured,
-      health.value.environments,
+      health.value?.environments,
     );
     await loadEnvironment();
   } catch (error) {
     health.value = null;
-    agentError.value =
-      error instanceof ZgK8sAgentError
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : "未检测到 zg-k8s-agent，请确认程序已启动";
+    agentError.value = error instanceof Error ? error.message : "本机 Agent 未就绪，请前往设置处理";
   }
 };
 const restoreEnvironmentSession = async (target: ZgK8sEnvironment) => {
@@ -585,15 +479,11 @@ const saveToken = async () => {
   tokenSaving.value = true;
   errorMessage.value = "";
   try {
-    const status = await saveZhaogangK8sToken(
-      environment.value,
-      tokenInput.value,
-    );
-    tokenStatus.value = status.configured;
     await client().login(environment.value, tokenInput.value.trim());
-    tokenInput.value = "";
-    tokenEditing.value = false;
     health.value = await client().health();
+    const status = await saveZhaogangK8sToken(environment.value, tokenInput.value.trim());
+    tokenStatus.value = status.configured;
+    tokenInput.value = "";
     await loadEnvironment();
     ElMessage.success(
       `${environmentLabel(environment.value)} Token 已保存并连接`,
@@ -605,139 +495,14 @@ const saveToken = async () => {
     tokenSaving.value = false;
   }
 };
-const removeToken = async () => {
-  try {
-    await ElMessageBox.confirm(
-      `确定删除 ${environmentLabel(environment.value)} Token 吗？`,
-      "删除 Token",
-      { type: "warning" },
-    );
-    tokenStatus.value = (
-      await deleteZhaogangK8sToken(environment.value)
-    ).configured;
-    await client().logout(environment.value);
-    tokenEditing.value = false;
-    deployments.value = [];
-    health.value = await client().health();
-    ElMessage.success("Token 已删除");
-  } catch (error) {
-    if (error !== "cancel")
-      errorMessage.value =
-        error instanceof Error ? error.message : "Token 删除失败";
-  }
-};
+const openAgentSettings = () => void router.push({ path: "/zhaogang/settings", query: { section: "agent" } });
+const openAgentTokenSettings = () => void router.push({ path: "/zhaogang/settings", query: { section: "agent-k8s", environment: environment.value } });
 const openDashboard = (deploymentName: string) =>
   window.open(
     zhaogangK8sDashboardUrl(environment.value, namespace.value, deploymentName),
     "_blank",
     "noopener,noreferrer",
   );
-const startAgent = async () => {
-  if (startingAgent.value) return;
-  startingAgent.value = true;
-  agentError.value = "";
-  const deadline = Date.now() + 10000;
-  let started = false;
-  try {
-    zgK8sAgentStartProtocol();
-    while (Date.now() < deadline) {
-      await wait(400);
-      try {
-        const refreshed = await client().health();
-        health.value = refreshed;
-        autostartEnabled.value = refreshed.autostartEnabled;
-        started = true;
-        break;
-      } catch {
-        // The protocol handler may need a few seconds to start the local process.
-      }
-    }
-    if (!started) {
-      agentError.value = "已发送 Agent 启动请求，但暂未检测到本机服务，请稍后重试";
-      ElMessage.warning(agentError.value);
-      return;
-    }
-    ElMessage.success("zg-k8s-agent 启动成功，页面即将刷新");
-    window.setTimeout(() => window.location.reload(), 700);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Agent 启动失败";
-    agentError.value = message;
-    ElMessage.error(message);
-  } finally {
-    startingAgent.value = false;
-  }
-};
-const openInstallGuide = () => {
-  const target = window.open(
-    router.resolve("/zhaogang/services/install").href,
-    "_blank",
-    "noopener",
-  );
-  if (target) target.opener = null;
-};
-const openDownload = async () => {
-  const url = await resolveZgK8sAgentDownloadUrl();
-  const link = document.createElement("a");
-  link.href = url;
-  link.click();
-};
-const toggleAutostart = async () => {
-  try {
-    const result = await client().autostart(!autostartEnabled.value);
-    autostartEnabled.value = result.enabled;
-  } catch (error) {
-    ElMessage.error(
-      error instanceof Error ? error.message : "开机自启设置失败",
-    );
-  }
-};
-const wait = (milliseconds: number) =>
-  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
-const updateAgent = async () => {
-  const targetVersion = updateInfo.value?.latestVersion;
-  if (!targetVersion || updating.value) return;
-  updating.value = true;
-  updateCheckError.value = "";
-  try {
-    if (manualUpdateRequired.value) {
-      await openDownload();
-      ElMessage.info("已开始下载新版 Agent，请安装后重新打开本页面");
-      return;
-    }
-    await client().startUpdate();
-    const deadline = Date.now() + 120000;
-    let status: ZgK8sAgentUpdateStatus | null = null;
-    let restarted = false;
-    while (Date.now() < deadline) {
-      await wait(1500);
-      status = await client().updateStatus().catch(() => null);
-      if (status?.state === "FAILED")
-        throw new Error(status.message || "Agent 更新失败");
-      try {
-        const refreshed = await client().health();
-        health.value = refreshed;
-        autostartEnabled.value = refreshed.autostartEnabled;
-        if (refreshed.version === targetVersion) {
-          restarted = true;
-          break;
-        }
-      } catch {
-        // The Agent briefly drops the loopback connection while restarting.
-      }
-    }
-    if (!restarted)
-      throw new Error(`Agent 更新超时，暂未检测到版本 ${targetVersion}`);
-
-    await checkAgent();
-    ElMessage.success(`zg-k8s-agent 已更新到 ${targetVersion}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "更新请求失败";
-    updateCheckError.value = message;
-    ElMessage.error(message);
-  } finally {
-    updating.value = false;
-  }
-};
 const schedulePolling = () => {
   window.clearInterval(pollTimer);
   if (

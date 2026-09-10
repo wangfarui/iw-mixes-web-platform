@@ -20,6 +20,8 @@ import type {
 } from '@/types/zhaogang'
 import type { ZhaogangReleaseReceipt } from '@/types/zhaogangRelease'
 import type { ZgK8sEnvironment } from '@/types/zhaogangService'
+import type { ZhaogangAiConfigCommand, ZhaogangAiConfigStatus, ZhaogangAgentTicket } from '@/types/zhaogangAi'
+import type { ZhaogangReleaseBatchAddResult, ZhaogangReleaseImportPreview, ZhaogangReleaseRecognizedRow } from '@/types/zhaogangReleaseImport'
 import { dispatchZhaogangPermissionPrompt, permissionPromptFrom } from '@/services/zhaogangPermissionPrompt'
 
 const API_ROOT = `${import.meta.env.VITE_BUILD_ENV === 'prod' ? '//api.itwray.com' : ''}/external-service/api/zhaogang`
@@ -44,7 +46,7 @@ export class ZhaogangRequestError extends Error {
 export const zhaogangRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
-  if (init.body && !headers.has('Content-Type')) {
+  if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json;charset=utf-8')
   }
   const response = await fetch(`${API_ROOT}${path}`, {
@@ -101,6 +103,47 @@ export const getZhaogangK8sToken = (environment: ZgK8sEnvironment) => zhaogangRe
 export const deleteZhaogangK8sToken = (environment: ZgK8sEnvironment) => zhaogangRequest<ZhaogangK8sTokenStatus>(
   `/k8s-tokens/${environment}`, { method: 'DELETE' }
 )
+
+export const getZhaogangAiConfig = () => zhaogangRequest<ZhaogangAiConfigStatus>('/ai/config')
+
+export const saveZhaogangAiConfig = (command: ZhaogangAiConfigCommand) => zhaogangRequest<ZhaogangAiConfigStatus>(
+  '/ai/config', { method: 'PUT', body: JSON.stringify(command) }
+)
+
+export const clearZhaogangAiConfig = () => zhaogangRequest<ZhaogangAiConfigStatus>('/ai/config', { method: 'DELETE' })
+
+export const testZhaogangAiConfig = (command?: ZhaogangAiConfigCommand) => zhaogangRequest<string>('/ai/config/test', {
+  method: 'POST', body: command ? JSON.stringify(command) : undefined
+})
+
+export const issueZhaogangAgentTicket = (iterationId: number, projectColumnName: string, planColumnName: string) => zhaogangRequest<ZhaogangAgentTicket>('/ai/agent-tickets', {
+  method: 'POST', body: JSON.stringify({ iterationId, projectColumnName, planColumnName })
+})
+
+export const recognizeZhaogangReleaseImage = (
+  iterationId: number,
+  file: File,
+  projectColumnName: string,
+  planColumnName: string,
+) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('projectColumnName', projectColumnName)
+  form.append('planColumnName', planColumnName)
+  return zhaogangRequest<ZhaogangReleaseImportPreview>(`/iterations/${iterationId}/release-import/recognize`, {
+    method: 'POST', body: form
+  })
+}
+
+export const matchZhaogangReleaseRows = (iterationId: number, items: ZhaogangReleaseRecognizedRow[]) =>
+  zhaogangRequest<ZhaogangReleaseImportPreview>(`/iterations/${iterationId}/release-import/match`, {
+    method: 'POST', body: JSON.stringify({ items })
+  })
+
+export const batchAddZhaogangReleasePlans = (iterationId: number, items: Array<{ rowNo: number; projectId: number; planId: number }>) =>
+  zhaogangRequest<ZhaogangReleaseBatchAddResult>(`/iterations/${iterationId}/release-import/batch-add`, {
+    method: 'POST', body: JSON.stringify({ items })
+  })
 
 export const getZhaogangProjects = () => zhaogangRequest<ZhaogangProject[]>('/projects')
 

@@ -63,7 +63,7 @@
           />
         </el-select>
         <el-button :icon="Refresh" :loading="refreshingAll" @click="refreshAll">刷新状态</el-button>
-        <el-button v-if="canEdit" type="primary" :icon="Plus" @click="openAddDialog">添加发布项目</el-button>
+        <el-button v-if="canEdit" type="primary" :icon="Plus" @click="openImportDialog">添加发布项目</el-button>
       </div>
     </header>
 
@@ -88,7 +88,7 @@
             </div>
             <div v-else class="build-status-cell">
               <div class="status-tag-row">
-                <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
+                <el-tag class="build-status-tag" :type="buildTagType(latestBuild(scope.row)?.status)" effect="dark">
                   {{ buildStatus(latestBuild(scope.row)?.status) }}
                 </el-tag>
                 <el-tooltip v-if="runtime[scope.row.id]?.error" :content="runtime[scope.row.id]?.error" placement="top">
@@ -213,7 +213,7 @@
             />
           </el-select>
           <el-button :icon="Refresh" :loading="refreshingAll" @click="refreshAll">刷新状态</el-button>
-          <el-button v-if="canEdit" type="primary" :icon="Plus" @click="openAddDialog">添加发布项目</el-button>
+          <el-button v-if="canEdit" type="primary" :icon="Plus" @click="openImportDialog">添加发布项目</el-button>
         </div>
       </header>
 
@@ -238,7 +238,7 @@
               </div>
               <div v-else class="build-status-cell">
                 <div class="status-tag-row">
-                  <el-tag :type="buildTagType(latestBuild(scope.row)?.status)" effect="light">
+                  <el-tag class="build-status-tag" :type="buildTagType(latestBuild(scope.row)?.status)" effect="dark">
                     {{ buildStatus(latestBuild(scope.row)?.status) }}
                   </el-tag>
                   <el-tooltip v-if="runtime[scope.row.id]?.error" :content="runtime[scope.row.id]?.error" placement="top">
@@ -388,6 +388,7 @@
       <el-button type="primary" :loading="triggering" :disabled="!buildForm.branch || !buildForm.environment" @click="triggerBuild">确定</el-button>
     </template>
   </el-dialog>
+  <ReleasePlanImportDialog v-if="canEdit" v-model="importDialogVisible" :iteration-id="iterationId" :release-plans="releasePlans" @completed="handleImportCompleted" />
 </template>
 
 <script setup lang="ts">
@@ -403,6 +404,7 @@ import type {
   ZhaogangBranch, ZhaogangBuild, ZhaogangBuildPlan, ZhaogangPlanDetail, ZhaogangProject, ZhaogangSessionStatus
 } from '@/types/zhaogang'
 import type { TeamIterationReleasePlan } from '@/types/zhaogangIteration'
+import ReleasePlanImportDialog from './ReleasePlanImportDialog.vue'
 
 const props = defineProps<{
   iterationId: number
@@ -414,6 +416,7 @@ const emit = defineEmits<{
   added: [releasePlan: TeamIterationReleasePlan]
   removed: [releasePlanId: number]
   'mode-change': [mode: DisplayMode]
+  refresh: []
 }>()
 
 interface PlanRuntime {
@@ -451,6 +454,7 @@ const refreshInterval = ref(30)
 const planKeyword = ref('')
 const runtime = reactive<Record<number, PlanRuntime>>({})
 const addDialogVisible = ref(false)
+const importDialogVisible = ref(false)
 const projectsLoading = ref(false)
 const plansLoading = ref(false)
 const adding = ref(false)
@@ -824,6 +828,9 @@ const openAddDialog = async () => {
   finally { projectsLoading.value = false }
 }
 
+const openImportDialog = () => { importDialogVisible.value = true }
+const handleImportCompleted = () => { emit('refresh') }
+
 const loadPlans = async (projectId: number) => {
   addForm.planId = undefined
   plans.value = []
@@ -883,9 +890,7 @@ const openBuildDialog = async (releasePlan: TeamIterationReleasePlan) => {
   }
   activeReleasePlan.value = releasePlan
   const environments = detail.plan.environments
-  const defaultEnvironment = defaultEnvironmentFor(releasePlan)
-  const environment = environments.find(item => normalizeBuildEnvironment(item) === defaultEnvironment)
-    || environments.find(item => item.toLowerCase() === 'sit')
+  const environment = environments.find(item => normalizeBuildEnvironment(item) === 'sit')
     || environments[0]
     || ''
   Object.assign(buildForm, { environment, branch: defaultBranchFor(environment, detail.plan) })
@@ -1005,9 +1010,11 @@ defineExpose({ openDrawer })
 .release-environment-select { width: 82px; }
 .release-plan-name { display: block; min-width: 0; overflow: hidden; color: #2c3a4f; text-overflow: ellipsis; white-space: nowrap; }
 .release-plan-name strong { color: inherit; }
-.release-project-name, .build-status-cell span, .status-loading { color: #8994a5; font-size: 12px; }
+.release-project-name, .build-status-cell > span, .status-loading { color: #8994a5; font-size: 12px; }
 .build-status-cell { display: grid; justify-items: start; gap: 5px; }
 .build-status-cell > span { line-height: 1.35; white-space: normal; }
+.build-status-tag { --el-tag-text-color: #fff; color: #fff; }
+.build-status-tag :deep(.el-tag__content) { color: #fff; }
 .status-tag-row { display: flex; min-width: 0; align-items: center; gap: 5px; }
 .status-tag-row--centered { justify-content: center; }
 .refresh-warning { flex: 0 0 auto; color: #d69b32; cursor: help; }

@@ -17,23 +17,28 @@ if [ ! -d "$SOURCE_FILE" ]; then
     exit 1
 fi
 
-AGENT_RELEASE_DIR="$SOURCE_FILE/downloads/zg-k8s-agent"
+AGENT_RELEASE_DIR="$SOURCE_FILE/downloads/zg-workbench-agent"
+LEGACY_AGENT_RELEASE_DIR="$SOURCE_FILE/downloads/zg-k8s-agent"
 AGENT_MANIFEST="$AGENT_RELEASE_DIR/latest.json"
 if [ ! -s "$AGENT_MANIFEST" ]; then
-    echo "zg-k8s-agent 更新清单不存在：$AGENT_MANIFEST，停止发布." >&2
+    echo "zg-workbench-agent 更新清单不存在：$AGENT_MANIFEST，停止发布." >&2
     exit 1
 fi
 node -e 'const fs=require("fs"); const path=process.argv[1]; const manifest=JSON.parse(fs.readFileSync(path, "utf8")); if (!manifest.version || !manifest.platforms || Object.keys(manifest.platforms).length !== 4) throw new Error("Agent 更新清单缺少版本或平台文件");' "$AGENT_MANIFEST"
 for agent_file in \
-    "$AGENT_RELEASE_DIR/zg-k8s-agent-darwin-arm64.bin" \
-    "$AGENT_RELEASE_DIR/zg-k8s-agent-darwin-amd64.bin" \
-    "$AGENT_RELEASE_DIR/zg-k8s-agent-windows-amd64.runtime.exe" \
-    "$AGENT_RELEASE_DIR/zg-k8s-agent-windows-arm64.runtime.exe"; do
+    "$AGENT_RELEASE_DIR/zg-workbench-agent-darwin-arm64.bin" \
+    "$AGENT_RELEASE_DIR/zg-workbench-agent-darwin-amd64.bin" \
+    "$AGENT_RELEASE_DIR/zg-workbench-agent-windows-amd64.runtime.exe" \
+    "$AGENT_RELEASE_DIR/zg-workbench-agent-windows-arm64.runtime.exe"; do
     if [ ! -s "$agent_file" ]; then
-        echo "zg-k8s-agent 发布文件不存在：$agent_file，停止发布." >&2
-        exit 1
-    fi
+    echo "zg-workbench-agent 发布文件不存在：$agent_file，停止发布." >&2
+    exit 1
+  fi
 done
+if [ ! -s "$LEGACY_AGENT_RELEASE_DIR/latest.json" ]; then
+    echo "旧版 zg-k8s-agent 更新清单不存在：$LEGACY_AGENT_RELEASE_DIR/latest.json，停止发布." >&2
+    exit 1
+fi
 
 # 2. 连接到远程服务器并进行操作
 ssh aliyun183 << EOF

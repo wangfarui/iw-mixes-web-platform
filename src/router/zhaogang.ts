@@ -54,8 +54,14 @@ const zhaogangRoute: RouteRecordRaw = {
     {
       path: 'services/install',
       name: '找钢服务使用教程',
-      component: () => import('@/views/zhaogang/service/ZhaogangServiceInstallView.vue'),
-      meta: { public: true, title: 'Agent 使用教程', zhaogangView: 'services' }
+      redirect: '/zhaogang/settings?section=agent',
+      meta: { public: true, title: 'Agent 使用教程', zhaogangView: 'settings' }
+    },
+    {
+      path: 'settings/agent-guide',
+      name: '找钢 Agent 使用教程',
+      component: () => import('@/views/zhaogang/settings/ZhaogangAgentGuideView.vue'),
+      meta: { public: true, title: 'Agent 使用教程', zhaogangView: 'settings' }
     },
     {
       path: 'settings',
