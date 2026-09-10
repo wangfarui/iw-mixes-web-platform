@@ -18,37 +18,56 @@ export interface ZhaogangPermissionPromptDetail {
 
 interface PermissionErrorPayload {
   type?: string
+  message?: unknown
   missingPermissions?: unknown
 }
 
-const stringsIn = (value: unknown, depth = 0): string[] => {
-  if (depth > 8 || value === null || value === undefined) return []
-  if (typeof value === 'string') return [value]
-  if (Array.isArray(value)) return value.flatMap(item => stringsIn(item, depth + 1))
-  if (typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).flatMap(item => stringsIn(item, depth + 1))
+const permissionPayloadIn = (value: unknown, depth = 0): PermissionErrorPayload | null => {
+  if (depth > 8 || value === null || typeof value !== 'object') return null
+  const payload = value as PermissionErrorPayload
+  if (payload.type === 'CODING_PERMISSION_DENIED') return payload
+  const children = Array.isArray(value) ? value : Object.values(value as Record<string, unknown>)
+  for (const child of children) {
+    const match = permissionPayloadIn(child, depth + 1)
+    if (match) return match
   }
-  return []
+  return null
 }
 
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
+const explicitErrorSignal = /\b(?:unauthorized|forbidden)\b|(?:无权|没有权限)(?:访问|操作|读取|修改|调用)?|权限不足|缺少[^。；\n]*权限/i
+const legacyErrorFields = new Set(['warning', 'reason', 'syncMessage'])
+
+const legacyPermissionMessageIn = (value: unknown, depth = 0): string => {
+  if (depth > 8 || value === null || typeof value !== 'object') return ''
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = legacyPermissionMessageIn(item, depth + 1)
+      if (message) return message
+    }
+    return ''
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (legacyErrorFields.has(key) && typeof child === 'string' && explicitErrorSignal.test(child)) return child
+    const message = legacyPermissionMessageIn(child, depth + 1)
+    if (message) return message
+  }
+  return ''
+}
 
 export const permissionPromptFrom = (value: unknown, fallbackMessage = ''): ZhaogangPermissionPromptDetail | null => {
-  const payload = value && typeof value === 'object' ? value as PermissionErrorPayload : undefined
+  const payload = permissionPayloadIn(value)
   const explicit = Array.isArray(payload?.missingPermissions)
     ? payload.missingPermissions.filter((item): item is string => typeof item === 'string')
     : []
-  const texts = unique([...stringsIn(value), fallbackMessage])
-  const permissionSignal = payload?.type === 'CODING_PERMISSION_DENIED'
-    || texts.some(text => /权限|unauthorized|forbidden|无权/i.test(text))
-  if (!permissionSignal) return null
+  const legacyMessage = fallbackMessage
+    ? (explicitErrorSignal.test(fallbackMessage) ? fallbackMessage : '')
+    : legacyPermissionMessageIn(value)
+  if (!payload && !legacyMessage) return null
 
-  const joined = texts.join('\n')
-  const inferred = zhaogangPermissionLabels.filter(label => joined.includes(label))
-  const message = (/权限|unauthorized|forbidden|无权/i.test(fallbackMessage) ? fallbackMessage : '')
-    || texts.find(text => /权限|无权/i.test(text))
-    || texts.find(text => /unauthorized|forbidden/i.test(text))
-    || 'CODING 已拒绝本次调用，请检查个人令牌权限'
+  const payloadMessage = typeof payload?.message === 'string' ? payload.message : ''
+  const message = payloadMessage || legacyMessage || fallbackMessage || 'CODING 已拒绝本次调用，请检查个人令牌权限'
+  const inferred = zhaogangPermissionLabels.filter(label => message.includes(label))
   return { permissions: unique([...explicit, ...inferred]), message }
 }
 

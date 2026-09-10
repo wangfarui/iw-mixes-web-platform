@@ -1,7 +1,18 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-09-09-01",
+  "currentReleaseId": "zg-2026-09-10-01",
   "releases": [
+    {
+      "id": "zg-2026-09-10-01",
+      "version": "1.3.2",
+      "publishedAt": "2026-09-10T09:18:16+08:00",
+      "items": [
+        {
+          "type": "FIX",
+          "text": "修复工时事项标题包含“权限”等字样时错误显示 CODING 令牌权限不足提示的问题"
+        }
+      ]
+    },
     {
       "id": "zg-2026-09-09-01",
       "version": "1.3.1",

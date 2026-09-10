@@ -97,6 +97,14 @@ export interface ZhaogangBranch {
 
 export type ZhaogangWorklogScope = 'SELF' | 'WORKBENCH_TEAM'
 export type ZhaogangWorklogRankingMetric = 'TOTAL_HOURS' | 'OVERTIME_HOURS' | 'OVERTIME_DAYS'
+
+export interface ZhaogangCodingPermissionError {
+  type: 'CODING_PERMISSION_DENIED'
+  message: string
+  missingPermissions: string[]
+  action: string
+  codingErrorCode: string
+}
 export type ZhaogangCalendarDayType = 'WORKDAY' | 'REST_DAY'
 
 export interface ZhaogangCalendarDay {
@@ -132,6 +140,7 @@ export interface ZhaogangWorklogCoverage {
   partial: boolean
   failedMemberCount: number
   warning: string
+  permissionError?: ZhaogangCodingPermissionError | null
 }
 
 export interface ZhaogangWorklogDailyTotal {

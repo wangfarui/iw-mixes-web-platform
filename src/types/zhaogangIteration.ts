@@ -1,3 +1,5 @@
+import type { ZhaogangCodingPermissionError } from '@/types/zhaogang'
+
 export type TeamIterationStage = 'NOT_STARTED' | 'DEVELOPING' | 'TESTING' | 'RELEASED'
 export type TeamIterationRole = 'PRODUCT' | 'BACKEND' | 'FRONTEND' | 'QA'
 export type TeamIterationIssueType = 'REQUIREMENT' | 'TASK' | 'USER_STORY' | 'SUB_TASK' | 'DEFECT'
@@ -89,6 +91,7 @@ export interface TeamIterationCodingSyncFailure {
   issueId: number
   title: string
   reason: string
+  permissionError?: ZhaogangCodingPermissionError | null
 }
 
 export interface TeamIterationCodingSyncResult {
