@@ -153,6 +153,7 @@
                   <el-dropdown-menu>
                     <el-dropdown-item :icon="Refresh" command="refresh">刷新状态</el-dropdown-item>
                     <el-dropdown-item :icon="Link" command="open-coding">前往 CODING 发布页</el-dropdown-item>
+                    <el-dropdown-item :icon="TopRight" command="open-k8s">前往 K8s 页面</el-dropdown-item>
                     <el-dropdown-item divided :icon="Delete" command="remove">移除</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -303,6 +304,7 @@
                     <el-dropdown-menu>
                       <el-dropdown-item :icon="Refresh" command="refresh">刷新状态</el-dropdown-item>
                       <el-dropdown-item :icon="Link" command="open-coding">前往 CODING 发布页</el-dropdown-item>
+                      <el-dropdown-item :icon="TopRight" command="open-k8s">前往 K8s 页面</el-dropdown-item>
                       <el-dropdown-item divided :icon="Delete" command="remove">移除</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
@@ -394,12 +396,19 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUpdated, reactive, ref, watch, type ComponentPublicInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, ArrowUp, Delete, Expand, Fold, Link, Plus, Refresh, Search, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, Delete, Expand, Fold, Link, Plus, Refresh, Search, TopRight, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
 import {
   getZhaogangPlanDetail, getZhaogangPlans, getZhaogangProjects, searchZhaogangBranches, triggerZhaogangBuild
 } from '@/api/zhaogang'
 import { addTeamIterationReleasePlan, removeTeamIterationReleasePlan } from '@/api/zhaogangIteration'
-import { queryReleaseK8sStatuses, type ReleaseK8sStatus } from '@/services/zhaogangReleaseK8s'
+import {
+  deploymentNameFromPlanName,
+  getCachedZhaogangK8sNamespace,
+  k8sEnvironmentFromBuild,
+  queryReleaseK8sStatuses,
+  zhaogangK8sDashboardUrl,
+  type ReleaseK8sStatus
+} from '@/services/zhaogangReleaseK8s'
 import type {
   ZhaogangBranch, ZhaogangBuild, ZhaogangBuildPlan, ZhaogangPlanDetail, ZhaogangProject, ZhaogangSessionStatus
 } from '@/types/zhaogang'
@@ -867,12 +876,28 @@ const removeReleasePlan = async (releasePlan: TeamIterationReleasePlan) => {
 const handleCommand = (command: string, releasePlan: TeamIterationReleasePlan) => {
   if (command === 'refresh') void refreshSinglePlan(releasePlan)
   else if (command === 'open-coding') openCodingReleasePage(releasePlan)
+  else if (command === 'open-k8s') openK8sPage(releasePlan)
   else if (command === 'remove') void removeReleasePlan(releasePlan)
 }
 
 const openCodingReleasePage = (releasePlan: TeamIterationReleasePlan) => {
   const projectName = encodeURIComponent(releasePlan.projectName)
   window.open(`https://g-iijw5014.coding.net/p/${projectName}/ci/job?id=${releasePlan.planId}`, '_blank', 'noopener')
+}
+
+const openK8sPage = (releasePlan: TeamIterationReleasePlan) => {
+  const environment = k8sEnvironmentFromBuild(selectedEnvironmentFor(releasePlan))
+  if (!environment) {
+    ElMessage.warning('当前构建环境无法匹配 K8s 环境')
+    return
+  }
+  const namespace = getCachedZhaogangK8sNamespace(environment)
+  const deploymentName = deploymentNameFromPlanName(releasePlan.planName) || undefined
+  window.open(
+    zhaogangK8sDashboardUrl(environment, namespace, deploymentName),
+    '_blank',
+    'noopener,noreferrer'
+  )
 }
 
 const defaultBranchFor = (environment: string, plan: ZhaogangBuildPlan) => {

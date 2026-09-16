@@ -75,6 +75,9 @@ const readNamespaceCache = (): Record<string, string> => {
   }
 }
 
+export const getCachedZhaogangK8sNamespace = (environment: ZgK8sEnvironment) =>
+  readNamespaceCache()[environment]
+
 const writeNamespaceCache = (value: Record<string, string>) => {
   window.localStorage.setItem(namespaceCacheKey, JSON.stringify(value))
 }
