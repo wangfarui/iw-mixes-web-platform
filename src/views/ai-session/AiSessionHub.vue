@@ -60,7 +60,7 @@
       <div class="panel-head">
         <div>
           <div class="panel-title">会话任务列表</div>
-          <div class="panel-subtitle">共 {{ tasks.length }} 条记录。</div>
+          <div class="panel-subtitle">共 {{ pagination.total }} 条记录。</div>
         </div>
         <div class="panel-actions">
           <el-tag :type="launcherStatusTagType" effect="plain">
@@ -278,6 +278,19 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-row">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 15, 20, 50]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @size-change="handlePageSizeChange"
+          @current-change="handleCurrentPageChange"
+        />
+      </div>
     </section>
 
     <div ref="actionColumnProbeRef" class="action-column-probe" aria-hidden="true">
@@ -844,6 +857,11 @@ const projectOptions = ref<string[]>([])
 const workspaceOptions = ref<string[]>([])
 const modelProviderOptions = ref<string[]>([])
 const tasks = ref<AiSessionTask[]>([])
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
 const tableColumnWidths = reactive<TableColumnWidths>(readTableColumnWidths())
 const importTool = ref<ImportTool>('claude')
 const importSourceLabel = ref('未选择')
@@ -1073,8 +1091,8 @@ const mapTaskVo = (task: AiTaskType.AiTaskPageVo | AiTaskType.AiTaskDetailVo): A
 
 const buildPageDto = (): AiTaskType.AiTaskPageDto => {
   return {
-    currentPage: 1,
-    pageSize: 200,
+    currentPage: pagination.currentPage,
+    pageSize: pagination.pageSize,
     keyword: normalizeOptionalText(filters.keyword),
     toolType: filters.toolType ? getToolTypeCode(filters.toolType as ToolType) : undefined,
     taskStatus: filters.taskStatus ? getTaskStatusCode(filters.taskStatus as TaskStatus) : undefined,
@@ -1135,11 +1153,32 @@ const loadTaskPage = async () => {
   listLoading.value = true
   try {
     const response = await queryAiTaskPage(buildPageDto())
-    const pageData = response.data as { records?: Array<AiTaskType.AiTaskPageVo> }
+    const pageData = response.data as {
+      records?: Array<AiTaskType.AiTaskPageVo>
+      total?: number
+    }
+    pagination.total = Number(pageData.total) || 0
+
+    const maximumPage = Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
+    if (pagination.currentPage > maximumPage) {
+      pagination.currentPage = maximumPage
+      await loadTaskPage()
+      return
+    }
+
     tasks.value = (pageData.records || []).map(mapTaskVo)
   } finally {
     listLoading.value = false
   }
+}
+
+const handlePageSizeChange = () => {
+  pagination.currentPage = 1
+  void loadTaskPage()
+}
+
+const handleCurrentPageChange = () => {
+  void loadTaskPage()
 }
 
 const updateTaskStatus = async (task: AiSessionTask, nextStatus: TaskStatus) => {
@@ -2025,6 +2064,7 @@ watch(
   ],
   () => {
     window.clearTimeout(filterTimer)
+    pagination.currentPage = 1
     filterTimer = window.setTimeout(() => {
       void loadTaskPage()
     }, 200)
@@ -2095,6 +2135,12 @@ onBeforeUnmount(() => {
 .panel-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 
 .row-actions {
@@ -2352,6 +2398,11 @@ onBeforeUnmount(() => {
   .import-draft-footer {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .pagination-row {
+    justify-content: flex-start;
+    overflow-x: auto;
   }
 }
 </style>

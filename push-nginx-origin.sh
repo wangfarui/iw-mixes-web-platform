@@ -51,7 +51,8 @@ fi
 
 # 2. 将构建目录压缩为单个文件，并先校验压缩包可正常读取
 echo "开始压缩构建产物..."
-tar -czf "$ARCHIVE_FILE" -C "$SOURCE_FILE" .
+# macOS 的 bsdtar 默认会写入 LIBARCHIVE.xattr.* 扩展头，CentOS 的 GNU tar 会对此告警。
+tar --no-xattrs -czf "$ARCHIVE_FILE" -C "$SOURCE_FILE" .
 tar -tzf "$ARCHIVE_FILE" >/dev/null
 echo "构建产物已压缩：$(du -h "$ARCHIVE_FILE" | awk '{print $1}')"
 
