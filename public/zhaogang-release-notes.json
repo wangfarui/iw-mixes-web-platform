@@ -1,7 +1,29 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-09-14-02",
+  "currentReleaseId": "zg-2026-09-22-01",
   "releases": [
+    {
+      "id": "zg-2026-09-22-01",
+      "version": "1.7.4",
+      "publishedAt": "2026-09-22T10:00:00+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "优化手动添加发布项目的构建计划下拉样式，紧凑展示计划名称和所属项目"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-09-21-01",
+      "version": "1.7.3",
+      "publishedAt": "2026-09-21T10:00:00+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "迭代详情手动添加发布项目支持跨项目搜索可快捷构建计划，选中计划后自动带出所属 CODING 项目"
+        }
+      ]
+    },
     {
       "id": "zg-2026-09-14-02",
       "version": "1.7.2",

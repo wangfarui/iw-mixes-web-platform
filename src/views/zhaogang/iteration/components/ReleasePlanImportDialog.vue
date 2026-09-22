@@ -11,7 +11,7 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane label="手动添加" name="manual" :disabled="recognizing">
         <el-form label-position="top" class="manual-form">
-          <el-form-item label="CODING 项目" required>
+          <el-form-item label="CODING 项目">
             <el-select
               v-model="manualProjectId"
               class="full-control"
@@ -24,8 +24,27 @@
             </el-select>
           </el-form-item>
           <el-form-item label="构建计划" required>
-            <el-select v-model="manualPlanId" class="full-control" filterable :disabled="!manualProjectId" placeholder="选择可构建计划">
-              <el-option v-for="plan in manualPlans" :key="plan.id" :label="plan.name" :value="plan.id" />
+            <el-select
+              v-model="manualPlanId"
+              class="full-control"
+              filterable
+              :loading="catalogLoading"
+              placeholder="搜索构建计划"
+              no-data-text="暂无可快捷构建计划"
+              popper-class="release-plan-select-popper"
+              @change="handleManualPlanChange"
+            >
+              <el-option
+                v-for="plan in selectableManualPlans"
+                :key="`${plan.projectId}:${plan.id}`"
+                :label="plan.name"
+                :value="plan.id"
+              >
+                <div class="manual-plan-option">
+                  <span class="manual-plan-option-name">{{ plan.name }}</span>
+                  <span class="manual-plan-option-project">{{ projectLabel(plan) }}</span>
+                </div>
+              </el-option>
             </el-select>
           </el-form-item>
         </el-form>
@@ -178,6 +197,7 @@ import {
   createZhaogangReleaseImageTask,
   getZhaogangReleaseImageTask,
   getZhaogangAiConfig,
+  getZhaogangPlanCatalog,
   getZhaogangPlans,
   getZhaogangProjects,
   issueZhaogangAgentTicket,
@@ -244,6 +264,8 @@ let pollingPromise: Promise<unknown> | null = null
 const manualProjectId = ref<number>()
 const manualPlanId = ref<number>()
 const manualPlans = ref<ZhaogangBuildPlan[]>([])
+const allManualPlans = ref<ZhaogangBuildPlan[]>([])
+const allManualPlansLoaded = ref(false)
 const projectColumnName = ref(DEFAULT_RELEASE_IMPORT_PROJECT_COLUMN)
 const planColumnName = ref(DEFAULT_RELEASE_IMPORT_PLAN_COLUMN)
 const dialogWidth = computed(() => activeTab.value === 'manual'
@@ -252,6 +274,7 @@ const dialogWidth = computed(() => activeTab.value === 'manual'
 const readyRows = computed(() => rows.value.filter(row => row.status === 'READY' && row.projectId && row.planId))
 const collapsedSummary = computed(() => summarizeCollapsedReleaseImportRows(rows.value))
 const displayRows = computed(() => visibleReleaseImportRows(rows.value, nonActionableExpanded.value))
+const selectableManualPlans = computed(() => manualProjectId.value ? manualPlans.value : allManualPlans.value)
 const statusText: Record<ZhaogangReleaseImportStatus, string> = { READY: '可添加', PROJECT_AMBIGUOUS: '项目待确认', PLAN_AMBIGUOUS: '计划待确认', UNMATCHED: '未匹配', DUPLICATE_IN_IMAGE: '截图重复', ALREADY_ADDED: '已添加', UNBUILDABLE: '不可快捷构建', CATALOG_UNAVAILABLE: '目录不可用' }
 const statusLabel = (status: ZhaogangReleaseImportStatus) => statusText[status] || status
 const statusType = (status: ZhaogangReleaseImportStatus) => status === 'READY' ? 'success' : status === 'UNBUILDABLE' || status === 'ALREADY_ADDED' ? 'info' : 'warning'
@@ -302,9 +325,19 @@ const handleClosed = () => {
   if (!recognizing.value) reset()
 }
 const ensureCatalog = async () => {
-  if (projects.value.length) return
+  if (projects.value.length && allManualPlansLoaded.value) return
   catalogLoading.value = true
-  try { projects.value = await getZhaogangProjects() }
+  try {
+    const [projectResult, planCatalog] = await Promise.all([
+      projects.value.length ? Promise.resolve(projects.value) : getZhaogangProjects(),
+      allManualPlansLoaded.value ? Promise.resolve(undefined) : getZhaogangPlanCatalog(),
+    ])
+    projects.value = projectResult
+    if (planCatalog) {
+      allManualPlans.value = planCatalog.plans.filter(plan => plan.quickBuildSupported)
+      allManualPlansLoaded.value = true
+    }
+  }
   finally { catalogLoading.value = false }
 }
 const loadPlans = async (projectId: number) => {
@@ -587,6 +620,13 @@ const loadManualPlans = async (projectId: number) => {
   manualPlanId.value = undefined
   manualPlans.value = projectId ? (await loadPlans(projectId)).filter(plan => plan.quickBuildSupported) : []
 }
+const projectLabel = (plan: ZhaogangBuildPlan) => plan.projectDisplayName || plan.projectName
+const handleManualPlanChange = (planId: number) => {
+  const plan = selectableManualPlans.value.find(item => item.id === planId)
+  if (!plan || manualProjectId.value === plan.projectId) return
+  manualPlans.value = allManualPlans.value.filter(item => item.projectId === plan.projectId)
+  manualProjectId.value = plan.projectId
+}
 const recomputeSelectedRows = () => {
   const seen = new Set<string>()
   for (const row of rows.value) {
@@ -657,6 +697,15 @@ onBeforeUnmount(() => {
 <style scoped>
 .manual-form { max-width: 620px; }
 .full-control { width: 100%; }
+:global(.release-plan-select-popper) { overflow: hidden; }
+:global(.release-plan-select-popper .el-select-dropdown__wrap) { max-height: 320px; }
+:global(.release-plan-select-popper .el-select-dropdown__list) { padding: 4px 0; }
+:global(.release-plan-select-popper .el-select-dropdown__item) { box-sizing: border-box; height: 48px; padding: 6px 12px; line-height: normal; }
+:global(.release-plan-select-popper .manual-plan-option) { display: grid; width: 100%; min-width: 0; gap: 2px; line-height: 1.35; }
+:global(.release-plan-select-popper .manual-plan-option-name) { overflow: hidden; color: #303133; font-size: 14px; font-weight: 500; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+:global(.release-plan-select-popper .manual-plan-option-project) { overflow: hidden; color: #909399; font-size: 12px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+:global(.release-plan-select-popper .el-select-dropdown__item.hover), :global(.release-plan-select-popper .el-select-dropdown__item:hover) { background: #f0f7ff; }
+:global(.release-plan-select-popper .el-select-dropdown__item.selected .manual-plan-option-name) { color: var(--el-color-primary); }
 .image-import-content { min-height: 320px; }
 .column-config { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .column-config :deep(.el-form-item) { margin-bottom: 14px; }
