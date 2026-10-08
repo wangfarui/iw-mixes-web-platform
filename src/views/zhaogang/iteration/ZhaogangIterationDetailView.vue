@@ -265,6 +265,7 @@
               <div class="sub-task-field-row">
                 <el-form-item label="预估工时（小时）" required><el-input-number v-model="childForm.estimatedHours" :min="0.1" :max="9999.9" :precision="1" :step="0.1" controls-position="right" class="hours-control" /></el-form-item>
                 <el-form-item label="任务类型" required><el-select v-model="childForm.taskType" filterable class="task-type-control"><el-option v-for="item in creationOptions.taskTypes" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+                <el-form-item label="优先级" required><el-select v-model="childForm.priority" class="full-control"><el-option v-for="item in subTaskPriorityOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
               </div>
             </template>
           </div>
@@ -301,6 +302,7 @@ import type {
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
 import IterationIssueEditorDialog from './components/IterationIssueEditorDialog.vue'
+import { defaultSubTaskPriority, subTaskPriorityOptions } from './iterationIssuePriority'
 import IterationReleasePanel from './components/IterationReleasePanel.vue'
 import {
   formatCodingIssueAssociationResult,
@@ -358,7 +360,7 @@ const selectedTeamIds = ref<number[]>([])
 const selectedByTeam = reactive<Record<number, number[]>>({})
 const draftRoles = reactive<Record<string, TeamIterationRole[]>>({})
 const editForm = reactive({ name: '', stage: 'NOT_STARTED' as TeamIterationStage, startDate: '', plannedReleaseDate: '' })
-const childForm = reactive({ issueType: 'SUB_TASK' as TeamIterationIssueType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', onlineBug: false, bugPriority: '' })
+const childForm = reactive({ issueType: 'SUB_TASK' as TeamIterationIssueType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
 const worklogForm = reactive({ spendHours: 1, registeredAt: '' })
 const codingIssueUrlPlaceholder = '可粘贴多条链接，每条以 https:// 开始、detail 结尾\n例如：https://g-iijw5014.coding.net/p/.../issues/xxx/detail'
 const stageOptions: Array<{ value: TeamIterationStage, label: string }> = [
@@ -385,7 +387,7 @@ const childSubmitEnabled = computed(() => {
   if (childMode.value === 'LINK') return extractCodingIssueUrls(childCodingUrl.value).length > 0
   if (!childForm.title.trim()) return false
   if (childForm.issueType === 'USER_STORY') return Boolean(childForm.developmentTeam && childForm.definitionOfDone)
-  if (childForm.issueType === 'SUB_TASK') return childForm.estimatedHours > 0 && Boolean(childForm.taskType)
+  if (childForm.issueType === 'SUB_TASK') return childForm.estimatedHours > 0 && Boolean(childForm.taskType && childForm.priority)
   return true
 })
 const teamById = computed(() => new Map(teamOptions.value.map(team => [team.teamId, team])))
@@ -597,7 +599,7 @@ const openChildEditor = (issue: TeamIterationIssue) => {
   childCodingUrl.value = ''
   const defaultType = defaultManualChildIssueType(issue.issueType)
   if (!defaultType) return
-  Object.assign(childForm, { issueType: defaultType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', onlineBug: false, bugPriority: '' })
+  Object.assign(childForm, { issueType: defaultType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
   childSyncToCoding.value = Boolean(preferencesRef?.value.autoSyncCreatedChildIssue
     && childIssueAutoSyncAvailability(issue, defaultType, detail.value?.issues || []).enabled)
   childDialogVisible.value = true
@@ -631,6 +633,7 @@ const saveChildIssue = async () => {
         definitionOfDone: childForm.issueType === 'USER_STORY' ? childForm.definitionOfDone : undefined,
         estimatedHours: childForm.issueType === 'SUB_TASK' ? childForm.estimatedHours : undefined,
         taskType: childForm.issueType === 'SUB_TASK' ? childForm.taskType : undefined,
+        priority: childForm.issueType === 'SUB_TASK' ? childForm.priority : undefined,
         onlineBug: childForm.issueType === 'DEFECT' ? childForm.onlineBug : undefined,
         bugPriority: undefined,
         syncToCoding: syncRequested
@@ -688,7 +691,7 @@ const loadCreationOptions = async () => {
 }
 
 watch(() => childForm.issueType, () => {
-  Object.assign(childForm, { developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', onlineBug: false, bugPriority: '' })
+  Object.assign(childForm, { developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
   if (!childAutoSyncAvailability.value.enabled) childSyncToCoding.value = false
   if (childDialogVisible.value && childMode.value === 'CREATE') void loadCreationOptions()
 })
@@ -900,7 +903,7 @@ watch(() => route.params.iterationId, load)
 .child-sync-option { display: grid; gap: 5px; }
 .child-sync-reason { color: #8994a5; font-size: 12px; line-height: 1.4; }
 .issue-type-select { width: 180px; }
-.sub-task-field-row { display: grid; grid-template-columns: 140px minmax(0, 220px); gap: 16px; align-items: start; }
+.sub-task-field-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 120px; gap: 16px; align-items: start; }
 .hours-control { width: 140px; }
 .task-type-control { width: 220px; }
 .story-field-row { display: grid; grid-template-columns: repeat(2,minmax(0,220px)); gap: 16px; }

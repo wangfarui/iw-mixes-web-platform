@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-10-08-01",
+  "currentReleaseId": "zg-2026-10-08-02",
   "releases": [
     {
       "id": "zg-2026-10-08-01",
@@ -365,6 +365,21 @@
         {
           "type": "FEATURE",
           "text": "找钢工作台功能上线"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-10-08-02",
+      "version": "1.9.0",
+      "publishedAt": "2026-10-08T17:58:06+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "迭代详情新增和编辑子工作项支持选择低、中、高、紧急优先级，新增同步和编辑保存均可同步到 CODING"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "新建子工作项默认优先级调整为中，关联和回拉已有事项时保留 CODING 实际优先级"
         }
       ]
     }

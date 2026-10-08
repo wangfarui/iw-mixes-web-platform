@@ -3,6 +3,7 @@ import type { ZhaogangCodingPermissionError } from '@/types/zhaogang'
 export type TeamIterationStage = 'NOT_STARTED' | 'DEVELOPING' | 'TESTING' | 'RELEASED'
 export type TeamIterationRole = 'PRODUCT' | 'BACKEND' | 'FRONTEND' | 'QA'
 export type TeamIterationIssueType = 'REQUIREMENT' | 'TASK' | 'USER_STORY' | 'SUB_TASK' | 'DEFECT'
+export type TeamIterationIssuePriority = '0' | '1' | '2' | '3'
 export type TeamIterationIssueSource = 'CODING' | 'WORKBENCH'
 export type TeamIterationIssueSyncStatus = 'NOT_REQUIRED' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'UNKNOWN'
 
@@ -66,6 +67,7 @@ export interface TeamIterationIssue {
   definitionOfDone?: string
   estimatedHours?: number
   taskType?: string
+  priority?: TeamIterationIssuePriority
   onlineBug?: boolean
   bugPriority?: string
   syncedAt?: string
@@ -180,6 +182,7 @@ export interface TeamIterationCreateChildIssueCommand {
   definitionOfDone?: string
   estimatedHours?: number
   taskType?: string
+  priority?: TeamIterationIssuePriority
   onlineBug?: boolean
   bugPriority?: string
   syncToCoding?: boolean
@@ -192,6 +195,7 @@ export interface TeamIterationUpdateIssueCommand {
   definitionOfDone?: string
   estimatedHours?: number
   taskType?: string
+  priority?: TeamIterationIssuePriority
   onlineBug?: boolean
   bugPriority?: string
 }

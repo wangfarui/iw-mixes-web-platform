@@ -47,6 +47,11 @@
               <el-option v-for="item in optionsFor('taskTypes', form.taskType)" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
+          <el-form-item label="优先级" required>
+            <el-select v-model="form.priority" class="full-control" placeholder="请选择优先级">
+              <el-option v-for="item in subTaskPriorityOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </el-form-item>
         </template>
 
         <template v-else-if="issue.issueType === 'DEFECT'">
@@ -74,8 +79,9 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTeamIterationIssueEditOptions, updateTeamIterationIssue } from '@/api/zhaogangIteration'
 import type {
-  TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationSelectionOption
+  TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationSelectionOption, TeamIterationIssuePriority
 } from '@/types/zhaogangIteration'
+import { subTaskPriorityOptions } from '../iterationIssuePriority'
 
 const props = defineProps<{
   modelValue: boolean
@@ -97,7 +103,7 @@ const options = reactive<TeamIterationIssueCreationOptions>({
 })
 const form = reactive({
   title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1,
-  taskType: '', onlineBug: false, bugPriority: ''
+  taskType: '', priority: '' as TeamIterationIssuePriority | '', onlineBug: false, bugPriority: ''
 })
 
 const typeLabels: Record<TeamIterationIssue['issueType'], string> = {
@@ -108,7 +114,7 @@ const dialogTitle = computed(() => `编辑${typeLabel.value}`)
 const submitEnabled = computed(() => {
   if (!form.title.trim() || !props.issue) return false
   if (props.issue.issueType === 'USER_STORY') return Boolean(form.developmentTeam && form.definitionOfDone)
-  if (props.issue.issueType === 'SUB_TASK') return form.estimatedHours > 0 && Boolean(form.taskType)
+  if (props.issue.issueType === 'SUB_TASK') return form.estimatedHours > 0 && Boolean(form.taskType && form.priority)
   if (props.issue.issueType === 'DEFECT') return Boolean(form.bugPriority)
   return true
 })
@@ -144,6 +150,7 @@ const save = async () => {
       definitionOfDone: props.issue.issueType === 'USER_STORY' ? form.definitionOfDone : undefined,
       estimatedHours: props.issue.issueType === 'SUB_TASK' ? form.estimatedHours : undefined,
       taskType: props.issue.issueType === 'SUB_TASK' ? form.taskType : undefined,
+      priority: props.issue.issueType === 'SUB_TASK' ? form.priority || undefined : undefined,
       onlineBug: props.issue.issueType === 'DEFECT' ? form.onlineBug : undefined,
       bugPriority: props.issue.issueType === 'DEFECT' ? form.bugPriority : undefined
     })
@@ -161,6 +168,7 @@ watch(() => [props.modelValue, props.issue?.id] as const, ([visible]) => {
     title: props.issue.title || '', description: props.issue.description || '',
     developmentTeam: props.issue.developmentTeam || '', definitionOfDone: props.issue.definitionOfDone || '',
     estimatedHours: props.issue.estimatedHours || 1, taskType: props.issue.taskType || '',
+    priority: props.issue.priority || ((props.issue.source === 'CODING' || props.issue.syncStatus === 'SYNCED') ? '' : '0'),
     onlineBug: props.issue.onlineBug ?? false, bugPriority: props.issue.bugPriority || ''
   })
   resetOptions()

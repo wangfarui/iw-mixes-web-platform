@@ -167,13 +167,21 @@ assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/i
 assert.equal(capturedRequest.init.method, 'POST')
 assert.deepEqual(JSON.parse(capturedRequest.init.body), {issueIds: [11, 12]})
 await iterationApi.addTeamIterationChildIssue(7, 11, {
-  issueType: 'SUB_TASK', title: '实现接口', syncToCoding: true
+  issueType: 'SUB_TASK', title: '实现接口', priority: '1', syncToCoding: true
 })
 assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/issues/11/children')
 assert.equal(capturedRequest.init.method, 'POST')
 assert.deepEqual(JSON.parse(capturedRequest.init.body), {
-  issueType: 'SUB_TASK', title: '实现接口', syncToCoding: true
+  issueType: 'SUB_TASK', title: '实现接口', priority: '1', syncToCoding: true
 })
+responseData = {id: 12, issueType: 'SUB_TASK', priority: '0', worklogs: [], children: []}
+const updatedPriorityIssue = await iterationApi.updateTeamIterationIssue(7, 12, {
+  title: '实现接口', estimatedHours: 1, taskType: '开发任务', priority: '0'
+})
+assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/issues/12')
+assert.equal(capturedRequest.init.method, 'PUT')
+assert.equal(JSON.parse(capturedRequest.init.body).priority, '0')
+assert.equal(updatedPriorityIssue.priority, '0')
 responseData = {issues: [], members: [], releasePlans: [], issueCount: 0}
 await iterationApi.transitionTeamIteration(7, 3, 'TESTING', 5, 9)
 assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/stage')
