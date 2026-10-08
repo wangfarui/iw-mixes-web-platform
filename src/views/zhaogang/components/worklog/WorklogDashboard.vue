@@ -72,6 +72,11 @@
       </div>
 
       <el-alert v-if="statisticsError" class="view-error" type="error" :closable="false" show-icon :title="statisticsError" />
+      <WorklogCoverageNotice
+        v-if="statistics && scope === 'WORKBENCH_TEAM' && presentationMode === 'TREND'"
+        :coverage="statistics.coverage"
+        :title="statisticsCoverageMessage"
+      />
       <el-skeleton v-if="statisticsLoading && !statistics" :rows="6" animated />
       <div v-else-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <WorklogRanking
@@ -118,13 +123,10 @@
           </div>
         </div>
       </template>
-      <el-alert
+      <WorklogCoverageNotice
         v-if="entries?.coverage.partial"
-        class="coverage-alert"
-        type="warning"
-        :closable="false"
-        show-icon
-        :title="`部分成员工时暂未取得，失败成员 ${entries.coverage.failedMemberCount} 人`"
+        :coverage="entries.coverage"
+        :title="entriesCoverageMessage"
       />
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
       <el-skeleton v-if="entriesLoading && !entries" :rows="6" animated />
@@ -159,6 +161,7 @@ import WorklogTrendChart from './WorklogTrendChart.vue'
 import WorklogRanking from './WorklogRanking.vue'
 import WorklogWeekList from './WorklogWeekList.vue'
 import WorklogAbsenceDialog from './WorklogAbsenceDialog.vue'
+import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 
 const current = new Date()
 const month = ref(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`)
@@ -210,6 +213,18 @@ const summary = computed(() => {
     return `总计工时 ${formatHours(monthTotal.value)}h · ${count} 人 · 加班天数 ${teamStatistics.value.overtimeDays}天 · 加班工时 ${formatHours(teamStatistics.value.overtimeHours)}h · 平均工时 ${formatAverageHours(teamStatistics.value.averageHours)}h`
   }
   return `总计工时 ${formatHours(monthTotal.value)}h · 加班天数 ${personalStatistics.value.overtimeDays}天 · 加班工时 ${formatHours(personalStatistics.value.overtimeHours)}h · 平均工时 ${formatAverageHours(personalStatistics.value.averageHours)}h`
+})
+const statisticsCoverageMessage = computed(() => {
+  const failed = statistics.value?.coverage.failedMemberCount || 0
+  return failed > 0
+    ? `部分成员工时暂未取得，失败成员 ${failed} 人，月度统计可能不完整`
+    : '部分成员工时未完整取得，月度统计可能不完整'
+})
+const entriesCoverageMessage = computed(() => {
+  const failed = entries.value?.coverage.failedMemberCount || 0
+  return failed > 0
+    ? `部分成员工时暂未取得，失败成员 ${failed} 人`
+    : '部分成员工时未完整取得，登记明细可能不完整'
 })
 const scopeLabel = computed(() => scope.value === 'SELF' ? '我的工时' : selectedTeam.value?.name || '团队工时')
 const syncTimeLabel = computed(() => {
@@ -467,7 +482,7 @@ onMounted(async () => {
 .month-controls { justify-content: center; gap: 14px; margin-bottom: 12px; }
 .month-controls strong { min-width: 120px; color: #35445b; text-align: center; }
 .selection-placeholder { display: grid; min-height: 260px; place-items: center; color: #8a96a9; }
-.view-error, .coverage-alert { margin-bottom: 12px; }
+.view-error { margin-bottom: 12px; }
 .week-header { justify-content: space-between; gap: 16px; }
 .entry-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .entry-controls > span { color: #356ec8; font-size: 13px; font-weight: 600; white-space: nowrap; }

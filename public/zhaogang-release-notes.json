@@ -1,7 +1,18 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-09-22-01",
+  "currentReleaseId": "zg-2026-10-08-01",
   "releases": [
+    {
+      "id": "zg-2026-10-08-01",
+      "version": "1.8.0",
+      "publishedAt": "2026-10-08T11:32:21+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "团队工时数据不完整时，可查看受影响成员及各自的取数原因，涵盖月度统计、排行榜、登记明细和缺勤统计"
+        }
+      ]
+    },
     {
       "id": "zg-2026-09-22-01",
       "version": "1.7.4",

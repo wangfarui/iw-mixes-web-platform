@@ -1,13 +1,6 @@
 <template>
   <section class="worklog-ranking" aria-label="团队月度卷王排行榜">
-    <el-alert
-      v-if="coverage.partial"
-      class="ranking-alert"
-      type="warning"
-      :closable="false"
-      show-icon
-      :title="coverageMessage"
-    />
+    <WorklogCoverageNotice :coverage="coverage" :title="coverageMessage" />
 
     <div class="ranking-intro">
       <div class="ranking-heading">
@@ -65,6 +58,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Trophy } from '@element-plus/icons-vue'
+import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 import type {
   ZhaogangWorklogCoverage,
   ZhaogangWorklogMemberDailyTotal,
@@ -177,7 +171,6 @@ const rankLabel = (rank: number) => rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 
 
 <style scoped>
 .worklog-ranking { min-height: 302px; color: #26344a; }
-.ranking-alert { margin-bottom: 14px; }
 .ranking-intro { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .ranking-heading { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
 .ranking-intro strong { font-size: 16px; }

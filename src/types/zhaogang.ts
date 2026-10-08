@@ -141,6 +141,13 @@ export interface ZhaogangWorklogCoverage {
   failedMemberCount: number
   warning: string
   permissionError?: ZhaogangCodingPermissionError | null
+  memberIssues?: ZhaogangWorklogMemberIssue[]
+}
+
+export interface ZhaogangWorklogMemberIssue {
+  user: ZhaogangWorklogUser
+  reasonCode: string
+  reason: string
 }
 
 export interface ZhaogangWorklogDailyTotal {

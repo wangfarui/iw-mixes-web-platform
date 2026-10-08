@@ -14,14 +14,7 @@
         <span>统计月份：{{ monthLabel }}</span>
         <span>统计范围：{{ rangeLabel }}</span>
       </div>
-      <el-alert
-        v-if="report.coverage.partial"
-        class="absence-alert"
-        type="warning"
-        :closable="false"
-        show-icon
-        :title="coverageWarning"
-      />
+      <WorklogCoverageNotice :coverage="report.coverage" :title="coverageWarning" />
       <el-empty v-if="!report.members.length" description="所选范围内没有缺勤记录" :image-size="90" />
       <el-table v-else :data="report.members" size="small" stripe>
         <el-table-column label="成员" min-width="150">
@@ -51,6 +44,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ZhaogangWorklogAbsence } from '@/types/zhaogang'
+import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
@@ -85,7 +79,6 @@ const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN'
 
 <style scoped>
 .absence-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 18px; margin-bottom: 14px; color: #65738a; font-size: 13px; }
-.absence-alert { margin-bottom: 14px; }
 .member-cell { display: flex; align-items: center; gap: 8px; color: #35445b; }
 .absence-day-list { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 760px) {
