@@ -10,7 +10,33 @@
           <el-button class="back-button" link :icon="ArrowLeft" title="返回迭代看板" @click="router.push('/zhaogang/iterations')">返回</el-button>
           <div class="title-block">
             <div class="title-row">
-              <h2>{{ detail.name }}</h2>
+              <el-select
+                v-model="selectedIterationId"
+                class="iteration-selector"
+                filterable
+                :disabled="loading || saving || syncingCoding || deletingIssues"
+                :loading="iterationOptionsLoading"
+                :filter-method="filterIterationOptions"
+                :no-match-text="iterationSelectorKeyword ? '没有匹配的迭代' : '暂无可选迭代'"
+                :no-data-text="iterationSelectorKeyword ? '没有匹配的迭代' : '暂无可选迭代'"
+                placeholder="选择迭代"
+                aria-label="选择迭代"
+                @visible-change="onIterationSelectorVisibleChange"
+                @change="switchIteration"
+                @keydown.esc.capture="filterIterationOptions('')"
+              >
+                <el-option
+                  v-for="iteration in visibleIterationOptions"
+                  :key="iteration.id"
+                  :label="iteration.name"
+                  :value="iteration.id"
+                >
+                  <div class="iteration-option">
+                    <span class="iteration-option-name">{{ iteration.name }}</span>
+                    <span class="iteration-option-stage">{{ stageLabel(iteration.stage) }}</span>
+                  </div>
+                </el-option>
+              </el-select>
               <el-tag v-if="detail.version" effect="plain">{{ detail.version }}</el-tag>
             </div>
             <div class="detail-meta">
@@ -168,8 +194,9 @@
       </section>
 
       <IterationReleasePanel
+        :key="detail.id"
         ref="releasePanelRef"
-        :iteration-id="id()"
+        :iteration-id="detail.id"
         :release-plans="detail.releasePlans"
         :can-edit="detail.permissions.canEdit"
         @added="releasePlanAdded"
@@ -292,12 +319,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Delete, Edit, Expand, Link, RefreshRight, Timer, UserFilled } from '@element-plus/icons-vue'
 import {
   addTeamIterationChildIssue, addTeamIterationCodingIssue, deleteTeamIteration, getTeamIteration,
-  getTeamIterationIssueCreationOptions, getTeamIterationIssueStatusOptions, getTeamIterationMemberOptions, registerTeamIterationIssueWorklog,
+  getTeamIterationIssueCreationOptions, getTeamIterationIssueStatusOptions, getTeamIterationMemberOptions, getTeamIterations, registerTeamIterationIssueWorklog,
   removeTeamIterationIssue, removeTeamIterationIssues, replaceTeamIterationMembers, retryTeamIterationIssueWorklog,
   syncTeamIterationCodingIssues, syncTeamIterationIssue, updateTeamIteration, updateTeamIterationIssueStatus
 } from '@/api/zhaogangIteration'
 import type {
-  TeamIterationDetail, TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationIssueType, TeamIterationRole,
+  TeamIterationDetail, TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationIssueType, TeamIterationListItem, TeamIterationRole,
   TeamIterationReleasePlan, TeamIterationSelectionOption, TeamIterationStage, TeamIterationTeamOption, TeamIterationUser
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
@@ -327,6 +354,13 @@ const saving = ref(false)
 const syncingCoding = ref(false)
 const deletingIssues = ref(false)
 const detail = ref<TeamIterationDetail>()
+const selectedIterationId = ref<number>()
+const iterationOptions = ref<TeamIterationListItem[]>([])
+const iterationSelectorKeyword = ref('')
+const iterationOptionsLoading = ref(false)
+let iterationOptionsRequestId = 0
+let detailRequestId = 0
+let iterationOptionsLoaded = false
 const releasePanelRef = ref<{ openDrawer: () => void } | null>(null)
 const releasePanelMode = ref<'bottom' | 'drawer'>('bottom')
 const selectedIssues = ref<TeamIterationIssue[]>([])
@@ -402,6 +436,13 @@ const memberDrafts = computed(() => selectedTeamIds.value.flatMap(teamId => {
   }).filter((item): item is { key: string, teamId: number, teamName: string, user: TeamIterationUser, roles: TeamIterationRole[] } => Boolean(item))
 }))
 const id = () => Number(route.params.iterationId)
+const visibleIterationOptions = computed(() => {
+  const keyword = iterationSelectorKeyword.value.trim().toLocaleLowerCase()
+  const current = detail.value
+  const options = iterationOptions.value.filter(iteration => iteration.id !== current?.id)
+  if (current) options.unshift(current)
+  return options.filter(iteration => !keyword || iteration.name.toLocaleLowerCase().includes(keyword))
+})
 const selectedIssueIds = computed(() => selectedIssues.value.map(issue => issue.id))
 const issueStatusFilterGroups = computed(() => buildIterationIssueStatusFilterGroups(detail.value?.issues || []))
 const availableIssueStatusFilterValues = computed(() => new Set(issueStatusFilterGroups.value.flatMap(group => group.options.map(option => option.value))))
@@ -436,12 +477,22 @@ const showCodingIssueAssociationFailures = (failures: CodingIssueAssociationFail
 
 const load = async () => {
   const iterationId = id()
+  const requestId = ++detailRequestId
   const preserveExpansion = expandedIterationId === iterationId
+  selectedIterationId.value = iterationId
   loading.value = true
   selectedIssues.value = []
+  if (detail.value && detail.value.id !== iterationId) {
+    detail.value = undefined
+    issueStatusFilters.value = []
+    Object.keys(statusOptionsByIssue).forEach(key => delete statusOptionsByIssue[Number(key)])
+    Object.keys(statusValueByIssue).forEach(key => delete statusValueByIssue[Number(key)])
+  }
   try {
     const loadedDetail = await getTeamIteration(iterationId)
+    if (requestId !== detailRequestId) return
     detail.value = loadedDetail
+    if (!iterationOptionsLoaded) void loadIterationOptions()
     expandedIssueIds.value = preserveExpansion
       ? retainExpandedIterationIssueIds(expandedIssueIds.value, loadedDetail.issues)
       : iterationIssueParentIds(loadedDetail.issues)
@@ -450,9 +501,62 @@ const load = async () => {
       : []
     expandedIterationId = iterationId
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '迭代详情加载失败')
-  } finally { loading.value = false }
+    if (requestId === detailRequestId) ElMessage.error(error instanceof Error ? error.message : '迭代详情加载失败')
+  } finally { if (requestId === detailRequestId) loading.value = false }
 }
+
+const loadAllIterations = async (stage: TeamIterationStage) => {
+  const pageSize = 50
+  const items: TeamIterationListItem[] = []
+  let pageNumber = 1
+  let total = 0
+  do {
+    const page = await getTeamIterations({ stage, pageNumber, pageSize })
+    items.push(...page.items)
+    total = page.total
+    pageNumber += 1
+    if (!page.items.length) break
+  } while (items.length < total)
+  return items
+}
+
+const loadIterationOptions = async () => {
+  if (iterationOptionsLoading.value) return
+  const requestId = ++iterationOptionsRequestId
+  iterationOptionsLoading.value = true
+  try {
+    const iterations = (await Promise.all(
+      (['NOT_STARTED', 'DEVELOPING', 'TESTING'] as TeamIterationStage[]).map(loadAllIterations)
+    )).flat()
+    const byId = new Map<number, TeamIterationListItem>()
+    iterations.forEach(iteration => byId.set(iteration.id, iteration))
+    if (requestId !== iterationOptionsRequestId) return
+    iterationOptions.value = Array.from(byId.values())
+    iterationOptionsLoaded = true
+  } catch (error) {
+    if (requestId === iterationOptionsRequestId) {
+      ElMessage.error(error instanceof Error ? error.message : '迭代选项加载失败')
+    }
+  } finally {
+    if (requestId === iterationOptionsRequestId) iterationOptionsLoading.value = false
+  }
+}
+
+const filterIterationOptions = (keyword: string) => {
+  iterationSelectorKeyword.value = keyword
+}
+
+const onIterationSelectorVisibleChange = (visible: boolean) => {
+  iterationSelectorKeyword.value = ''
+  if (visible) void loadIterationOptions()
+}
+
+const switchIteration = async (iterationId: number) => {
+  if (!iterationId || iterationId === id()) return
+  await router.push(`/zhaogang/iterations/${iterationId}`)
+}
+
+const stageLabel = (stage: TeamIterationStage) => stageOptions.find(item => item.value === stage)?.label || stage
 
 const openEdit = () => {
   if (!detail.value) return
@@ -861,7 +965,13 @@ watch(() => route.params.iterationId, load)
 .detail-heading { align-items: flex-start; flex: 1 1 auto; }
 .back-button { flex: 0 0 auto; margin-top: 1px; }
 .title-block { flex: 1 1 auto; }
-.title-row h2 { min-width: 0; margin: 0; overflow: hidden; font-size: 22px; text-overflow: ellipsis; white-space: nowrap; }
+.iteration-selector { width: 420px; min-width: 0; max-width: 100%; }
+.iteration-selector :deep(.el-select__wrapper) { min-height: 34px; padding: 0 11px; font-size: 22px; background: transparent; box-shadow: none; }
+.iteration-selector :deep(.el-select__caret) { color: #718097; }
+.iteration-selector :deep(.el-select__selected-item) { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.iteration-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
+.iteration-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iteration-option-stage { flex: 0 0 auto; color: #8a96a8; font-size: 12px; }
 .title-row :deep(.el-tag) { flex: 0 0 auto; }
 .detail-meta { flex-wrap: wrap; gap: 5px 18px; margin-top: 7px; color: #617087; font-size: 12px; }
 .detail-meta span,.detail-meta button { display: inline-flex; align-items: center; gap: 5px; padding: 0; color: inherit; line-height: 1.4; white-space: nowrap; background: transparent; border: 0; }
@@ -919,6 +1029,6 @@ watch(() => route.params.iterationId, load)
 .role-list { flex-wrap: wrap; }
 :global(.coding-association-result-dialog .el-message-box__message p) { overflow-wrap: anywhere; white-space: pre-wrap; }
 @media(max-width:1100px){.detail-header{flex-wrap:wrap}.header-actions{width:100%;justify-content:flex-end}}
-@media(max-width:640px){.detail-header{display:block}.detail-heading{gap:4px}.back-button{padding-right:4px;padding-left:0}.title-row h2{font-size:20px}.detail-meta{gap:4px 12px}.header-actions{width:auto;justify-content:flex-start;margin-top:12px}.issue-section{min-height:120px}.form-grid,.story-field-row,.sub-task-field-row,.child-entry-row{grid-template-columns:1fr}.child-sync-field{min-width:0;justify-self:stretch}.hours-control,.task-type-control{width:100%}}
+@media(max-width:640px){.detail-header{display:block}.detail-heading{gap:4px}.back-button{padding-right:4px;padding-left:0}.iteration-selector{width:100%;min-width:0}.iteration-selector :deep(.el-select__wrapper){font-size:20px}.detail-meta{gap:4px 12px}.header-actions{width:auto;justify-content:flex-start;margin-top:12px}.issue-section{min-height:120px}.form-grid,.story-field-row,.sub-task-field-row,.child-entry-row{grid-template-columns:1fr}.child-sync-field{min-width:0;justify-self:stretch}.hours-control,.task-type-control{width:100%}}
 @media(max-width:640px){.section-header{display:block}.section-toolbar{align-items:stretch;flex-direction:column;margin-top:10px}.issue-status-filter{width:100%}.section-actions{flex-wrap:wrap}}
 </style>
