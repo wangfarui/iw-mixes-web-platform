@@ -53,6 +53,22 @@ export const toolCategories: ToolCategoryItem[] = [
 
 export const toolCatalog: ToolCatalogItem[] = [
     {
+        path: 'skills',
+        toolKey: 'skills',
+        routePath: '/tools/skills',
+        routeName: 'Skill 工作台',
+        title: 'Skill 工作台',
+        menuTitle: 'Skill 工作台',
+        description: '扫描本机或导入 Skills，按全局与项目分类，以卡片浏览并查看说明和文件。',
+        category: 'work',
+        releasedAt: '2026-10-14',
+        scenarios: ['本机 Skills 管理', '全局与项目分类', 'Skill 说明预览'],
+        tags: ['本机扫描', '手动导入', '不上传'],
+        keywords: ['skill', 'skills', 'codex', 'claude', 'cursor', '技能', '工作台', '全局', '项目'],
+        icon: Memo,
+        component: () => import('@/views/skill-workbench/SkillWorkbenchTool.vue')
+    },
+    {
         path: 'typing-practice',
         toolKey: 'typing-practice',
         routePath: '/tools/typing-practice',

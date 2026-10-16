@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 
-export const LAUNCHER_VERSION = '1.4.3'
+export const LAUNCHER_VERSION = '1.5.3'
 export const LAUNCHER_HOST = '127.0.0.1'
 export const LAUNCHER_PORT = 17321
 export const LAUNCHER_ORIGINS = [
@@ -11,15 +11,18 @@ export const LAUNCHER_ORIGINS = [
 ]
 export const LAUNCHER_LABEL = 'com.itwray.ai-session-launcher'
 
-export const getLauncherPaths = (homeDir = os.homedir()) => {
-  const rootDir = path.join(homeDir, 'Library', 'Application Support', 'IW AI Launcher')
+export const getLauncherPaths = (homeDir = os.homedir(), platform = process.platform) => {
+  const pathApi = platform === 'win32' ? path.win32 : path
+  const rootDir = platform === 'win32'
+    ? pathApi.join(homeDir, 'AppData', 'Local', 'IW AI Launcher')
+    : pathApi.join(homeDir, 'Library', 'Application Support', 'IW AI Launcher')
   return {
     rootDir,
-    appDir: path.join(rootDir, 'app'),
-    configPath: path.join(rootDir, 'config.json'),
-    logsDir: path.join(rootDir, 'logs'),
-    stdoutPath: path.join(rootDir, 'logs', 'launcher.log'),
-    stderrPath: path.join(rootDir, 'logs', 'launcher-error.log'),
-    plistPath: path.join(homeDir, 'Library', 'LaunchAgents', `${LAUNCHER_LABEL}.plist`)
+    appDir: pathApi.join(rootDir, 'app'),
+    configPath: pathApi.join(rootDir, 'config.json'),
+    logsDir: pathApi.join(rootDir, 'logs'),
+    stdoutPath: pathApi.join(rootDir, 'logs', 'launcher.log'),
+    stderrPath: pathApi.join(rootDir, 'logs', 'launcher-error.log'),
+    plistPath: pathApi.join(homeDir, 'Library', 'LaunchAgents', `${LAUNCHER_LABEL}.plist`)
   }
 }

@@ -13,6 +13,12 @@ import { createMetadataOptimizer } from './metadataOptimizer.mjs'
 import { createSessionInspector } from './sessionInspector.mjs'
 import { createSessionLauncher } from './sessionLauncher.mjs'
 import { createTerminalAdapter } from './terminalAdapter.mjs'
+import { createSkillWorkbench } from './skills/scanner.mjs'
+import { createSkillFileOpener } from './skills/openFile.mjs'
+import { createDirectoryPicker } from './skills/directoryPicker.mjs'
+import { createDirectoryBrowser } from './skills/directoryBrowser.mjs'
+
+const openSkillFile = createSkillFileOpener()
 
 const MAX_BODY_BYTES = 16 * 1024
 
@@ -62,7 +68,10 @@ export const createLauncherServer = ({
   sessionInspector,
   metadataOptimizer,
   host = LAUNCHER_HOST,
-  port = LAUNCHER_PORT
+  port = LAUNCHER_PORT,
+  skillWorkbench = createSkillWorkbench({ openFile: openSkillFile }),
+  directoryPicker = createDirectoryPicker(),
+  directoryBrowser = createDirectoryBrowser()
 }) => {
   const configuredOrigins = Array.isArray(config.allowedOrigins)
     ? config.allowedOrigins
@@ -102,11 +111,52 @@ export const createLauncherServer = ({
       }
       sendJson(res, 200, {
         version: LAUNCHER_VERSION,
+        platform: process.platform,
+        capabilities: ['skills', 'skills-directory-browser', 'skills-current-directory'],
         paired: hasValidToken,
         tools: Object.fromEntries(
           Object.entries(config.executables || {}).map(([tool, executable]) => [tool, Boolean(executable)])
         )
       })
+      return
+    }
+
+    if (requestUrl.pathname.startsWith('/v1/skills')) {
+      if (!hasValidToken) {
+        sendJson(res, 401, { code: 'UNAUTHORIZED', message: '请先使用配对令牌连接本机助手' })
+        return
+      }
+      try {
+        const endpoint = requestUrl.pathname.slice('/v1/skills'.length)
+        if (req.method === 'GET' && endpoint === '/discover') sendJson(res, 200, { sources: await skillWorkbench.discover() })
+        else if (req.method === 'GET' && endpoint === '/changes') sendJson(res, 200, skillWorkbench.status())
+        else if (req.method === 'POST' && endpoint === '/directories') sendJson(res, 200, await directoryBrowser(await readJsonBody(req)))
+        else if (req.method === 'POST' && endpoint === '/choose-directory') {
+          const controller = new AbortController()
+          const onDisconnect = () => controller.abort()
+          res.once('close', onDisconnect)
+          try { sendJson(res, 200, await directoryPicker({ signal: controller.signal })) }
+          finally { res.removeListener('close', onDisconnect) }
+        }
+        else if (req.method === 'POST' && endpoint === '/scan') sendJson(res, 202, skillWorkbench.start((await readJsonBody(req)).sources))
+        else if (req.method === 'GET' && /^\/jobs\/[a-f0-9-]+$/.test(endpoint)) sendJson(res, 200, skillWorkbench.job(endpoint.split('/')[2]))
+        else if (req.method === 'POST' && /^\/jobs\/[a-f0-9-]+\/cancel$/.test(endpoint)) sendJson(res, 200, skillWorkbench.cancel(endpoint.split('/')[2]))
+        else if (req.method === 'POST' && endpoint === '/open') {
+          const body = await readJsonBody(req)
+          sendJson(res, 200, await skillWorkbench.open(body.id, body.path))
+        } else if (req.method === 'POST' && endpoint === '/clear') sendJson(res, 200, skillWorkbench.clear())
+        else sendJson(res, 404, { code: 'NOT_FOUND', message: 'Skill 接口不存在' })
+      } catch (error) { sendJson(res, 400, { code: 'SKILLS_REQUEST_FAILED', message: error.message }) }
+      return
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/v1/shutdown') {
+      if (!hasValidToken) { sendJson(res, 401, { code: 'UNAUTHORIZED', message: '缺少有效配对令牌' }); return }
+      sendJson(res, 200, { stopped: true })
+      skillWorkbench.close()
+      directoryPicker.close?.()
+      server.close()
+      server.closeIdleConnections()
       return
     }
 
@@ -203,6 +253,8 @@ export const createLauncherServer = ({
       })
     }),
     close: () => new Promise((resolve, reject) => {
+      skillWorkbench.close()
+      directoryPicker.close?.()
       server.close((error) => error ? reject(error) : resolve())
     })
   }

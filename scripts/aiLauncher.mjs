@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -12,6 +12,7 @@ import {
   LAUNCHER_PORT,
   getLauncherPaths
 } from '../local-ai-launcher/constants.mjs'
+import { buildWindowsStartupScript, getWindowsStartupPath } from '../local-ai-launcher/windowsInstallation.mjs'
 import { discoverToolExecutables } from '../local-ai-launcher/executables.mjs'
 
 const execFileAsync = promisify(execFile)
@@ -90,12 +91,38 @@ const buildPlist = () => {
 `
 }
 
+const stopWindows = async (config) => {
+  if (!config) return
+  try {
+    await fetch(`http://${LAUNCHER_HOST}:${LAUNCHER_PORT}/v1/shutdown`, { method: 'POST', headers: { 'X-IW-Launcher-Token': config.token }, signal: AbortSignal.timeout(3000) })
+  } catch { /* The helper may already be stopped. */ }
+}
+
+const startWindows = async () => {
+  const config = await readExistingConfig()
+  if (!config) throw new Error('请先安装本机助手')
+  try {
+    const response = await fetch(`http://${LAUNCHER_HOST}:${LAUNCHER_PORT}/v1/status`, { headers: { 'X-IW-Launcher-Token': config.token }, signal: AbortSignal.timeout(1000) })
+    if (response.ok) return
+  } catch { /* Start an installed but stopped helper. */ }
+  const stdout = await open(paths.stdoutPath, 'a'), stderr = await open(paths.stderrPath, 'a')
+  try {
+    const child = spawn(process.execPath, [path.join(paths.appDir, 'server.mjs'), '--config', paths.configPath], {
+      detached: true, windowsHide: true, stdio: ['ignore', stdout.fd, stderr.fd]
+    })
+    await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+    child.unref()
+  } finally { await stdout.close(); await stderr.close() }
+}
+
 const install = async () => {
-  if (process.platform !== 'darwin') {
-    throw new Error('IW AI Launcher 目前只支持 macOS')
+  if (!['darwin', 'win32'].includes(process.platform)) {
+    throw new Error('IW 本机助手安装支持 macOS 和 Windows')
   }
+  if (Number(process.versions.node.split('.')[0]) < 20) throw new Error('本机助手需要 Node.js 20 或更高版本')
   await access(sourceAppDir)
   const existingConfig = await readExistingConfig()
+  if (process.platform === 'win32') await stopWindows(existingConfig)
   const executables = await discoverToolExecutables(existingConfig?.executables)
   const config = {
     allowedOrigins: LAUNCHER_ORIGINS,
@@ -105,17 +132,26 @@ const install = async () => {
 
   await mkdir(paths.rootDir, { recursive: true, mode: 0o700 })
   await mkdir(paths.logsDir, { recursive: true, mode: 0o700 })
-  await mkdir(path.dirname(paths.plistPath), { recursive: true })
-  await rm(legacyITermProfilePath, { force: true })
+  if (process.platform === 'darwin') {
+    await mkdir(path.dirname(paths.plistPath), { recursive: true })
+    await rm(legacyITermProfilePath, { force: true })
+  }
   await rm(paths.appDir, { recursive: true, force: true })
   await cp(sourceAppDir, paths.appDir, { recursive: true })
   await writeFile(paths.configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 })
-  await writeFile(paths.plistPath, buildPlist(), 'utf8')
-
-  const domain = `gui/${process.getuid()}`
-  await runLaunchctl(['bootout', domain, paths.plistPath], true)
-  await runLaunchctl(['bootstrap', domain, paths.plistPath])
-  await runLaunchctl(['kickstart', '-k', `${domain}/${LAUNCHER_LABEL}`])
+  if (process.platform === 'win32') {
+    const startupPath = getWindowsStartupPath(os.homedir())
+    await mkdir(path.dirname(startupPath), { recursive: true })
+    const startupScript = buildWindowsStartupScript({ nodePath: process.execPath, serverPath: path.join(paths.appDir, 'server.mjs'), configPath: paths.configPath, shortcutPath: startupPath })
+    await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(startupScript, 'utf16le').toString('base64')])
+    await startWindows()
+  } else {
+    await writeFile(paths.plistPath, buildPlist(), 'utf8')
+    const domain = `gui/${process.getuid()}`
+    await runLaunchctl(['bootout', domain, paths.plistPath], true)
+    await runLaunchctl(['bootstrap', domain, paths.plistPath])
+    await runLaunchctl(['kickstart', '-k', `${domain}/${LAUNCHER_LABEL}`])
+  }
 
   process.stdout.write('IW AI Launcher 已安装并启动。\n')
   process.stdout.write(`允许来源：${LAUNCHER_ORIGINS.join(', ')}\n`)
@@ -124,10 +160,15 @@ const install = async () => {
 }
 
 const uninstall = async () => {
-  const domain = `gui/${process.getuid()}`
-  await runLaunchctl(['bootout', domain, paths.plistPath], true)
-  await rm(paths.plistPath, { force: true })
-  await rm(legacyITermProfilePath, { force: true })
+  if (process.platform === 'win32') {
+    await stopWindows(await readExistingConfig())
+    await rm(getWindowsStartupPath(os.homedir()), { force: true })
+  } else {
+    const domain = `gui/${process.getuid()}`
+    await runLaunchctl(['bootout', domain, paths.plistPath], true)
+    await rm(paths.plistPath, { force: true })
+    await rm(legacyITermProfilePath, { force: true })
+  }
   await rm(paths.rootDir, { recursive: true, force: true })
   process.stdout.write('IW AI Launcher 已卸载。\n')
 }
@@ -159,13 +200,14 @@ const pair = async () => {
 
 const commandMap = {
   install,
+  start: async () => { if (process.platform !== 'win32') throw new Error('macOS 安装后由 launchd 自动启动'); await startWindows(); process.stdout.write('本机助手已启动。\n') },
   uninstall,
   status,
   pair
 }
 
 if (!commandMap[command]) {
-  process.stderr.write('用法：node scripts/aiLauncher.mjs <install|uninstall|status|pair>\n')
+  process.stderr.write('用法：node scripts/aiLauncher.mjs <install|start|uninstall|status|pair>\n')
   process.exitCode = 1
 } else {
   commandMap[command]().catch((error) => {
