@@ -16,7 +16,7 @@
           <div class="search-input">
             <span class="label">字典类型:</span>
             <el-select v-model="page.dto.dictType" clearable placeholder="请选择字典类型">
-              <el-option v-for="item in dictStore.getDictTypeArray()"
+              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4011].includes(Number(item.code)))"
                          :key="item.code"
                          :label="item.name"
                          :value="item.code"
@@ -121,7 +121,7 @@ function searchPage() {
   loading.value = true
   queryDictPage(page.dto).then(data => {
     page.total = data.data.total
-    page.list = data.data.records
+    page.list = data.data.records.filter((item: DictListData) => ![4001, 4002, 4011].includes(Number(item.dictType)))
     loading.value = false
   }).finally(() => {
     loading.value = false

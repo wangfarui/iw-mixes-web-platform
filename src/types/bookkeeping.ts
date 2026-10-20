@@ -5,6 +5,10 @@ export type BookkeepingListData =  {
     recordCategory?: number,
     recordSource: string,
     amount?: number,
+    recordTypeId?: number | null,
+    recordTypeName?: string | null,
+    dictionarySnapshotStatus?: number,
+    recordTagSnapshots?: Array<{ id: number, type: number, name: string }>,
 }
 
 export type BookkeepingPageDto = {
@@ -13,38 +17,33 @@ export type BookkeepingPageDto = {
     recordStartDate?: string,
     recordEndDate?: string,
     recordSource?: string,
-    recordType?: number,
+    categoryNames?: string[],
+    categoryState?: 'UNCATEGORIZED' | 'PENDING',
+    tagNames?: string[],
     recordCategory?: number
 }
 
 export type BookkeepingAddDto = {
-    mealDate: Date,
-    mealTime?: number,
-    diners?: number,
+    recordDate?: string,
+    recordCategory: 1 | 2,
+    recordSource?: string,
+    amount: number,
+    recordTypeId?: number | null,
+    recordTags?: number[],
     remark?: string,
-    mealMenuList?: Array<BookkeepingMenuAddDto>
+    isStatistics?: number,
+    shared?: number,
+    expenseUserId?: number,
 }
 
-export type BookkeepingMenuAddDto = {
-    dishesId: number,
-    dishesName: string
-}
-
-export type BookkeepingUpdateDto = BookkeepingAddDto & {
-    id: number
-}
-
-export type BookkeepingDetailVo = {
+export type BookkeepingUpdateDto = Omit<BookkeepingAddDto, 'recordTypeId' | 'recordTags'> & {
     id: number,
-    mealDate: Date,
-    mealTimeStr?: number,
-    diners?: number,
+    dictionaryChanges?: { categoryId?: number | null, tagIds?: number[] },
+}
+
+export type BookkeepingDetailVo = BookkeepingListData & {
     remark?: string,
-    mealMenuList?: Array<BookkeepingMenuDetailVo>
+    recordDate?: string,
 }
 
-export type BookkeepingMenuDetailVo = {
-    id: number,
-    dishesId: number,
-    dishesName: string
-}
+export type BookkeepingFilterOptions = { categories: Array<{ name: string }>, expenseTags: Array<{ name: string }>, incomeTags: Array<{ name: string }> }

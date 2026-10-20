@@ -25,3 +25,4 @@ export const deleteBookkeeping = (id: number) => {
 export const queryBookkeepingDetail = (id: number) => {
     return request.get('/bookkeeping-service/bookkeeping/records/detail?id=' + id)
 }
+export const queryBookkeepingFilterOptions = (params: Partial<BookkeepingType.BookkeepingPageDto> = {}) => request.get('/bookkeeping-service/bookkeeping/records/filter-options', { params })

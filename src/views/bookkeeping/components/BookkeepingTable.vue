@@ -41,20 +41,26 @@
 
         <el-col :span="4">
           <el-select
-            v-model="page.dto.recordType"
+            v-model="page.dto.categoryNames"
+            multiple
             placeholder="记录分类"
             clearable
             @change="searchPage"
           >
             <el-option
-              v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.BOOKKEEPING_RECORD_TYPE)"
-              :key="item.dictCode"
-              :label="item.dictName"
-              :value="item.dictCode"
+              v-for="item in filterOptions.categories"
+              :key="item.name"
+              :label="item.name"
+              :value="item.name"
             />
           </el-select>
         </el-col>
 
+        <el-col :span="4">
+          <el-select v-model="page.dto.tagNames" multiple clearable placeholder="历史标签" @change="searchPage">
+            <el-option v-for="name in tagOptions" :key="name" :label="name" :value="name" />
+          </el-select>
+        </el-col>
         <el-col :span="6">
           <el-date-picker
             v-model="dateRange"
@@ -81,10 +87,13 @@
         </el-table-column>
         <el-table-column prop="recordSource" label="记录来源" width="180"/>
         <el-table-column prop="amount" label="金额" width="180"/>
-        <el-table-column prop="recordType" label="记录分类" width="180">
+        <el-table-column prop="recordTypeName" label="记录分类" width="180">
           <template #default="{ row }">
-            {{ dictStore.getDictNameByCode(dictStore.dictTypeEnum.BOOKKEEPING_RECORD_TYPE, row.recordType) }}
+            {{ categoryName(row) }}
           </template>
+        </el-table-column>
+        <el-table-column label="标签" min-width="180">
+          <template #default="{ row }">{{ tagNames(row) }}</template>
         </el-table-column>
 <!--        <el-table-column label="操作">-->
 <!--          <template #default="scope">-->
@@ -112,22 +121,41 @@
           @current-change="handleCurrentChange"
       />
     </div>
+    <el-dialog v-model="showDetail" title="账单详情" width="540px">
+      <el-descriptions v-if="detail" :column="1" border>
+        <el-descriptions-item label="记录时间">{{ detail.recordDate || detail.recordTime }}</el-descriptions-item>
+        <el-descriptions-item label="来源">{{ detail.recordSource }}</el-descriptions-item>
+        <el-descriptions-item label="金额">{{ detail.amount }}</el-descriptions-item>
+        <el-descriptions-item label="分类">{{ categoryName(detail) }}</el-descriptions-item>
+        <el-descriptions-item label="标签">{{ tagNames(detail) || '无' }}</el-descriptions-item>
+        <el-descriptions-item label="备注">{{ detail.remark || '无' }}</el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import {ref, onMounted, reactive} from 'vue'
+import {ref, onMounted, reactive, computed} from 'vue'
 import router from '@/router'
-import type {BookkeepingListData, BookkeepingPageDto} from "@/types/bookkeeping"
-import {queryBookkeepingPage, queryBookkeepingDetail, deleteBookkeeping} from "@/api/bookkeeping"
+import type {BookkeepingListData, BookkeepingPageDto, BookkeepingDetailVo, BookkeepingFilterOptions} from "@/types/bookkeeping"
+import {queryBookkeepingPage, queryBookkeepingDetail, deleteBookkeeping, queryBookkeepingFilterOptions} from "@/api/bookkeeping"
 import {useDictStore} from "@/stores/dict";
 import { ElMessage } from 'element-plus'
 import request from "@/api/request"
+import authSession from '@/services/authSession'
 
 const dictStore = useDictStore();
 const baseUrl = import.meta.env.VITE_API_BASE_URL
 
 const loading = ref(false)
+const showDetail = ref(false)
+const detail = ref<BookkeepingDetailVo | null>(null)
+const filterOptions = ref<BookkeepingFilterOptions>({ categories: [], expenseTags: [], incomeTags: [] })
+const tagOptions = computed(() => Array.from(new Set((page.dto.recordCategory === 1 ? filterOptions.value.expenseTags : page.dto.recordCategory === 2 ? filterOptions.value.incomeTags : [...filterOptions.value.expenseTags, ...filterOptions.value.incomeTags]).map(item => item.name))))
+function tagNames(row: BookkeepingListData) { return (row.recordTagSnapshots || []).map(tag => tag.name).join('、') }
+function categoryName(row: BookkeepingListData) {
+  return row.dictionarySnapshotStatus === 0 ? '分类待核对' : row.recordTypeName || '未分类'
+}
 const dateRange = ref<[Date, Date] | null>(null)
 
 const page = reactive({
@@ -136,7 +164,8 @@ const page = reactive({
     pageSize: 10,
     recordSource: undefined,
     recordCategory: undefined,
-    recordType: undefined,
+    categoryNames: [],
+    tagNames: [],
     recordStartDate: undefined,
     recordEndDate: undefined
   } as BookkeepingPageDto,
@@ -148,23 +177,37 @@ onMounted(() => {
   searchPage()
 })
 
-function searchPage() {
+let requestSequence = 0
+async function searchPage() {
+  const requestId = ++requestSequence
+  const token = authSession.getToken()
   loading.value = true
-  queryBookkeepingPage(page.dto).then(data => {
-    page.total = data.data.total
-    page.list = data.data.records
-    loading.value = false
-  }).finally(() => {
-    loading.value = false
-  })
+  const params = { recordStartDate: page.dto.recordStartDate, recordEndDate: page.dto.recordEndDate, recordCategory: page.dto.recordCategory }
+  const isCurrent = () => requestId === requestSequence && token === authSession.getToken()
+  try {
+    await Promise.all([
+      queryBookkeepingPage(page.dto).then(data => {
+        if (!isCurrent()) return
+        page.total = data.data.total
+        page.list = data.data.records
+      }),
+      queryBookkeepingFilterOptions(params).then(res => {
+        if (isCurrent()) filterOptions.value = res.data
+      })
+    ])
+  } finally {
+    if (isCurrent()) loading.value = false
+  }
 }
 
 function handleBookkeepingAdd() {
   router.push({path: '/bookkeeping/add'})
 }
 
-const handleClick = (row: BookkeepingListData) => {
-  router.push({path: '/bookkeeping/detail'})
+const handleClick = async (row: BookkeepingListData) => {
+  const res = await queryBookkeepingDetail(row.id)
+  detail.value = res.data
+  showDetail.value = true
 }
 
 const handleEdit = (index: number, row: BookkeepingListData) => {
