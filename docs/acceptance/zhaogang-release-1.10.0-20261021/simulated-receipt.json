@@ -1,0 +1,15 @@
+{
+  "environment": "isolated local fixtures, not a real bound CODING session",
+  "writes": [
+    {
+      "path": "/release-notes/zg-2026-10-21-01/receipt",
+      "method": "PUT"
+    }
+  ],
+  "receipts": {
+    "/release-notes/zg-2026-10-21-01/receipt": {
+      "read": true,
+      "readAt": "2026-10-21T07:20:50.982Z"
+    }
+  }
+}
