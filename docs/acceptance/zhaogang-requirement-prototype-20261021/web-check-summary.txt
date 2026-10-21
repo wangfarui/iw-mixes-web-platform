@@ -1,0 +1,12 @@
+npm run test:zhaogang-iteration: passed
+npm run type-check: passed
+npm run build: passed
+
+dist/assets/chunk-YQYVFZYE-CuX4CIHs.js                                  448.14 kB │ gzip: 158.38 kB
+dist/assets/index-DG_j7IA8.js                                         1,218.65 kB │ gzip: 403.24 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 28.54s

@@ -1,0 +1,43 @@
+{
+  "environment": "isolated local API fixtures, no real CODING credentials or business writes",
+  "successfulRequests": [
+    {
+      "path": "/iterations/1/issues/11",
+      "body": {
+        "title": "测试需求：补充原型",
+        "description": "需求描述示例",
+        "prototypeUrl": "https://example.com/prototype-editor"
+      }
+    },
+    {
+      "path": "/iterations/1/issues/11",
+      "body": {
+        "title": "测试需求：补充原型",
+        "description": "需求描述示例",
+        "prototypeUrl": ""
+      }
+    },
+    {
+      "path": "/iterations/1/issues/11/prototype",
+      "body": {
+        "prototypeUrl": "https://example.com/prototype-quick"
+      }
+    },
+    {
+      "path": "/iterations/1/issues/11/prototype",
+      "body": {
+        "prototypeUrl": "http://127.0.0.1:5180/quick"
+      }
+    }
+  ],
+  "navigationRequests": [
+    {
+      "path": "/quick",
+      "time": "2026-10-21T06:49:20.061Z"
+    },
+    {
+      "path": "/existing",
+      "time": "2026-10-21T06:49:46.109Z"
+    }
+  ]
+}

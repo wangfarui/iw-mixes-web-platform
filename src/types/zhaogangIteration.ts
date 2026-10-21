@@ -57,6 +57,7 @@ export interface TeamIterationIssue {
   issueTypeName: string
   title: string
   description?: string
+  prototypeUrl?: string | null
   statusName: string
   assigneeName?: string
   available: boolean
@@ -191,6 +192,7 @@ export interface TeamIterationCreateChildIssueCommand {
 export interface TeamIterationUpdateIssueCommand {
   title: string
   description?: string
+  prototypeUrl?: string
   developmentTeam?: string
   definitionOfDone?: string
   estimatedHours?: number

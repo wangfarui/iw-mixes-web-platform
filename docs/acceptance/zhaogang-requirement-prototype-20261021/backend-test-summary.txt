@@ -1,0 +1,35 @@
+[INFO]
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ iw-external ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.itwray.iw.external.zhaogang.iteration.DefaultTeamIterationModuleTest
+[INFO] Tests run: 71, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.805 s -- in com.itwray.iw.external.zhaogang.iteration.DefaultTeamIterationModuleTest
+[INFO] Running com.itwray.iw.external.zhaogang.iteration.IterationPrototypePersistenceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.235 s -- in com.itwray.iw.external.zhaogang.iteration.IterationPrototypePersistenceTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 72, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for iw-parent 0.2.1:
+[INFO]
+[INFO] iw-parent .......................................... SUCCESS [  0.001 s]
+[INFO] iw-common .......................................... SUCCESS [  0.378 s]
+[INFO] iw-starter ......................................... SUCCESS [  0.000 s]
+[INFO] iw-redis-starter ................................... SUCCESS [  0.216 s]
+[INFO] iw-web ............................................. SUCCESS [  0.356 s]
+[INFO] iw-feign-client .................................... SUCCESS [  0.001 s]
+[INFO] iw-auth-client ..................................... SUCCESS [  0.037 s]
+[INFO] iw-external-client ................................. SUCCESS [  0.032 s]
+[INFO] iw-packaging-parent ................................ SUCCESS [  0.000 s]
+[INFO] iw-external ........................................ SUCCESS [ 23.445 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  24.693 s
+[INFO] Finished at: 2026-10-21T14:48:49+08:00
+[INFO] ------------------------------------------------------------------------

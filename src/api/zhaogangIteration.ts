@@ -119,6 +119,11 @@ export const updateTeamIterationIssue = (id: number, issueId: number, command: T
     method: 'PUT', body: JSON.stringify(command)
   }).then(normalizeIssue)
 
+export const updateTeamIterationIssuePrototypeUrl = (id: number, issueId: number, prototypeUrl: string) =>
+  zhaogangRequest<{ prototypeUrl: string }>(`/iterations/${id}/issues/${issueId}/prototype`, {
+    method: 'PUT', body: JSON.stringify({ prototypeUrl })
+  })
+
 export const getTeamIterationIssueStatusOptions = (id: number, issueId: number) =>
   zhaogangRequest<TeamIterationSelectionOption[]>(`/iterations/${id}/issues/${issueId}/status-options`)
 

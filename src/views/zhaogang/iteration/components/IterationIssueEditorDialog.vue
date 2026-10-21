@@ -10,6 +10,9 @@
       <el-form-item :label="issue.issueCode ? '标题（保存后同步 CODING）' : '标题'" required>
         <el-input v-model="form.title" maxlength="256" />
       </el-form-item>
+      <el-form-item v-if="issue.issueType === 'REQUIREMENT'" label="需求原型" :error="prototypeError">
+        <el-input v-model="form.prototypeUrl" maxlength="255" show-word-limit clearable placeholder="请输入完整的 HTTP/HTTPS 原型链接" />
+      </el-form-item>
       <el-form-item label="描述">
         <el-input
           v-model="form.description"
@@ -82,6 +85,7 @@ import type {
   TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationSelectionOption, TeamIterationIssuePriority
 } from '@/types/zhaogangIteration'
 import { subTaskPriorityOptions } from '../iterationIssuePriority'
+import { prototypeLinkError } from '../iterationPrototypeLink'
 
 const props = defineProps<{
   modelValue: boolean
@@ -102,7 +106,7 @@ const options = reactive<TeamIterationIssueCreationOptions>({
   issueType: 'REQUIREMENT', developmentTeams: [], definitionsOfDone: [], taskTypes: [], bugPriorities: []
 })
 const form = reactive({
-  title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1,
+  title: '', description: '', prototypeUrl: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1,
   taskType: '', priority: '' as TeamIterationIssuePriority | '', onlineBug: false, bugPriority: ''
 })
 
@@ -111,7 +115,9 @@ const typeLabels: Record<TeamIterationIssue['issueType'], string> = {
 }
 const typeLabel = computed(() => typeLabels[props.issue?.issueType || 'REQUIREMENT'])
 const dialogTitle = computed(() => `编辑${typeLabel.value}`)
+const prototypeError = computed(() => props.issue?.issueType === 'REQUIREMENT' ? prototypeLinkError(form.prototypeUrl) : '')
 const submitEnabled = computed(() => {
+  if (prototypeError.value) return false
   if (!form.title.trim() || !props.issue) return false
   if (props.issue.issueType === 'USER_STORY') return Boolean(form.developmentTeam && form.definitionOfDone)
   if (props.issue.issueType === 'SUB_TASK') return form.estimatedHours > 0 && Boolean(form.taskType && form.priority)
@@ -146,6 +152,7 @@ const save = async () => {
     const updated = await updateTeamIterationIssue(props.iterationId, props.issue.id, {
       title: form.title.trim(),
       description: form.description,
+      prototypeUrl: props.issue.issueType === 'REQUIREMENT' ? form.prototypeUrl.trim() : undefined,
       developmentTeam: props.issue.issueType === 'USER_STORY' ? form.developmentTeam : undefined,
       definitionOfDone: props.issue.issueType === 'USER_STORY' ? form.definitionOfDone : undefined,
       estimatedHours: props.issue.issueType === 'SUB_TASK' ? form.estimatedHours : undefined,
@@ -165,7 +172,7 @@ const save = async () => {
 watch(() => [props.modelValue, props.issue?.id] as const, ([visible]) => {
   if (!visible || !props.issue) return
   Object.assign(form, {
-    title: props.issue.title || '', description: props.issue.description || '',
+    title: props.issue.title || '', description: props.issue.description || '', prototypeUrl: props.issue.prototypeUrl || '',
     developmentTeam: props.issue.developmentTeam || '', definitionOfDone: props.issue.definitionOfDone || '',
     estimatedHours: props.issue.estimatedHours || 1, taskType: props.issue.taskType || '',
     priority: props.issue.priority || ((props.issue.source === 'CODING' || props.issue.syncStatus === 'SYNCED') ? '' : '0'),

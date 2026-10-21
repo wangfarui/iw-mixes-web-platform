@@ -180,6 +180,7 @@
                   <el-dropdown-menu>
                     <el-dropdown-item v-if="canSync(scope.row)" :command="`sync:${scope.row.id}`" :icon="RefreshRight">同步到 CODING</el-dropdown-item>
                     <el-dropdown-item v-if="canRegisterWorklog(scope.row)" :command="`worklog:${scope.row.id}`" :icon="Timer">登记工时</el-dropdown-item>
+                    <el-dropdown-item v-if="scope.row.issueType === 'REQUIREMENT'" :command="`prototype:${scope.row.id}`" :icon="Link">跳转到需求原型</el-dropdown-item>
                     <el-dropdown-item v-if="scope.row.url" :command="`open:${scope.row.id}`" :icon="Link">跳转到 CODING</el-dropdown-item>
                     <el-dropdown-item divided :command="`remove:${scope.row.id}`" :icon="Delete">移除</el-dropdown-item>
                   </el-dropdown-menu>
@@ -251,6 +252,15 @@
       :iteration-id="id()"
       :issue="issueEditing"
       @saved="issueSaved"
+    />
+
+    <IterationPrototypeLinkDialog
+      v-if="prototypeIssue"
+      :key="`${prototypeIterationId}:${prototypeIssue.id}`"
+      v-model="prototypeVisible"
+      :iteration-id="prototypeIterationId"
+      :issue="prototypeIssue"
+      @saved="prototypeSaved"
     />
 
     <el-dialog v-model="issueDialogVisible" title="关联 CODING 事项" width="min(620px, calc(100% - 28px))">
@@ -329,6 +339,8 @@ import type {
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
 import IterationIssueEditorDialog from './components/IterationIssueEditorDialog.vue'
+import IterationPrototypeLinkDialog from './components/IterationPrototypeLinkDialog.vue'
+import { prototypeLinkError } from './iterationPrototypeLink'
 import { defaultSubTaskPriority, subTaskPriorityOptions } from './iterationIssuePriority'
 import IterationReleasePanel from './components/IterationReleasePanel.vue'
 import {
@@ -374,6 +386,9 @@ const memberEditing = ref(false)
 const issueDialogVisible = ref(false)
 const issueEditVisible = ref(false)
 const issueEditing = ref<TeamIterationIssue>()
+const prototypeVisible = ref(false)
+const prototypeIssue = ref<TeamIterationIssue>()
+const prototypeIterationId = ref(0)
 const statusLoadingIssueId = ref<number>()
 const statusOptionsByIssue = reactive<Record<number, TeamIterationSelectionOption[]>>({})
 const statusValueByIssue = reactive<Record<number, number | undefined>>({})
@@ -873,8 +888,27 @@ const handleIssueCommand = (command: string) => {
   if (!issue) return
   if (action === 'sync') void syncIssue(issue)
   else if (action === 'worklog') openWorklogEditor(issue)
+  else if (action === 'prototype') openPrototype(issue)
   else if (action === 'open' && issue.url) openCoding(issue.url)
   else if (action === 'remove') void removeIssue(issue)
+}
+
+const prototypeSaved = (url: string, issueId: number, iterationId: number) => {
+  if (detail.value?.id !== iterationId) return
+  const issue = findIssue(detail.value.issues, issueId)
+  if (issue) issue.prototypeUrl = url
+}
+
+const openPrototype = (issue: TeamIterationIssue) => {
+  if (issue.prototypeUrl?.trim()) {
+    const error = prototypeLinkError(issue.prototypeUrl, true)
+    if (error) { ElMessage.error(error); return }
+    window.open(issue.prototypeUrl.trim(), '_blank', 'noopener,noreferrer')
+    return
+  }
+  prototypeIterationId.value = id()
+  prototypeIssue.value = issue
+  prototypeVisible.value = true
 }
 
 const findIssue = (issues: TeamIterationIssue[], issueId: number): TeamIterationIssue | undefined => {
@@ -953,7 +987,10 @@ const issueTagType = (value: TeamIterationIssueType) => value === 'DEFECT' ? 'da
 const formatDate = (value: string) => value?.replace('T', ' ').slice(0, 16) || '未设置'
 
 onMounted(load)
-watch(() => route.params.iterationId, load)
+watch(() => route.params.iterationId, () => {
+  prototypeVisible.value = false
+  void load()
+})
 </script>
 
 <style scoped>

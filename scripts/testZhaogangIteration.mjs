@@ -281,4 +281,23 @@ assert.match(releasePanelSource, /k8sEnvironmentFromBuild\(selectedEnvironmentFo
 assert.match(releasePanelSource, /getCachedZhaogangK8sNamespace\(environment\)/)
 assert.match(releasePanelSource, /zhaogangK8sDashboardUrl\(environment, namespace, deploymentName\)/)
 
+const prototypeOutfile = path.join(tempDir, 'iteration-prototype-link.mjs')
+await build({
+  entryPoints: [path.join(root, 'src/views/zhaogang/iteration/iterationPrototypeLink.ts')],
+  outfile: prototypeOutfile, bundle: true, platform: 'browser', format: 'esm', target: 'es2020', logLevel: 'silent'
+})
+const {prototypeLinkError} = await import(pathToFileURL(prototypeOutfile).href)
+for (const value of ['', '  ', 'https://example.com/design?id=1#page', ' http://localhost:8080/原型 ', 'https://example.com/%FF']) {
+  assert.equal(prototypeLinkError(value), '', value)
+}
+assert.match(prototypeLinkError('', true), /请输入/)
+for (const value of ['javascript:alert(1)', 'data:text/html,hello', 'ftp://example.com/a', '//example.com/a',
+  'example.com/a', 'https://', 'https://example.com/a b', 'https://example.com/%', 'http://example.com:99999/']) {
+  assert.match(prototypeLinkError(value), /HTTP\/HTTPS/, value)
+}
+const maxPrototype = 'https://example.com/' + 'a'.repeat(235)
+assert.equal(maxPrototype.length, 255)
+assert.equal(prototypeLinkError(maxPrototype), '')
+assert.match(prototypeLinkError(maxPrototype + 'a'), /255/)
+
 console.log('zhaogang iteration tests passed')
