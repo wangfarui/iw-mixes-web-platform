@@ -1,5 +1,6 @@
 <template>
   <div v-loading="loading">
+    <el-alert title="记账分类、标签与会员类型请在小程序的记账设置中维护" type="info" :closable="false" style="margin-bottom: 12px" />
     <div>
       <el-button type="primary" @click="handleDictAdd">新增</el-button>
       <el-button type="primary" @click="searchPage">刷新</el-button>
@@ -16,7 +17,7 @@
           <div class="search-input">
             <span class="label">字典类型:</span>
             <el-select v-model="page.dto.dictType" clearable placeholder="请选择字典类型">
-              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4011].includes(Number(item.code)))"
+              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4004, 4011].includes(Number(item.code)))"
                          :key="item.code"
                          :label="item.name"
                          :value="item.code"
@@ -121,7 +122,7 @@ function searchPage() {
   loading.value = true
   queryDictPage(page.dto).then(data => {
     page.total = data.data.total
-    page.list = data.data.records.filter((item: DictListData) => ![4001, 4002, 4011].includes(Number(item.dictType)))
+    page.list = data.data.records.filter((item: DictListData) => ![4001, 4002, 4004, 4011].includes(Number(item.dictType)))
     loading.value = false
   }).finally(() => {
     loading.value = false
