@@ -1,6 +1,6 @@
 <template>
   <div v-loading="loading">
-    <el-alert title="记账分类、标签与会员类型请在小程序的记账设置中维护" type="info" :closable="false" style="margin-bottom: 12px" />
+    <el-alert title="记账选项请在小程序“记账设置”维护；衣柜五类选项请在“衣柜穿搭 → 衣柜设置”维护" type="info" :closable="false" style="margin-bottom: 12px" />
     <div>
       <el-button type="primary" @click="handleDictAdd">新增</el-button>
       <el-button type="primary" @click="searchPage">刷新</el-button>
@@ -17,7 +17,7 @@
           <div class="search-input">
             <span class="label">字典类型:</span>
             <el-select v-model="page.dto.dictType" clearable placeholder="请选择字典类型">
-              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4004, 4011].includes(Number(item.code)))"
+              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.code)))"
                          :key="item.code"
                          :label="item.name"
                          :value="item.code"
@@ -54,11 +54,6 @@
           </template>
         </el-table-column>
         <el-table-column prop="dictName" label="字典名称" width="180"/>
-        <el-table-column label="所属品类" width="180">
-          <template #default="{ row }">
-            {{ getParentCategoryName(row) }}
-          </template>
-        </el-table-column>
         <el-table-column prop="sort" label="排序值" width="180"/>
         <el-table-column prop="dictStatus" label="字典状态" width="180">
           <template #default="{ row }">
@@ -122,18 +117,11 @@ function searchPage() {
   loading.value = true
   queryDictPage(page.dto).then(data => {
     page.total = data.data.total
-    page.list = data.data.records.filter((item: DictListData) => ![4001, 4002, 4004, 4011].includes(Number(item.dictType)))
+    page.list = data.data.records.filter((item: DictListData) => ![4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.dictType)))
     loading.value = false
   }).finally(() => {
     loading.value = false
   })
-}
-
-function getParentCategoryName(row: DictListData) {
-  if (Number(row.dictType) !== Number(dictStore.dictTypeEnum.WARDROBE_ITEM_SUBCATEGORY)) {
-    return ''
-  }
-  return dictStore.getDictNameById(dictStore.dictTypeEnum.WARDROBE_ITEM_CATEGORY, Number(row.parentId || 0))
 }
 
 function resetSearch() {

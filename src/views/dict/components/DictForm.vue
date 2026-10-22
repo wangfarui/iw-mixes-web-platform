@@ -1,22 +1,13 @@
 <template>
   <div>
-    <el-alert v-if="blocked" title="记账分类、标签与会员类型请在小程序的记账设置中维护" type="info" :closable="false" />
+    <el-alert v-if="blocked" title="记账选项请在小程序“记账设置”维护；衣柜五类选项请在“衣柜穿搭 → 衣柜设置”维护" type="info" :closable="false" />
     <el-form v-if="!blocked" ref="formRef" :model="formData" label-width="auto" style="max-width: 500px">
       <el-form-item label="字典类型" prop="dictType">
         <el-select v-model="formData.dictType" placeholder="请选择字典类型" style="width: 400px">
-          <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4004, 4011].includes(Number(item.code)))"
+          <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.code)))"
                      :key="item.code"
                      :label="item.name"
                      :value="item.code"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item v-if="isWardrobeItemSubcategory" label="所属品类" prop="parentId">
-        <el-select v-model="formData.parentId" placeholder="请选择所属品类" style="width: 400px">
-          <el-option v-for="item in parentCategoryOptions"
-                     :key="item.id"
-                     :label="item.dictName"
-                     :value="item.id"
           />
         </el-select>
       </el-form-item>
@@ -51,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref, onMounted, watch} from "vue"
+import {ref, onMounted} from "vue"
 import type {FormInstance} from "element-plus"
 import {ElMessage} from "element-plus"
 import router from "@/router"
@@ -81,35 +72,17 @@ const id = route.params.id as string;
 
 const formRef = ref<FormInstance>()
 
-const isWardrobeItemSubcategory = computed(() => {
-  return Number(formData.value.dictType) === Number(dictStore.dictTypeEnum.WARDROBE_ITEM_SUBCATEGORY)
-})
-
-const parentCategoryOptions = computed(() => {
-  return dictStore.getDictDataArray(dictStore.dictTypeEnum.WARDROBE_ITEM_CATEGORY) || []
-})
-
-watch(() => formData.value.dictType, () => {
-  if (!isWardrobeItemSubcategory.value) {
-    formData.value.parentId = 0
-  }
-})
-
 onMounted(() => {
   if (props.operate == "UPDATE") {
     queryDictDetail(id).then(res => {
-      if ([4001, 4002, 4004, 4011].includes(Number(res.data.dictType))) { blocked.value = true; return }
+      if ([4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(res.data.dictType))) { blocked.value = true; return }
       formData.value = res.data
     }).catch(() => { blocked.value = true })
   }
 })
 
 const handleDialogConfirm = (formEl: FormInstance | undefined) => {
-  if (!formEl || blocked.value || [4001, 4002, 4004, 4011].includes(Number(formData.value.dictType))) return
-  if (isWardrobeItemSubcategory.value && !formData.value.parentId) {
-    ElMessage.warning('请选择所属品类')
-    return
-  }
+  if (!formEl || blocked.value || [4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(formData.value.dictType))) return
   if (props.operate == "ADD") {
     // 新增字典
     addDict(formData.value).then(res => {
