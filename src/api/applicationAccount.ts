@@ -31,3 +31,6 @@ export const queryApplicationAccountDetail = (id: number) => {
 export const viewPasswordById = (id: number) => {
     return request.get('/auth-service/application/account/viewPassword?id=' + id)
 }
+
+// Includes disabled personal categories for historical account display.
+export const queryAccountCategories = () => request.get('/auth-service/application/account/categories')

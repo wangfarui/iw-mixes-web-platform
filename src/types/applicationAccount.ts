@@ -1,6 +1,7 @@
 export type AccountListData =  {
     id: number,
-    type: string,
+    type: number | null,
+    typeName?: string,
     name?: string,
     address?: string,
     account?: string,
@@ -18,7 +19,7 @@ export type AccountPageDto = {
 }
 
 export type AccountAddDto = {
-    type?: string,
+    type?: number | null,
     name?: string,
     address?: string,
     account?: string,
@@ -31,3 +32,5 @@ export type AccountUpdateDto = AccountAddDto & {
     id?: number
 }
 
+
+export type AccountCategory = { id: number; code: number; name: string; enabled: boolean; revision: number; accountCount: number }

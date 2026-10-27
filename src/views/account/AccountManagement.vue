@@ -1,5 +1,6 @@
 <template>
   <div v-loading="loading">
+    <el-alert title="应用分类请在小程序“账号管理 → 管理分类”维护" type="info" :closable="false" style="margin-bottom: 12px" />
     <div>
       <el-button type="primary" @click="handleAdd">新增</el-button>
       <el-button type="primary" @click="searchPage">刷新</el-button>
@@ -33,10 +34,10 @@
           @tab-click="handleClick"
         >
           <el-tab-pane :key="-1" label="所有" :name="-1" />
-          <el-tab-pane v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.AUTH_APPLICATION_ACCOUNT_TYPE)"
-                      :key="item.dictCode"
-                      :label="item.dictName"
-                      :name="item.dictCode">
+          <el-tab-pane v-for="item in categories.filter(item => item.enabled || item.accountCount > 0)"
+                      :key="item.code"
+                      :label="item.name + (item.enabled ? '' : ' · 已停用')"
+                      :name="item.code">
           </el-tab-pane>
       </el-tabs>
     </div>
@@ -46,7 +47,7 @@
         <el-table-column prop="account" label="账号" width="180"/>
         <el-table-column prop="type" label="应用分类" width="100">
           <template #default="{ row }">
-            {{ dictStore.getDictNameByCode(dictStore.dictTypeEnum.AUTH_APPLICATION_ACCOUNT_TYPE, row.type) }}
+            {{ row.typeName || '未分类' }}
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" width="180"/>
@@ -84,6 +85,7 @@
         v-model="dialogData.visible"
         :title="dialogData.title"
         width="500"
+        :show-close="!saving"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         align-center
@@ -92,11 +94,11 @@
       <div>
         <el-form ref="formRef" :model="formData" label-width="auto" style="max-width: 500px">
           <el-form-item label="应用分类" prop="type">
-            <el-select v-model="formData.type" placeholder="请选择应用分类" style="width: 400px">
-              <el-option v-for="item in dictStore.getDictDataArray(dictStore.dictTypeEnum.AUTH_APPLICATION_ACCOUNT_TYPE)"
-                        :key="item.dictCode"
-                        :label="item.dictName"
-                        :value="item.dictCode"
+            <el-select v-model="formData.type" placeholder="未分类" clearable style="width: 400px">
+              <el-option v-for="item in categories.filter(item => item.enabled || item.code === formData.type)"
+                        :key="item.code"
+                        :label="item.name + (item.enabled ? '' : ' · 已停用')"
+                        :value="item.code"
               />
             </el-select>
           </el-form-item>
@@ -113,7 +115,7 @@
             <el-switch v-model="formData.updatePassword"/>
           </el-form-item>
           <el-form-item label="密码" prop="password" v-if="dialogData.operate === 'ADD' || formData.updatePassword">
-            <el-input v-model="formData.password"/>
+            <el-input v-model="formData.password" type="password" show-password/>
           </el-form-item>
           <el-form-item label="备注" prop="remark">
             <el-input v-model="formData.remark" type="textarea" autosize/>
@@ -121,8 +123,8 @@
         </el-form>
 
         <div class="dialog-footer">
-          <el-button @click="cancelDialog()">取消</el-button>
-          <el-button type="primary" @click="handleDialogConfirm(formRef)">
+          <el-button :disabled="saving" @click="cancelDialog()">取消</el-button>
+          <el-button type="primary" :loading="saving" :disabled="saving" @click="handleDialogConfirm(formRef)">
             保存
           </el-button>
         </div>
@@ -130,6 +132,7 @@
     </el-dialog>
     <el-dialog
         v-model="viewPasswordDialog.visible"
+        @close="clearPassword"
         title="查看密码"
         width="500"
         align-center
@@ -146,27 +149,30 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, reactive, ref} from 'vue'
-import type {AccountListData, AccountPageDto, AccountUpdateDto} from "@/types/applicationAccount"
+import {onMounted, onBeforeUnmount, reactive, ref} from 'vue'
+import type {AccountCategory, AccountListData, AccountPageDto, AccountUpdateDto} from "@/types/applicationAccount"
 import {
   addApplicationAccount,
   deleteApplicationAccount,
   queryApplicationAccountDetail,
   queryApplicationAccountPage,
   updateApplicationAccount,
-  viewPasswordById
+  viewPasswordById,
+  queryAccountCategories
 } from "@/api/applicationAccount"
 import SvgIcon from "@/components/SvgIcon.vue";
-import {ElMessage} from "element-plus";
-import {useDictStore} from "@/stores/dict";
+import {ElMessage, ElMessageBox} from "element-plus";
 import type { FormInstance, TabsPaneContext } from 'element-plus'
 
-const dictStore = useDictStore();
+const categories = ref<AccountCategory[]>([])
 
 const loading = ref(false)
+const saving = ref(false)
+let passwordRequest = 0
+onBeforeUnmount(() => { passwordRequest++; viewPasswordDialog.pd = '' })
 const formRef = ref<FormInstance>()
 // Tab选中的名称
-const activeName = ref('-1')
+const activeName = ref<string | number>(-1)
 
 const page = reactive({
   dto: {
@@ -200,12 +206,14 @@ const viewPasswordDialog = reactive({
 })
 
 onMounted(() => {
+  queryAccountCategories().then(res => { categories.value = res.data.items }).catch(() => { categories.value = [] })
   searchPage()
 })
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   const name = tab.props.name;
   page.dto.type = name == "-1" ? undefined : name;
+  page.dto.currentPage = 1
   searchPage() 
 }
 
@@ -221,6 +229,8 @@ function searchPage() {
 }
 
 function resetSearch() {
+  activeName.value = -1
+  page.dto.currentPage = 1
   page.dto.type = undefined
   page.dto.name = undefined
   page.dto.address = undefined
@@ -228,18 +238,21 @@ function resetSearch() {
 }
 
 function handleAdd() {
+  initFormData()
   dialogData.operate = 'ADD'
   dialogData.visible = true;
 }
 
-const handleViewPassword = (index: number, row: AccountListData) => {
+const clearPassword = () => { passwordRequest++; viewPasswordDialog.pd = '' }
+const handleViewPassword = async (index: number, row: AccountListData) => {
+  const request = ++passwordRequest
   viewPasswordDialog.visible = true
+  viewPasswordDialog.pd = ''
   viewPasswordDialog.loading = true
-  viewPasswordById(row.id).then(res => {
-    viewPasswordDialog.pd = res.data
-  }).finally(() => {
-    viewPasswordDialog.loading = false
-  })
+  try {
+    const res = await viewPasswordById(row.id)
+    if (request === passwordRequest && viewPasswordDialog.visible) viewPasswordDialog.pd = res.data
+  } finally { if (request === passwordRequest) viewPasswordDialog.loading = false }
 }
 
 // 复制到剪贴板
@@ -255,7 +268,7 @@ const copyText = async () => {
 const handleEdit = (index: number, row: AccountListData) => {
   loading.value = true
   queryApplicationAccountDetail(row.id).then(res => {
-    formData.value = res.data
+    formData.value = { ...res.data, type: res.data.type === 0 ? null : res.data.type, password: '', updatePassword: false }
     dialogData.operate = 'UPDATE'
     dialogData.visible = true;
   }).finally(() => {
@@ -264,10 +277,9 @@ const handleEdit = (index: number, row: AccountListData) => {
 }
 
 const handleDelete = (index: number, row: AccountListData) => {
-  loading.value = true
-  deleteApplicationAccount(row.id).then(res => {
+  ElMessageBox.confirm('确认删除该账号吗？', '删除账号', { type: 'warning' }).then(() => deleteApplicationAccount(row.id)).then(res => {
     searchPage()
-  }).finally(() => {
+  }).catch(() => { /* Cancellation or request errors leave the list intact. */ }).finally(() => {
     loading.value = false
   })
 }
@@ -277,28 +289,23 @@ const cancelDialog = () => {
   initFormData();
 }
 
-const handleDialogConfirm = (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  if (dialogData.operate == "ADD") {
-    // 新增字典
-    addApplicationAccount(formData.value).then(res => {
-      searchPage()
-    }).finally(() => {
-      dialogData.visible = false;
-    })
-  } else if (dialogData.operate == "UPDATE") {
-    // 修改字典
-    const updateData = { ...formData.value }
-    if (!updateData.updatePassword) {
-      delete updateData.password
-    }
-    updateApplicationAccount(updateData).then(res => {
-      searchPage()
-    }).finally(() => {
-      dialogData.visible = false;
-    })
+const handleDialogConfirm = async (formEl: FormInstance | undefined) => {
+  if (!formEl || saving.value) return
+  const data = { ...formData.value, type: formData.value.type ?? null }
+  if (![data.name, data.address, data.account].some(value => String(value || '').trim())) {
+    ElMessage.warning('应用名称、应用地址、账号至少填写一项')
+    return
   }
-  initFormData();
+  saving.value = true
+  try {
+    if (dialogData.operate === 'ADD') await addApplicationAccount(data)
+    else {
+      if (!data.updatePassword) delete data.password
+      await updateApplicationAccount(data)
+    }
+    cancelDialog()
+    searchPage()
+  } finally { saving.value = false }
 }
 
 const initFormData = () => {
