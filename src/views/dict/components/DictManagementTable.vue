@@ -1,6 +1,6 @@
 <template>
   <div v-loading="loading">
-    <el-alert title="应用分类请在小程序“账号管理 → 管理分类”维护；记账选项请在小程序“记账设置”维护；衣柜五类选项请在“衣柜穿搭 → 衣柜设置”维护" type="info" :closable="false" style="margin-bottom: 12px" />
+    <el-alert title="应用分类请在小程序“账号管理 → 管理分类”维护；记账选项请在小程序“记账设置”维护；衣柜五类选项请在“衣柜穿搭 → 衣柜设置”维护；冰箱食材分类/分区请在小程序“厨房重地 → 厨房设置”维护" type="info" :closable="false" style="margin-bottom: 12px" />
     <div>
       <el-button type="primary" @click="handleDictAdd">新增</el-button>
       <el-button type="primary" @click="searchPage">刷新</el-button>
@@ -17,7 +17,7 @@
           <div class="search-input">
             <span class="label">字典类型:</span>
             <el-select v-model="page.dto.dictType" clearable placeholder="请选择字典类型">
-              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![2010, 4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.code)))"
+              <el-option v-for="item in dictStore.getDictTypeArray().filter(item => ![2010, 4001, 4002, 4004, 4011, 3010, 3011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.code)))"
                          :key="item.code"
                          :label="item.name"
                          :value="item.code"
@@ -117,7 +117,7 @@ function searchPage() {
   loading.value = true
   queryDictPage(page.dto).then(data => {
     page.total = data.data.total
-    page.list = data.data.records.filter((item: DictListData) => ![2010, 4001, 4002, 4004, 4011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.dictType)))
+    page.list = data.data.records.filter((item: DictListData) => ![2010, 4001, 4002, 4004, 4011, 3010, 3011, 5002, 5003, 5004, 5005, 5006].includes(Number(item.dictType)))
     loading.value = false
   }).finally(() => {
     loading.value = false
