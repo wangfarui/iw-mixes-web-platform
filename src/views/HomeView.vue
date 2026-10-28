@@ -59,6 +59,7 @@
                 <el-icon><SvgIcon dir="home" name="dishes-manage" /></el-icon>
                 <span>菜品管理</span>
               </el-menu-item>
+              <el-menu-item v-if="canManageSystem" index="/kitchen/settings"><span>厨房设置</span></el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="2">
               <template #title>
@@ -69,6 +70,7 @@
                 <el-icon><SvgIcon dir="home" name="bookkeeping-records" /></el-icon>
                 <span>记账记录</span>
               </el-menu-item>
+              <el-menu-item v-if="canManageSystem" index="/bookkeeping/settings"><span>记账设置</span></el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="3">
               <template #title>
@@ -103,10 +105,7 @@
                 <el-icon><SvgIcon dir="home" name="base-setting" /></el-icon>
                 <span>基础设置</span>
               </template>
-              <el-menu-item index="/dict">
-                <el-icon><SvgIcon dir="home" name="dict-manage" /></el-icon>
-                <span>字典管理</span>
-              </el-menu-item>
+
               <el-menu-item index="/account">
                 <el-icon><SvgIcon dir="home"  name="account-manage" /></el-icon>
                 <span>账号管理</span>
@@ -212,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, reactive, onMounted} from 'vue'
+import {ref, reactive, onMounted, onBeforeUnmount} from 'vue'
 import {RouterView} from 'vue-router'
 import router from "@/router";
 import {getCurrentInstance} from "vue";
@@ -229,6 +228,15 @@ import {
 import {ElMessage, ElLoading, type FormInstance, type TabsPaneContext, type FormRules} from "element-plus";
 import {editPasswordApi, getVerificationCodeByActionApi, refreshDictCache} from "@/api/login";
 import authSession from '@/services/authSession'
+import { systemCapabilities } from '@/api/systemOptions'
+const canManageSystem = ref(false)
+let systemPermissionSequence = 0
+async function reloadSystemPermission() {
+  const seq = ++systemPermissionSequence, token = authSession.getToken()
+  canManageSystem.value = false
+  try { const cap = await systemCapabilities(); if (seq === systemPermissionSequence && token === authSession.getToken()) canManageSystem.value = cap.manageSystemOptions } catch (_) {}
+}
+onBeforeUnmount(() => { systemPermissionSequence++; window.removeEventListener('focus', reloadSystemPermission); window.removeEventListener('storage', reloadSystemPermission) })
 import type {UserPasswordEditDto} from "@/types/types";
 import SvgIcon from "@/components/SvgIcon.vue";
 import versionPollingService from '@/services/versionPollingService'
@@ -273,7 +281,10 @@ const handleMenuSelect = (index: string) => {
   router.push(index)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  void reloadSystemPermission()
+  window.addEventListener('focus', reloadSystemPermission)
+  window.addEventListener('storage', reloadSystemPermission)
   user.name = authSession.getUserName();
 })
 

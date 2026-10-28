@@ -103,22 +103,24 @@ const router = createRouter({
                     component: () => import('@/views/points/PointsRecords.vue'),
                     meta: {title: '积分记录'}
                 },
+                { path: '/kitchen/settings', component: () => import('@/views/settings/BusinessSettings.vue'), props: { domain: 'kitchen' }, meta: { title: '厨房设置' } },
+                { path: '/bookkeeping/settings', component: () => import('@/views/settings/BusinessSettings.vue'), props: { domain: 'bookkeeping' }, meta: { title: '记账设置' } },
                 {
                     path: '/dict',
                     name: '字典管理',
-                    component: () => import('@/views/dict/DictManagement.vue'),
+                    component: () => import('@/views/settings/LegacyDictionary.vue'),
                     meta: {title: '字典管理'}
                 },
                 {
                     path: '/dict/add',
                     name: '新增字典',
-                    component: () => import('@/views/dict/DictAdd.vue'),
+                    component: () => import('@/views/settings/LegacyDictionary.vue'),
                     meta: {title: '新增字典'}
                 },
                 {
                     path: '/dict/edit/:id',
                     name: '修改字典',
-                    component: () => import('@/views/dict/DictEdit.vue'),
+                    component: () => import('@/views/settings/LegacyDictionary.vue'),
                     meta: {title: '修改字典'}
                 },
                 {

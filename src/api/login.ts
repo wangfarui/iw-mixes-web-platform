@@ -27,7 +27,7 @@ export const getDictTypeList = () => {
 
 // 查询所有数据字典集合
 export const getAllDictList = () => {
-    return request.get('/auth-service/dict/getAllDictList');
+    return request.get('/auth-service/dict/getAllDictList', { params: { latest: true } });
 }
 
 // 注册获取手机验证码
