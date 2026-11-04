@@ -143,6 +143,59 @@
         >删除令牌</el-button>
       </div>
       <p class="settings-hint">Skill 请求地址：<code>https://api.itwray.com/external-service/api/zhaogang/agent-api</code></p>
+
+      <section class="skill-package-section">
+        <header class="skill-package-heading">
+          <div>
+            <h4>胖猫云工作台构建 Skill</h4>
+            <p>下载后解压到工作区，或复制安装提示词交给 Agent 完成校验和安装。</p>
+          </div>
+          <el-button
+            type="primary"
+            :icon="Download"
+            :disabled="!skillPackage.available"
+            @click="downloadSkillPackage"
+          >下载 Skill 安装包</el-button>
+        </header>
+        <dl class="connection-details skill-package-details">
+          <div><dt>版本</dt><dd>{{ skillPackage.version }}</dd></div>
+          <div><dt>文件名</dt><dd><code>{{ skillPackage.fileName }}</code></dd></div>
+          <div><dt>SHA-256</dt><dd><code>{{ skillPackage.checksum }}</code></dd></div>
+          <div><dt>安装目录</dt><dd><code>&lt;工作区&gt;/.agents/skills/pangmaoyun-workbench-build</code></dd></div>
+        </dl>
+        <el-alert
+          v-if="!skillPackage.available"
+          type="info"
+          :closable="false"
+          show-icon
+          :title="skillPackage.unavailableReason"
+        />
+        <el-alert
+          v-else
+          type="success"
+          :closable="false"
+          show-icon
+          title="压缩包根目录固定为 pangmaoyun-workbench-build/，不包含 Agent 令牌或本地状态。"
+        />
+        <div class="skill-install-steps">
+          <h5>手工安装</h5>
+          <ol>
+            <li>下载并校验 ZIP 的 SHA-256。</li>
+            <li>将压缩包根目录下的 <code>pangmaoyun-workbench-build/</code> 解压到目标工作区的 <code>.agents/skills/</code>。</li>
+            <li>目标目录已存在时先停止；确认升级后再备份并替换，不能静默覆盖。</li>
+            <li>安装后运行 Skill 测试，再按页面提示绑定 Agent 令牌，不把令牌写入压缩包或 Git。</li>
+          </ol>
+        </div>
+        <div class="skill-prompt-row">
+          <el-button
+            :icon="DocumentCopy"
+            :loading="copyingSkillPrompt"
+            :disabled="!skillPackage.available"
+            @click="copySkillInstallPrompt"
+          >复制 Agent 安装提示词</el-button>
+          <span>提示词会要求 Agent 先校验 SHA-256、检查根目录，并在目标已存在时停止。</span>
+        </div>
+      </section>
     </section>
 
     <section v-if="props.activeSection === 'ai'" id="ai" class="settings-section">
@@ -247,7 +300,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { DocumentCopy, Promotion, QuestionFilled, Reading, Refresh, Setting, Upload } from '@element-plus/icons-vue'
+import { DocumentCopy, Download, Promotion, QuestionFilled, Reading, Refresh, Setting, Upload } from '@element-plus/icons-vue'
 import {
   ZhaogangRequestError,
   clearZhaogangAiConfig,
@@ -314,6 +367,7 @@ const agentTokenLoading = ref(false)
 const agentTokenSaving = ref(false)
 const agentTokenDeleting = ref(false)
 const copyingAgentToken = ref(false)
+const copyingSkillPrompt = ref(false)
 const updateCheckError = ref('')
 const k8sConfigured = ref(emptyEnvironmentFlags())
 const k8sTokens = ref(emptyEnvironmentTokens())
@@ -411,24 +465,89 @@ const copyNewAgentToken = async () => {
   if (!newAgentToken.value) return
   copyingAgentToken.value = true
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(newAgentToken.value)
-    } else {
-      const textarea = document.createElement('textarea')
-      textarea.value = newAgentToken.value
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      textarea.remove()
-    }
+    await writeClipboardText(newAgentToken.value)
     ElMessage.success('令牌已复制')
   } catch {
     ElMessage.error('复制失败，请手动选择令牌复制')
   } finally {
     copyingAgentToken.value = false
   }
+}
+
+const writeClipboardText = async (value: string) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  let copied = false
+  try {
+    textarea.select()
+    copied = document.execCommand('copy')
+  } finally {
+    textarea.remove()
+  }
+  if (!copied) throw new Error('当前浏览器不支持自动复制')
+}
+
+const skillPackageDownloadUrl = 'https://itwray.oss-cn-heyuan.aliyuncs.com/zg/pangmaoyun/agents/pangmaoyun-workbench-build-v1.0.0.zip'
+
+const skillPackage = {
+  available: Boolean(skillPackageDownloadUrl),
+  unavailableReason: '安装包下载地址正在配置，请联系工作台维护人。',
+  version: 'v1.0.0',
+  fileName: 'pangmaoyun-workbench-build-v1.0.0.zip',
+  checksum: '4f10aedaafd7ec3128b54fd82992fad53ddd120f5ce12369393d4f8ecaade67b',
+  downloadUrl: skillPackageDownloadUrl
+}
+
+const skillInstallPrompt = `请将找钢工作台的胖猫云工作台构建 Skill 安装到我指定的目标工作区。
+
+安装包地址：${skillPackage.downloadUrl || '【请先向工作台维护人获取下载地址】'}
+安装包版本：${skillPackage.version}
+文件名：${skillPackage.fileName}
+SHA-256：${skillPackage.checksum}
+
+执行要求：
+1. 先确认我给出的目标工作区绝对路径，并确认该路径是可写目录。
+2. 下载安装包后计算 SHA-256，必须与上面给出的值完全一致；不一致时停止，不得解压安装。
+3. 检查压缩包只包含单一根目录 pangmaoyun-workbench-build/，拒绝绝对路径、../ 路径穿越和额外根目录。
+4. 目标目录 <工作区>/.agents/skills/pangmaoyun-workbench-build 已存在时，先停止并说明现有内容；只有我明确确认升级后才能备份并替换，不能静默覆盖。
+5. 安装到 <工作区>/.agents/skills/pangmaoyun-workbench-build/，不要修改工作区其它文件，不执行 Git 提交或推送。
+6. 安装后检查 SKILL.md 和 scripts/pmy-workbench-build（入口脚本必须可执行）。
+7. 在安装目录运行 Skill 的测试：python3 -m unittest discover -s tests -p 'test_*.py'。
+8. 不读取、打印或复制完整 Agent 令牌；不要自动绑定令牌，也不要自动触发构建。安装完成后提示我回到工作台 Agent 授权页生成令牌，再执行 auth set。
+9. 最后报告：安装路径、版本、SHA-256 是否匹配、测试结果，以及是否需要绑定 Agent 令牌。`
+
+const copySkillInstallPrompt = async () => {
+  if (!skillPackage.available) {
+    ElMessage.info(skillPackage.unavailableReason)
+    return
+  }
+  copyingSkillPrompt.value = true
+  try {
+    await writeClipboardText(skillInstallPrompt)
+    ElMessage.success('Agent 安装提示词已复制')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '安装提示词复制失败')
+  } finally {
+    copyingSkillPrompt.value = false
+  }
+}
+
+const downloadSkillPackage = () => {
+  if (!skillPackage.available) return
+  const link = document.createElement('a')
+  link.href = skillPackage.downloadUrl
+  link.download = skillPackage.fileName
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
 }
 
 const formatAgentTokenTime = (value: string) => {
@@ -687,6 +806,20 @@ onMounted(async () => {
 .new-agent-token-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .new-agent-token-row code { min-width: 0; padding: 6px 8px; overflow-wrap: anywhere; color: #31527e; background: #fff; border-radius: 4px; }
 .new-agent-token-row .el-button { flex: 0 0 auto; }
+.skill-package-section { padding-top: 18px; margin-top: 18px; border-top: 1px solid #edf0f5; }
+.skill-package-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.skill-package-heading h4 { margin: 0; color: #344158; font-size: 15px; }
+.skill-package-heading p { margin: 6px 0 0; color: #7d899c; font-size: 13px; line-height: 1.5; }
+.skill-package-heading .el-button { flex: 0 0 auto; }
+.skill-package-details { margin-top: 12px; }
+.skill-package-details code { padding: 2px 5px; color: #31527e; background: #f1f5fb; border-radius: 4px; }
+.skill-package-section .el-alert { margin-top: 12px; }
+.skill-install-steps { margin-top: 14px; }
+.skill-install-steps h5 { margin: 0; color: #4f5e74; font-size: 13px; }
+.skill-install-steps ol { display: grid; gap: 7px; padding-left: 20px; margin: 9px 0 0; color: #718097; font-size: 13px; line-height: 1.6; }
+.skill-install-steps code { padding: 2px 5px; color: #31527e; background: #f1f5fb; border-radius: 4px; overflow-wrap: anywhere; }
+.skill-prompt-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.skill-prompt-row span { color: #8490a4; font-size: 12px; line-height: 1.5; }
 .preferences-form { padding-top: 18px; }
 .preferences-form :deep(.el-form-item) { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #edf0f5; }
 .preferences-form :deep(.el-form-item__label) { color: #4f5e74; }
@@ -710,6 +843,7 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .settings-section { padding: 16px; }
   .settings-heading { flex-direction: column; gap: 10px; }
+  .skill-package-heading { flex-direction: column; }
   .connection-details > div { align-items: flex-start; flex-direction: column; gap: 7px; }
   .connection-details dd { width: 100%; text-align: left; }
   .k8s-token-row { grid-template-columns: minmax(92px, 1fr) auto; gap: 8px; padding: 10px 12px; }
