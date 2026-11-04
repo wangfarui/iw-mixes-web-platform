@@ -88,6 +88,63 @@
       </div>
     </section>
 
+    <section v-if="props.activeSection === 'agent-auth'" id="agent-auth" class="settings-section">
+      <header class="settings-heading">
+        <div>
+          <h3>Agent 授权</h3>
+          <p>供胖猫云 Skill 触发工作台构建。令牌永久有效，仅展示一次完整值，服务端只保存哈希。</p>
+        </div>
+        <el-tag :type="agentTokenStatus?.configured ? 'success' : 'info'" effect="light">
+          {{ agentTokenStatus?.configured ? '已授权' : '未授权' }}
+        </el-tag>
+      </header>
+      <dl class="connection-details agent-token-details">
+        <div>
+          <dt>当前令牌</dt>
+          <dd><code>{{ agentTokenStatus?.configured ? agentTokenStatus.tokenHint : '尚未生成' }}</code></dd>
+        </div>
+        <div><dt>生成时间</dt><dd>{{ agentTokenStatus?.createdAt ? formatAgentTokenTime(agentTokenStatus.createdAt) : '—' }}</dd></div>
+        <div><dt>最近使用</dt><dd>{{ agentTokenStatus?.lastUsedAt ? formatAgentTokenTime(agentTokenStatus.lastUsedAt) : '从未使用' }}</dd></div>
+      </dl>
+      <el-alert
+        v-if="newAgentToken"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="请立即复制并保存到胖猫云 Skill"
+      >
+        <template #default>
+          <p class="new-agent-token-hint">完整令牌离开本页面后无法再次查看；重新生成会使旧令牌立即失效。</p>
+          <div class="new-agent-token-row">
+            <code>{{ newAgentToken }}</code>
+            <el-button :icon="DocumentCopy" :loading="copyingAgentToken" @click="copyNewAgentToken">复制令牌</el-button>
+          </div>
+        </template>
+      </el-alert>
+      <div class="settings-actions">
+        <el-button
+          type="primary"
+          :loading="agentTokenSaving"
+          :disabled="agentTokenLoading"
+          @click="createAgentToken"
+        >{{ agentTokenStatus?.configured ? '重新生成' : '生成令牌' }}</el-button>
+        <el-button
+          :icon="DocumentCopy"
+          :disabled="!newAgentToken"
+          :loading="copyingAgentToken"
+          @click="copyNewAgentToken"
+        >复制当前令牌</el-button>
+        <el-button
+          v-if="agentTokenStatus?.configured"
+          type="danger"
+          plain
+          :loading="agentTokenDeleting"
+          @click="deleteAgentToken"
+        >删除令牌</el-button>
+      </div>
+      <p class="settings-hint">Skill 请求地址：<code>https://api.itwray.com/external-service/api/zhaogang/agent-api</code></p>
+    </section>
+
     <section v-if="props.activeSection === 'ai'" id="ai" class="settings-section">
       <header class="settings-heading">
         <div>
@@ -190,10 +247,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Promotion, QuestionFilled, Reading, Refresh, Setting, Upload } from '@element-plus/icons-vue'
+import { DocumentCopy, Promotion, QuestionFilled, Reading, Refresh, Setting, Upload } from '@element-plus/icons-vue'
 import {
+  ZhaogangRequestError,
   clearZhaogangAiConfig,
+  createZhaogangAgentToken,
+  deleteZhaogangAgentToken,
   deleteZhaogangK8sToken,
+  getZhaogangAgentToken,
   getZhaogangAiConfig,
   getZhaogangK8sToken,
   getZhaogangK8sTokenStatus,
@@ -214,12 +275,15 @@ import { canStartZgWorkbenchAgentUpdate, shouldCheckZgWorkbenchAgentUpdate } fro
 import { createZhaogangAiConnectionTestImage, runZhaogangAiConnectionTest } from '@/services/zhaogangAiConnectionTest'
 import type { ZhaogangAiExecutionLocation } from '@/types/zhaogangAi'
 import type { ZgK8sEnvironment } from '@/types/zhaogangService'
+import type { ZhaogangAgentTokenStatus } from '@/types/zhaogang'
 
-type ActiveSection = 'agent' | 'agent-k8s' | 'ai' | null
+type ActiveSection = 'agent' | 'agent-k8s' | 'agent-auth' | 'ai' | null
 type SummaryTagType = 'success' | 'warning' | 'info'
 type AgentSettingsSummary = {
   agent: string
   agentType: SummaryTagType
+  agentAuth: string
+  agentAuthType: SummaryTagType
   k8s: string
   k8sType: SummaryTagType
   ai: string
@@ -244,6 +308,12 @@ const updateInfo = ref<ZgWorkbenchAgentUpdateInfo | null>(null)
 const agentPort = ref(getZgWorkbenchAgentPort())
 const agentLoading = ref(false)
 const agentUpdating = ref(false)
+const agentTokenStatus = ref<ZhaogangAgentTokenStatus | null>(null)
+const newAgentToken = ref('')
+const agentTokenLoading = ref(false)
+const agentTokenSaving = ref(false)
+const agentTokenDeleting = ref(false)
+const copyingAgentToken = ref(false)
 const updateCheckError = ref('')
 const k8sConfigured = ref(emptyEnvironmentFlags())
 const k8sTokens = ref(emptyEnvironmentTokens())
@@ -275,6 +345,8 @@ const settingsSummary = computed<AgentSettingsSummary>(() => {
   return {
     agent,
     agentType: agent === '可用' ? 'success' : agent === '检测中' ? 'info' : 'warning',
+    agentAuth: agentTokenStatus.value?.configured ? '已授权' : '未授权',
+    agentAuthType: agentTokenStatus.value?.configured ? 'success' : 'info',
     k8s: `${configuredCount.value}/3`,
     k8sType: configuredCount.value === 3 ? 'success' : configuredCount.value ? 'warning' : 'info',
     ai: aiConfig.value.configured ? '已配置' : '未配置',
@@ -284,6 +356,85 @@ const settingsSummary = computed<AgentSettingsSummary>(() => {
 const client = () => zgWorkbenchAgentClient(agentPort.value)
 
 watch(settingsSummary, summary => emit('summary-change', summary), { immediate: true })
+
+const loadAgentTokenStatus = async () => {
+  agentTokenLoading.value = true
+  try {
+    agentTokenStatus.value = await getZhaogangAgentToken()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'Agent 授权状态加载失败')
+  } finally {
+    agentTokenLoading.value = false
+  }
+}
+
+const createAgentToken = async () => {
+  const configured = agentTokenStatus.value?.configured
+  try {
+    if (configured) {
+      await ElMessageBox.confirm('重新生成会使旧令牌立即失效，已绑定的 Skill 需要更新令牌。确认继续？',
+        '重新生成 Agent 令牌', { confirmButtonText: '重新生成', cancelButtonText: '取消', type: 'warning' })
+    }
+    agentTokenSaving.value = true
+    const created = await createZhaogangAgentToken()
+    newAgentToken.value = created.token
+    agentTokenStatus.value = created.status
+    ElMessage.success('Agent 令牌已生成，请立即复制')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    const message = error instanceof Error ? error.message : 'Agent 令牌生成失败'
+    const codingCredentialMissing = error instanceof ZhaogangRequestError && error.code === 409
+    ElMessage.error(codingCredentialMissing ? `${message}（请先在“通用设置”重新绑定 CODING 令牌）` : message)
+  } finally {
+    agentTokenSaving.value = false
+  }
+}
+
+const deleteAgentToken = async () => {
+  try {
+    await ElMessageBox.confirm('删除后旧 Agent 令牌立即失效，确认继续？', '删除 Agent 令牌', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    agentTokenDeleting.value = true
+    agentTokenStatus.value = await deleteZhaogangAgentToken()
+    newAgentToken.value = ''
+    ElMessage.success('Agent 令牌已删除')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error(error instanceof Error ? error.message : 'Agent 令牌删除失败')
+  } finally {
+    agentTokenDeleting.value = false
+  }
+}
+
+const copyNewAgentToken = async () => {
+  if (!newAgentToken.value) return
+  copyingAgentToken.value = true
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(newAgentToken.value)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = newAgentToken.value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      textarea.remove()
+    }
+    ElMessage.success('令牌已复制')
+  } catch {
+    ElMessage.error('复制失败，请手动选择令牌复制')
+  } finally {
+    copyingAgentToken.value = false
+  }
+}
+
+const formatAgentTokenTime = (value: string) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+}
 
 const loadK8sStatus = async () => {
   try {
@@ -513,7 +664,7 @@ const syncTargetEnvironment = () => {
 
 watch(() => route.query.environment, syncTargetEnvironment)
 onMounted(async () => {
-  await Promise.all([refreshAgent(), loadK8sStatus(), loadAiConfig()])
+  await Promise.all([refreshAgent(), loadK8sStatus(), loadAgentTokenStatus(), loadAiConfig()])
   syncTargetEnvironment()
 })
 </script>
@@ -531,6 +682,11 @@ onMounted(async () => {
 .settings-actions { display: flex; gap: 9px; flex-wrap: wrap; }
 .settings-hint { margin: 13px 0 0; color: #7c899c; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .settings-hint--error { color: #c45656; }
+.settings-hint code, .agent-token-details code { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.new-agent-token-hint { margin: 0; line-height: 1.6; }
+.new-agent-token-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.new-agent-token-row code { min-width: 0; padding: 6px 8px; overflow-wrap: anywhere; color: #31527e; background: #fff; border-radius: 4px; }
+.new-agent-token-row .el-button { flex: 0 0 auto; }
 .preferences-form { padding-top: 18px; }
 .preferences-form :deep(.el-form-item) { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #edf0f5; }
 .preferences-form :deep(.el-form-item__label) { color: #4f5e74; }

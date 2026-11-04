@@ -15,6 +15,18 @@ export interface ZhaogangTokenValue {
   token: string
 }
 
+export interface ZhaogangAgentTokenStatus {
+  configured: boolean
+  tokenHint: string
+  createdAt: string | null
+  lastUsedAt: string | null
+}
+
+export interface ZhaogangAgentTokenCreated {
+  token: string
+  status: ZhaogangAgentTokenStatus
+}
+
 export type ZhaogangPlanTableColumnKey = 'service' | 'status' | 'branch' | 'builder' | 'duration' | 'startedAt'
 export type ZhaogangPlanPageSize = 10 | 15 | 20 | 50
 

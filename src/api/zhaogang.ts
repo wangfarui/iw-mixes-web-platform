@@ -1,4 +1,6 @@
 import type {
+  ZhaogangAgentTokenCreated,
+  ZhaogangAgentTokenStatus,
   ZhaogangBranch,
   ZhaogangBuild,
   ZhaogangBuildPlan,
@@ -81,6 +83,16 @@ export const getZhaogangSession = () => zhaogangRequest<ZhaogangSessionStatus>('
 export const getZhaogangToken = () => zhaogangRequest<ZhaogangTokenValue>('/session/token', { method: 'POST' })
 
 export const clearZhaogangSession = () => zhaogangRequest<void>('/session', { method: 'DELETE' })
+
+export const getZhaogangAgentToken = () => zhaogangRequest<ZhaogangAgentTokenStatus>('/agent-token')
+
+export const createZhaogangAgentToken = () => zhaogangRequest<ZhaogangAgentTokenCreated>('/agent-token', {
+  method: 'POST'
+})
+
+export const deleteZhaogangAgentToken = () => zhaogangRequest<ZhaogangAgentTokenStatus>('/agent-token', {
+  method: 'DELETE'
+})
 
 export const getZhaogangReleaseReceipt = (releaseId: string) => zhaogangRequest<ZhaogangReleaseReceipt>(
   `/release-notes/${encodeURIComponent(releaseId)}/receipt`

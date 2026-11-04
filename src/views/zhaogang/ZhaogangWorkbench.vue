@@ -575,12 +575,14 @@ type ViewMode = 'table' | 'card'
 type BuildabilityFilter = 'buildable' | 'unbuildable' | 'all'
 type PlanWithBuild = ZhaogangBuildPlan
 type ResizedPlanTableColumn = { columnKey?: string }
-type SettingsSection = 'general' | 'agent' | 'agent-k8s' | 'ai' | 'local-data'
+type SettingsSection = 'general' | 'agent' | 'agent-k8s' | 'agent-auth' | 'ai' | 'local-data'
 type AgentSettingsSection = Exclude<SettingsSection, 'general' | 'local-data'> | null
 type SettingsTagType = 'success' | 'warning' | 'info'
 type AgentSettingsSummary = {
   agent: string
   agentType: SettingsTagType
+  agentAuth: string
+  agentAuthType: SettingsTagType
   k8s: string
   k8sType: SettingsTagType
   ai: string
@@ -646,6 +648,8 @@ const releaseHistoryVisible = ref(false)
 const agentSettingsSummary = ref<AgentSettingsSummary>({
   agent: '检测中',
   agentType: 'info',
+  agentAuth: '检测中',
+  agentAuthType: 'info',
   k8s: '检测中',
   k8sType: 'info',
   ai: '检测中',
@@ -658,6 +662,7 @@ const settingsNavigation: Array<{ key: SettingsSection; label: string }> = [
   { key: 'general', label: '通用设置' },
   { key: 'agent', label: '本机 Agent' },
   { key: 'agent-k8s', label: 'K8s Token' },
+  { key: 'agent-auth', label: 'Agent 授权' },
   { key: 'ai', label: 'AI Agent' },
   { key: 'local-data', label: '本地数据' }
 ]
@@ -669,7 +674,8 @@ const settingsSection = computed<SettingsSection>(() => {
 })
 
 const agentSettingsSection = computed<AgentSettingsSection>(() =>
-  settingsSection.value === 'agent' || settingsSection.value === 'agent-k8s' || settingsSection.value === 'ai'
+  settingsSection.value === 'agent' || settingsSection.value === 'agent-k8s'
+    || settingsSection.value === 'agent-auth' || settingsSection.value === 'ai'
     ? settingsSection.value
     : null)
 
@@ -677,6 +683,7 @@ const settingsNavigationStatus = (section: SettingsSection) => {
   if (section === 'general') return '已连接'
   if (section === 'agent') return agentSettingsSummary.value.agent
   if (section === 'agent-k8s') return agentSettingsSummary.value.k8s
+  if (section === 'agent-auth') return agentSettingsSummary.value.agentAuth
   if (section === 'ai') return agentSettingsSummary.value.ai
   return `${favorites.value.size} 项`
 }
@@ -684,6 +691,7 @@ const settingsNavigationStatus = (section: SettingsSection) => {
 const settingsNavigationTagType = (section: SettingsSection): SettingsTagType => {
   if (section === 'agent') return agentSettingsSummary.value.agentType
   if (section === 'agent-k8s') return agentSettingsSummary.value.k8sType
+  if (section === 'agent-auth') return agentSettingsSummary.value.agentAuthType
   if (section === 'ai') return agentSettingsSummary.value.aiType
   return section === 'general' ? 'success' : 'info'
 }
