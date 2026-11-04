@@ -85,6 +85,9 @@ export interface ZhaogangCodeStatsScanMonth {
 }
 
 export interface ZhaogangCodeStatsSync {
+  jobId?: number | null
+  failedRepoCount?: number
+  unavailableDiffCount?: number
   enabled: boolean
   from: string
   to: string | null
@@ -290,6 +293,7 @@ export interface ZhaogangCodeStatsRepoFailure {
 }
 
 export interface ZhaogangCodeStatsDiffFailure {
+  commitAt?: string | null
   projectName: string
   depotName: string
   sha: string
@@ -299,6 +303,8 @@ export interface ZhaogangCodeStatsDiffFailure {
 }
 
 export interface ZhaogangCodeStatsFailures {
+  from?: string | null
+  to?: string | null
   repoFailures: ZhaogangCodeStatsRepoFailure[]
   diffFailures: ZhaogangCodeStatsDiffFailure[]
   page: ZhaogangCodeStatsPage

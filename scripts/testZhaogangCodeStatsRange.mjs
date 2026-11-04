@@ -47,3 +47,15 @@ assert.equal(range.disableCodeStatsDate(new Date(2024, 9, 31), now), true)
 assert.equal(range.disableCodeStatsDate(new Date(2026, 9, 30), now), false)
 
 console.log('zhaogang code stats range tests passed')
+
+const presentationSource = await readFile(new URL('../src/views/zhaogang/code/codeStatsPresentation.ts', import.meta.url), 'utf8')
+const presentationJs = await transform(presentationSource, { loader: 'ts', format: 'esm', platform: 'node' })
+const presentation = await import(`data:text/javascript;base64,${Buffer.from(presentationJs.code).toString('base64')}`)
+const sync = { from: '2026-01-01', to: '2026-11-04', status: 'PARTIAL', failedRepoCount: 0, unavailableDiffCount: 4 }
+assert.match(presentation.codeSyncWarningText(sync), /2026-01-01 ~ 2026-11-04/)
+assert.match(presentation.codeSyncWarningText(sync), /4 条提交行数未完整统计/)
+assert.doesNotMatch(presentation.codeSyncWarningText(sync), /仓库读取失败/)
+assert.equal(presentation.codeSyncWarningText({ ...sync, status: 'COMPLETED', unavailableDiffCount: 0 }), '')
+assert.match(presentation.codeSyncWarningText({ ...sync, failedRepoCount: 2 }), /2 个仓库读取失败/)
+assert.equal(presentation.codeSyncWarningText(undefined), '')
+console.log('zhaogang sync range warning tests passed')

@@ -1,6 +1,7 @@
 import type {
   ZhaogangCodeScanStage,
   ZhaogangCodeScanStatus,
+  ZhaogangCodeStatsSync,
   ZhaogangCodeStatsScanMonth
 } from '@/types/zhaogangCodeStats'
 
@@ -94,3 +95,15 @@ export const diffStatusText = (status: string) => ({
   FAILED: '统计失败',
   TOO_LARGE: 'diff 过大'
 }[status] || status)
+
+
+/** Background sync covers all months; its warnings do not describe the selected range. */
+export const codeSyncWarningText = (sync?: ZhaogangCodeStatsSync) => {
+  if (!sync) return ''
+  const repos = Number(sync.failedRepoCount || 0)
+  const diffs = Number(sync.unavailableDiffCount || 0)
+  if (!repos && !diffs && sync.status !== 'PARTIAL' && sync.status !== 'FAILED'
+    && sync.status !== 'INTERRUPTED') return ''
+  const details = [repos ? `${repos} 个仓库读取失败` : '', diffs ? `${diffs} 条提交行数未完整统计` : ''].filter(Boolean)
+  return `后台同步（${sync.from} ~ ${sync.to || '今天'}）${details.length ? `：${details.join('，')}` : `：${scanStatusText(sync.status)}`}`
+}

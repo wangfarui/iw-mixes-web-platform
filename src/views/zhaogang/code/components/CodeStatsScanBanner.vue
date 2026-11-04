@@ -6,6 +6,7 @@
         <template v-if="scan.sync.enabled && scan.sync.nextSyncAt"> · 下次 {{ formatCodeClock(scan.sync.nextSyncAt) }}</template>
       </p>
       <div class="banner-title">
+        <span class="stage-text">当前范围统计</span>
         <el-tag :type="scanStatusTagType(scan.aggregateStatus)" effect="light">{{ scanStatusText(scan.aggregateStatus) }}</el-tag>
         <span v-if="activeMonth" class="stage-text">{{ scanStageText(activeMonth.stage) }}</span>
         <span v-if="activeMonth" class="stage-text">{{ activeMonth.month }} · {{ activeMonth.mode === 'SYNC' ? '持续同步' : activeMonth.mode === 'INCREMENTAL' ? '增量更新' : activeMonth.mode === 'DIFF_BACKFILL' ? '补齐行数' : '全量扫描' }} · {{ formatCodeClock(activeMonth.startedAt) }} 开始</span>
@@ -39,12 +40,13 @@
         <template v-if="coverage.repoIssues?.length">部分仓库读取失败（{{ coverage.repoIssues.length }} 个），</template>
         当前展示已成功读取的部分数据，提交及行数统计可能尚未完整。
       </p>
+      <p v-if="syncWarning" class="banner-cooldown">{{ syncWarning }}。可查看后台同步失败明细。</p>
       <p v-if="cooldownText" class="banner-cooldown">{{ cooldownText }}</p>
     </div>
     <div class="banner-side">
       <el-button v-if="activeMonth" text type="warning" :loading="cancelling" @click="cancel">取消本轮同步</el-button>
       <el-button text type="primary" @click="$emit('show-scope')">查看扫描范围</el-button>
-      <el-button v-if="hasIssues" text type="warning" @click="$emit('show-scope')">查看失败明细</el-button>
+      <el-button v-if="hasIssues" text type="warning" @click="$emit('show-scope')">{{ coverage.partial ? '查看失败明细' : '查看后台同步告警' }}</el-button>
     </div>
   </section>
 </template>
@@ -60,6 +62,7 @@ import type {
 } from '@/types/zhaogangCodeStats'
 import {
   activeScanMonth,
+  codeSyncWarningText,
   formatCodeClock,
   formatCodeDuration,
   formatCodePercent,
@@ -94,10 +97,11 @@ const lastError = computed(() => {
   const failed = [...props.scan.months].reverse().find(month => month.error)
   return failed?.error || ''
 })
+const syncWarning = computed(() => codeSyncWarningText(props.scan.sync))
 const hasIssues = computed(() => (props.coverage.failedDiffCount || 0) > 0
   || (props.coverage.repoIssues?.length || 0) > 0
   || (props.coverage.memberIssues?.length || 0) > 0
-  || props.coverage.partial || props.coverage.truncated)
+  || props.coverage.partial || props.coverage.truncated || Boolean(syncWarning.value))
 const bannerType = computed(() => {
   const status: ZhaogangCodeScanStatus = props.scan.aggregateStatus
   if (status === 'FAILED' || status === 'INTERRUPTED') return 'danger'

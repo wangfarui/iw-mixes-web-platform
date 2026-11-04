@@ -8,7 +8,7 @@
   >
     <div class="scope-content">
       <section>
-        <h3>扫描月份</h3>
+        <h3>当前查询范围</h3>
         <div class="scope-month-list">
           <div v-for="month in scan.months" :key="month.month" class="scope-month">
             <div class="scope-month-head">
@@ -16,6 +16,7 @@
               <el-tag :type="scanStatusTagType(month.status)" size="small" effect="light">{{ scanStatusText(month.status) }}</el-tag>
               <span v-if="month.lastSuccessfulAt">上次成功 {{ formatCodeDateTime(month.lastSuccessfulAt) }}</span>
             </div>
+            <p v-if="month.mode === 'SYNC'">以下进度为后台同步任务总进度，包含其他月份；本范围状态按所选日期计算。</p>
             <p>
               仓库 {{ month.progress.reposDone }}/{{ month.progress.reposTotal }}
               · 分支 {{ month.progress.branchesDone }}/{{ month.progress.branchesTotal }}
@@ -52,7 +53,8 @@
       </section>
 
       <section>
-        <h3>失败明细</h3>
+        <h3>失败明细（后台任务范围）</h3>
+        <p v-if="failures?.from && failures?.to" class="failure-range">{{ failures.from }} ~ {{ failures.to }}，包含该同步范围的全部月份。</p>
         <el-alert v-if="failureError" type="warning" :closable="false" show-icon :title="failureError" />
         <el-skeleton v-else-if="failureLoading" :rows="3" animated />
         <template v-else-if="failures && (failures.repoFailures.length || failures.diffFailures.length)">
@@ -66,7 +68,7 @@
           <div v-if="failures.diffFailures.length" class="failure-block">
             <strong>diff 失败（{{ failures.page.totalRow }}）</strong>
             <div v-for="item in failures.diffFailures" :key="item.sha" class="failure-row">
-              <span>{{ item.depotName }} · {{ item.authorName || '未知作者' }} · {{ item.sha.slice(0, 8) }}</span>
+              <span>{{ item.depotName }} · {{ item.commitAt ? formatCodeDateTime(item.commitAt) + ' · ' : '' }}{{ item.authorName || '未知作者' }} · {{ item.sha.slice(0, 8) }}</span>
               <small>{{ item.reason }}（{{ item.reasonCode }}）</small>
             </div>
             <el-pagination
@@ -80,7 +82,7 @@
             />
           </div>
         </template>
-        <el-empty v-else description="当前范围没有失败明细" :image-size="70" />
+        <el-empty v-else description="该后台任务范围没有失败明细" :image-size="70" />
       </section>
     </div>
   </el-drawer>
@@ -118,11 +120,13 @@ const jobId = computed(() => {
 })
 
 const loadFailures = async () => {
+  const current = ++sequence
+  failures.value = null
+  failureError.value = ''
   if (!jobId.value) {
-    failures.value = null
+    failureLoading.value = false
     return
   }
-  const current = ++sequence
   failureLoading.value = true
   failureError.value = ''
   try {
@@ -140,7 +144,7 @@ const changeFailurePage = (page: number) => {
   void loadFailures()
 }
 
-watch(() => props.modelValue, (visible) => {
+watch(() => [props.modelValue, jobId.value, props.scan.months.find(month => month.jobId === jobId.value)?.status] as const, ([visible]) => {
   if (!visible) {
     sequence += 1
     return
@@ -165,6 +169,7 @@ watch(() => props.modelValue, (visible) => {
 .scope-stats dd { margin: 4px 0 0; color: #26344a; font-size: 18px; font-weight: 600; }
 .scope-issues { margin-top: 10px; padding: 11px 13px; color: #5e6c80; background: #fffaf0; border: 1px solid #f2dfb6; border-radius: 8px; font-size: 13px; }
 .scope-issues p { margin: 6px 0 0; }
+.failure-range { color: #6e7c92; font-size: 13px; }
 .failure-block { margin-bottom: 14px; }
 .failure-row { display: grid; gap: 3px; padding: 9px 0; border-bottom: 1px solid #edf0f5; font-size: 13px; }
 .failure-row small { color: #8490a4; }
