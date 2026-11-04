@@ -34,6 +34,23 @@ const zhaogangRoute: RouteRecordRaw = {
       meta: { public: true, title: '迭代详情', zhaogangView: 'iteration' }
     },
     {
+      path: 'code',
+      redirect: '/zhaogang/code/mine',
+      meta: { public: true, title: '代码', zhaogangView: 'code' }
+    },
+    {
+      path: 'code/mine',
+      name: '找钢我的代码',
+      component: () => import('@/views/zhaogang/code/ZhaogangCodeMineView.vue'),
+      meta: { public: true, title: '我的代码', zhaogangView: 'code' }
+    },
+    {
+      path: 'code/team',
+      name: '找钢团队代码',
+      component: () => import('@/views/zhaogang/code/ZhaogangCodeTeamView.vue'),
+      meta: { public: true, title: '团队代码', zhaogangView: 'code' }
+    },
+    {
       path: 'worklogs',
       name: '找钢工时',
       component: () => import('@/views/zhaogang/ZhaogangEmptyRoute.vue'),

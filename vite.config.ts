@@ -118,6 +118,11 @@ export default ({ command, mode }: any) => {
           changeOrigin: true,
           ws: true
         },
+        // Keep zhaogang aligned with production routing: iw-external directly, without the iw-core compatibility hop.
+        '/external-service/api/zhaogang': {
+          target: process.env.IW_LOCAL_ZHAOGANG_PROXY || 'http://127.0.0.1:18006',
+          changeOrigin: true
+        },
         '/external-service': {
           target: 'http://localhost:18000',
           changeOrigin: true

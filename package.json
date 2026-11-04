@@ -34,6 +34,7 @@
     "test:zg-workbench-agent-update": "node scripts/testZgWorkbenchAgentUpdate.mjs",
     "test:zhaogang-permission-prompt": "node scripts/testZhaogangPermissionPrompt.mjs",
     "test:zhaogang-release-notes": "node scripts/testZhaogangReleaseNotes.mjs",
+    "test:zhaogang-code-stats-range": "node scripts/testZhaogangCodeStatsRange.mjs",
     "test:remote-share": "node scripts/testRemoteShareProtocol.mjs",
     "ai-launcher:install": "node scripts/aiLauncher.mjs install",
     "ai-launcher:uninstall": "node scripts/aiLauncher.mjs uninstall",

@@ -108,6 +108,10 @@
           <el-icon><Tickets /></el-icon>
           <span class="workspace-nav-label">迭代</span>
         </button>
+        <button :class="{ active: activeTab === 'code' }" type="button" aria-label="代码" :title="navCollapsed ? '代码' : undefined" @click="navigateTab('code')">
+          <el-icon><DataAnalysis /></el-icon>
+          <span class="workspace-nav-label">代码</span>
+        </button>
         <button :class="{ active: activeTab === 'worklog' }" type="button" aria-label="工时" :title="navCollapsed ? '工时' : undefined" @click="navigateTab('worklog')">
           <el-icon><Timer /></el-icon>
           <span class="workspace-nav-label">工时</span>
@@ -144,7 +148,7 @@
           @open="openTokenCreation"
           @dismiss="permissionPrompt = null"
         />
-        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'calendar' || activeTab === 'services' || route.name === '找钢 Agent 使用教程'">
+        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'code' || activeTab === 'calendar' || activeTab === 'services' || route.name === '找钢 Agent 使用教程'">
           <router-view v-slot="{ Component }">
             <Suspense>
               <component :is="Component" />
@@ -328,6 +332,7 @@
                         <el-radio-button value="release">项目发布</el-radio-button>
                         <el-radio-button value="team">团队</el-radio-button>
                         <el-radio-button value="iteration">迭代</el-radio-button>
+                        <el-radio-button value="code">代码</el-radio-button>
                         <el-radio-button value="calendar">日历</el-radio-button>
                         <el-radio-button value="worklog">工时</el-radio-button>
                         <el-radio-button value="services">K8s</el-radio-button>
@@ -530,7 +535,7 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Calendar, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Calendar, DataAnalysis, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 import ToolboxIcon from '@/assets/icons/toolbox.svg'
 import {
   bindZhaogangToken,
@@ -565,7 +570,7 @@ import ZhaogangPermissionPrompt from './components/ZhaogangPermissionPrompt.vue'
 import ZhaogangReleaseHistoryDrawer from './components/ZhaogangReleaseHistoryDrawer.vue'
 import ZhaogangAgentSettings from './settings/ZhaogangAgentSettings.vue'
 
-type TabKey = 'release' | 'team' | 'iteration' | 'calendar' | 'worklog' | 'services' | 'settings'
+type TabKey = 'release' | 'team' | 'iteration' | 'code' | 'calendar' | 'worklog' | 'services' | 'settings'
 type ViewMode = 'table' | 'card'
 type BuildabilityFilter = 'buildable' | 'unbuildable' | 'all'
 type PlanWithBuild = ZhaogangBuildPlan
@@ -701,7 +706,7 @@ const showPermissionPrompt = (event: Event) => {
 
 const routeTab = (): TabKey => {
   const view = route.meta.zhaogangView
-  return view === 'team' || view === 'iteration' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'settings'
+  return view === 'team' || view === 'iteration' || view === 'code' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'settings'
     ? view
     : 'release'
 }
@@ -718,6 +723,8 @@ const navigateTab = async (tab: TabKey) => {
       ? '/zhaogang/teams'
     : tab === 'iteration'
       ? '/zhaogang/iterations'
+      : tab === 'code'
+        ? '/zhaogang/code/mine'
       : tab === 'calendar'
         ? '/zhaogang/calendar'
       : tab === 'services'
