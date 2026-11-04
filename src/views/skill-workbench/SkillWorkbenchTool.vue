@@ -186,7 +186,7 @@
         <el-checkbox v-model="autoRefresh">文件变化后自动刷新</el-checkbox>
         <el-checkbox v-model="remember">记住我的工作台</el-checkbox>
         <p class="muted">
-          开启后仅在当前浏览器保存来源、配对信息和备注，不保存 Skill 正文。
+          扫描来源会自动保存在当前浏览器，刷新后仍然可用。开启后还会保存配对信息、别名、标签和备注，不保存 Skill 正文。
         </p>
         <el-button size="small" @click="clearSaved">清除本地设置</el-button>
         <p v-if="snapshot.generatedAt" class="muted">
@@ -228,7 +228,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\aiLauncher.ps1 pair</pre>
         ></el-tabs
       >
       <p class="muted">
-        已安装旧版助手时，重新执行安装命令升级。浏览器可能要求允许访问本地网络。令牌仅用于本机连接；开启“记住工作台”才保存到当前浏览器。
+        已安装旧版助手时，重新执行安装命令升级。浏览器可能要求允许访问本地网络。令牌仅用于本机连接；开启“记住工作台”才把令牌保存到当前浏览器。扫描来源会单独保存。
       </p></el-dialog
     >
     <el-dialog
@@ -262,7 +262,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\aiLauncher.ps1 pair</pre>
       >
       <p class="muted">
         仅扫描所选目录本身及当前项目的
-        skills、.agents/skills、.codex/skills、.claude/skills、.cursor/skills，不扫描子项目。
+        skills、.agents/skills、.codex/skills、.claude/skills、.cursor/skills，不扫描子项目。来源会保存在当前浏览器，刷新后仍然可用，不保存 Skill 正文。
       </p>
       <el-button
         type="primary"
@@ -332,7 +332,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\aiLauncher.ps1 pair</pre>
         </div>
       </div>
       <p class="muted">
-        移除仅取消该来源及工作台中的扫描结果，不会删除本机文件。
+        移除仅取消该来源及工作台中的扫描结果，不会删除本机文件。扫描来源保存在当前浏览器，刷新后仍然可用。
       </p>
     </el-dialog>
     <el-dialog v-model="importVisible" title="手动导入" width="min(560px, 94vw)"
@@ -422,6 +422,7 @@ import {
 import {
   emptyAnnotation,
   readWorkspaceSettings,
+  saveCachedSources,
   saveWorkspaceSettings,
   STORAGE_KEY,
 } from "../../utils/skillWorkbench/storage";
@@ -564,6 +565,7 @@ const persist = () => {
 watch([remember, annotations, configuredSources, token, port], persist, {
   deep: true,
 });
+persist();
 const processSnapshot = (
   next: SkillSnapshot,
   files?: File[],
@@ -907,10 +909,7 @@ const clearAll = async () => {
   scope.value = "all";
   error.value = "";
   stale.value = false;
-  if (!remember.value) {
-    annotations.value = {};
-    configuredSources.value = [];
-  }
+  if (!remember.value) annotations.value = {};
   if (connected.value)
     try {
       await client().clear();
@@ -918,9 +917,16 @@ const clearAll = async () => {
       /* Results have already been cleared locally. */
     }
 };
-const clearSaved = () => {
+const clearSaved = async () => {
   remember.value = false;
-  localStorage.removeItem(STORAGE_KEY);
+  await nextTick();
+  try {
+    saveCachedSources([]);
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    ElMessage.warning("浏览器本地存储不可用，当前数据仍可使用");
+    return;
+  }
   ElMessage.success("已清除保存的工作台设置；当前页面内容仍可使用");
 };
 onMounted(() => {

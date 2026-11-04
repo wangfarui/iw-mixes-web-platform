@@ -548,6 +548,64 @@ try {
   );
   const cancelJob = await (await request("/skills/scan", { sources })).json();
   await request(`/skills/jobs/${cancelJob.id}/cancel`, {});
+
+  const storageFile = path.join(temp, "storage.mjs");
+  await build({
+    entryPoints: ["src/utils/skillWorkbench/storage.ts"],
+    outfile: storageFile,
+    bundle: true,
+    format: "esm",
+    platform: "browser",
+    logLevel: "silent",
+  });
+  const memory = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+    setItem: (key, value) => memory.set(key, String(value)),
+    removeItem: (key) => memory.delete(key),
+  };
+  const storage = await import(pathToFileURL(storageFile).href);
+  const manualSource = {
+    id: "source-1",
+    path: "/Users/测试/project",
+    label: "IW Web 项目",
+    scope: "project",
+    kind: "project",
+    project: "IW Web 项目",
+  };
+  storage.saveWorkspaceSettings({
+    enabled: false,
+    annotations: { "skill:a": { alias: "别名", tags: ["审查"], note: "备注" } },
+    sources: [
+      manualSource,
+      { ...manualSource, id: "duplicate" },
+      { ...manualSource, id: "imported", imported: true, path: "/tmp/import" },
+      { id: "bad" },
+    ],
+    token: "secret",
+    port: 17321,
+  });
+  assert.equal(memory.has(storage.STORAGE_KEY), false);
+  const cached = storage.readCachedSources();
+  assert.deepEqual(cached, [manualSource]);
+  assert.deepEqual(storage.readWorkspaceSettings().sources, [manualSource]);
+  assert.equal(storage.readWorkspaceSettings().enabled, false);
+  assert.equal(storage.readWorkspaceSettings().token, "");
+  memory.set(
+    storage.STORAGE_KEY,
+    JSON.stringify({
+      enabled: true,
+      annotations: {},
+      sources: [{ ...manualSource, id: "legacy", path: "/legacy/project" }],
+      token: "kept",
+      port: 17321,
+    }),
+  );
+  memory.delete(storage.SOURCES_STORAGE_KEY);
+  assert.equal(storage.readCachedSources()[0].path, "/legacy/project");
+  storage.saveCachedSources([]);
+  assert.deepEqual(storage.readCachedSources(), []);
+  assert.equal(storage.readWorkspaceSettings().token, "kept");
   console.log(
     "Skill workbench tests passed: project navigation, current-directory scan boundaries, YAML, import, full-package hashes, symlinks, exclusions, cancellation, Windows paths/startup, pairing, file boundaries and GUI-independent macOS/Windows directory browsing",
   );
