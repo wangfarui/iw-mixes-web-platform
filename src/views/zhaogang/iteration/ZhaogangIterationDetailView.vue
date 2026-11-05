@@ -109,13 +109,24 @@
           <el-table-column label="事项" min-width="330">
             <template #default="scope">
               <div class="issue-content" :style="{ paddingLeft: `${issueLevel(scope.row) * 14}px` }">
-                <button v-if="scope.row.url" type="button" class="issue-link" @click="openCoding(scope.row.url)">
-                  <strong>{{ scope.row.title || (scope.row.issueCode ? `#${scope.row.issueCode}` : '事项不可用') }}</strong>
-                  <span>{{ scope.row.projectName }}<template v-if="scope.row.issueCode"> · #{{ scope.row.issueCode }}</template></span>
-                </button>
-                <div v-else class="issue-link static">
-                  <strong>{{ scope.row.title }}</strong>
-                  <span>{{ scope.row.projectName }}</span>
+                <div class="issue-heading">
+                  <button v-if="scope.row.url" type="button" class="issue-link" @click="openCoding(scope.row.url)">
+                    <strong>{{ scope.row.title || (scope.row.issueCode ? `#${scope.row.issueCode}` : '事项不可用') }}</strong>
+                    <span>{{ scope.row.projectName }}<template v-if="scope.row.issueCode"> · #{{ scope.row.issueCode }}</template></span>
+                  </button>
+                  <div v-else class="issue-link static">
+                    <strong>{{ scope.row.title }}</strong>
+                    <span>{{ scope.row.projectName }}</span>
+                  </div>
+                  <el-button
+                    v-if="scope.row.title?.trim()"
+                    class="issue-copy-button"
+                    link
+                    :icon="CopyDocument"
+                    title="复制标题"
+                    aria-label="复制标题"
+                    @click.stop="copyIssueTitle(scope.row.title)"
+                  />
                 </div>
                 <p v-if="scope.row.description" class="issue-description">{{ scope.row.description }}</p>
               </div>
@@ -326,7 +337,7 @@
 import { computed, inject, onMounted, reactive, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Delete, Edit, Expand, Link, RefreshRight, Timer, UserFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, CopyDocument, Delete, Edit, Expand, Link, RefreshRight, Timer, UserFilled } from '@element-plus/icons-vue'
 import {
   addTeamIterationChildIssue, addTeamIterationCodingIssue, deleteTeamIteration, getTeamIteration,
   getTeamIterationIssueCreationOptions, getTeamIterationIssueStatusOptions, getTeamIterationMemberOptions, getTeamIterations, registerTeamIterationIssueWorklog,
@@ -982,6 +993,14 @@ const issueLevels = computed(() => {
 const issueLevel = (issue: TeamIterationIssue) => issueLevels.value.get(issue.id) || 0
 const issueRowClass = ({ row }: { row: TeamIterationIssue }) => `issue-level-${Math.min(issueLevel(row), 2)}`
 const openCoding = (url: string) => window.open(url, '_blank', 'noopener')
+const copyIssueTitle = async (title: string) => {
+  try {
+    await navigator.clipboard.writeText(title)
+    ElMessage.success('已复制标题')
+  } catch {
+    ElMessage.error('复制标题失败')
+  }
+}
 const roleLabel = (value: TeamIterationRole) => roleOptions.find(item => item.value === value)?.label || value
 const issueTagType = (value: TeamIterationIssueType) => value === 'DEFECT' ? 'danger' : value === 'USER_STORY' ? 'warning' : value === 'SUB_TASK' ? 'success' : value === 'TASK' ? 'info' : 'primary'
 const formatDate = (value: string) => value?.replace('T', ' ').slice(0, 16) || '未设置'
@@ -1036,7 +1055,9 @@ watch(() => route.params.iterationId, () => {
 :deep(.issue-level-2 .issue-type-column .el-table__indent) { padding-left: 12px !important; }
 :deep(.issue-type-column .el-table__expand-icon) { margin-right: 4px; }
 .issue-content { min-width: 0; }
-.issue-link { display: grid; gap: 5px; padding: 0; color: #27364b; text-align: left; background: transparent; border: 0; cursor: pointer; }
+.issue-heading { display: flex; align-items: flex-start; gap: 4px; }
+.issue-link { display: grid; min-width: 0; gap: 5px; padding: 0; color: #27364b; text-align: left; overflow-wrap: anywhere; background: transparent; border: 0; cursor: pointer; }
+.issue-copy-button { flex: none; min-width: 24px; min-height: 24px; }
 .issue-link.static { cursor: default; }
 .issue-link span,.warning-text,.muted-text { color: #8994a5; font-size: 12px; }
 .warning-text { line-height: 1.4; }
