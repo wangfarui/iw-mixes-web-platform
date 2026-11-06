@@ -197,7 +197,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.calendar-view { display: grid; gap: 16px; min-width: 0; }
+.calendar-view { display: grid; gap: 16px; min-width: 0; padding-top: 12px; }
 .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .calendar-title, .month-switcher, .calendar-legend { display: flex; align-items: center; }
 .calendar-title { gap: 12px; }

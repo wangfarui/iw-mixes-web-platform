@@ -13,7 +13,7 @@ const zhaogangRoute: RouteRecordRaw = {
       path: 'teams',
       name: '找钢团队',
       component: () => import('@/views/zhaogang/team/ZhaogangTeamView.vue'),
-      meta: { public: true, title: '团队', zhaogangView: 'team' }
+      meta: { public: true, title: '团队', zhaogangView: 'team', workbenchContentPadding: 'none' }
     },
     {
       path: 'invitations/:inviteCode',
@@ -25,7 +25,7 @@ const zhaogangRoute: RouteRecordRaw = {
       path: 'iterations',
       name: '找钢团队迭代',
       component: () => import('@/views/zhaogang/iteration/ZhaogangIterationListView.vue'),
-      meta: { public: true, title: '团队迭代', zhaogangView: 'iteration' }
+      meta: { public: true, title: '团队迭代', zhaogangView: 'iteration', workbenchContentPadding: 'none' }
     },
     {
       path: 'iterations/:iterationId',
@@ -42,31 +42,31 @@ const zhaogangRoute: RouteRecordRaw = {
       path: 'code/mine',
       name: '找钢我的代码',
       component: () => import('@/views/zhaogang/code/ZhaogangCodeMineView.vue'),
-      meta: { public: true, title: '我的代码', zhaogangView: 'code' }
+      meta: { public: true, title: '我的代码', zhaogangView: 'code', workbenchContentPadding: 'none' }
     },
     {
       path: 'code/team',
       name: '找钢团队代码',
       component: () => import('@/views/zhaogang/code/ZhaogangCodeTeamView.vue'),
-      meta: { public: true, title: '团队代码', zhaogangView: 'code' }
+      meta: { public: true, title: '团队代码', zhaogangView: 'code', workbenchContentPadding: 'none' }
     },
     {
       path: 'worklogs',
       name: '找钢工时',
       component: () => import('@/views/zhaogang/ZhaogangEmptyRoute.vue'),
-      meta: { public: true, title: '工时', zhaogangView: 'worklog' }
+      meta: { public: true, title: '工时', zhaogangView: 'worklog', workbenchContentPadding: 'none' }
     },
     {
       path: 'calendar',
       name: '找钢日历',
       component: () => import('@/views/zhaogang/calendar/ZhaogangCalendarView.vue'),
-      meta: { public: true, title: '日历', zhaogangView: 'calendar' }
+      meta: { public: true, title: '日历', zhaogangView: 'calendar', workbenchContentPadding: 'none' }
     },
     {
       path: 'services',
       name: '找钢 K8s',
       component: () => import('@/views/zhaogang/service/ZhaogangServiceView.vue'),
-      meta: { public: true, title: 'K8s', zhaogangView: 'services' }
+      meta: { public: true, title: 'K8s', zhaogangView: 'services', workbenchContentPadding: 'bottom-only' }
     },
     {
       path: 'services/install',
@@ -84,7 +84,7 @@ const zhaogangRoute: RouteRecordRaw = {
       path: 'settings',
       name: '找钢工作台设置',
       component: () => import('@/views/zhaogang/ZhaogangEmptyRoute.vue'),
-      meta: { public: true, title: '设置', zhaogangView: 'settings' }
+      meta: { public: true, title: '设置', zhaogangView: 'settings', workbenchContentPadding: 'bottom-only' }
     },
     {
       path: ':pathMatch(.*)*',

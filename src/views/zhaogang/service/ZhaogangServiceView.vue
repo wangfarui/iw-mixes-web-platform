@@ -1,9 +1,5 @@
 <template>
   <section class="service-page">
-    <header class="service-heading">
-      <div><h2>K8s 服务</h2><p>查看当前环境 Deployment 和 Pod 状态。</p></div>
-      <el-button v-if="tokenConfigured" link type="primary" @click="openAgentTokenSettings">前往设置管理 Token</el-button>
-    </header>
     <el-alert
       v-if="agentError"
       type="warning"
@@ -496,7 +492,6 @@ const saveToken = async () => {
   }
 };
 const openAgentSettings = () => void router.push({ path: "/zhaogang/settings", query: { section: "agent" } });
-const openAgentTokenSettings = () => void router.push({ path: "/zhaogang/settings", query: { section: "agent-k8s", environment: environment.value } });
 const openDashboard = (deploymentName: string) =>
   window.open(
     zhaogangK8sDashboardUrl(environment.value, namespace.value, deploymentName),
@@ -544,20 +539,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 14px;
 }
-.service-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-.service-heading-right {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-}
-.heading-actions,
 .alert-actions,
 .environment-tabs,
 .environment-state,
@@ -647,19 +628,6 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 @media (max-width: 720px) {
-  .service-heading {
-    flex-direction: column;
-  }
-  .heading-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  .service-heading-right {
-    width: 100%;
-    align-items: stretch;
-    flex-direction: column;
-    gap: 10px;
-  }
   .service-inline-toolbar {
     align-items: stretch;
     width: 100%;

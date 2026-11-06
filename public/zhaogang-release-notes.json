@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-05-01",
+  "currentReleaseId": "zg-2026-11-06-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -467,6 +467,29 @@
         {
           "type": "FEATURE",
           "text": "迭代详情的事项标题旁新增复制按钮，一键复制完整标题，点击有链接的标题仍可打开 CODING 事项"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-06-01",
+      "version": "1.12.2",
+      "publishedAt": "2026-11-06T14:06:23+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "工作台副标题更新为“研发协作与发布管理”"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "统一迭代、代码、工时、团队、日历、K8s 和设置页的内容区边距，减少四周留白，为看板、表格和图表腾出更多空间"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "团队页固定在屏幕高度内，团队列表和成员详情在内容超出时可分别滚动"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "精简 K8s 页，移除顶部说明和“前往设置管理 Token”快捷入口"
         }
       ]
     }
