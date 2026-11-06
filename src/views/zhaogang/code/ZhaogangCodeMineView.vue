@@ -9,6 +9,21 @@
       :refreshing="refreshing"
       @rescan="rescan"
     >
+      <template #sync-status>
+        <el-button
+          v-if="statistics"
+          link
+          size="small"
+          :type="scanDetailTone"
+          :aria-expanded="scanDetailsVisible"
+          aria-controls="my-code-scan-details"
+          @click="scanDetailsVisible = !scanDetailsVisible"
+        >
+          数据同步 {{ cacheTime || '—' }}<template v-if="scanDetailStatus"> · {{ scanDetailStatus }}</template>
+          <span class="scan-detail-toggle">{{ scanDetailsVisible ? '收起详情' : '展开详情' }}</span>
+        </el-button>
+        <span v-else class="scan-time">数据同步 —</span>
+      </template>
       <template #controls>
         <CodeStatsRangePicker
           :option="rangeOption"
@@ -36,6 +51,8 @@
     <template v-else-if="statistics">
       <CodeStatsKpiCards v-if="statistics.dataReady" :items="kpiItems" />
       <CodeStatsScanBanner
+        v-show="scanDetailsVisible"
+        id="my-code-scan-details"
         :scan="statistics.scan"
         :coverage="statistics.coverage"
         :refreshing="refreshing"
@@ -45,7 +62,7 @@
 
       <div v-if="!statistics.dataReady" class="code-placeholder">
         <el-icon v-if="activeMonth" :size="30"><Loading /></el-icon>
-        <strong v-if="['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(statistics.scan.aggregateStatus)">扫描尚未完成，请查看上方原因后重试</strong>
+        <strong v-if="['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(statistics.scan.aggregateStatus)">扫描尚未完成，请展开「数据同步」详情查看原因后重试</strong>
         <strong v-else-if="!activeMonth">当前范围尚未同步，请点击“立即同步”</strong>
         <strong v-else>后台正在回补代码数据</strong>
         <span v-if="activeMonth">扫描会在后台继续，可以离开页面后再回来查看；也可以点击“立即同步”发起回补。</span>
@@ -59,38 +76,31 @@
       <template v-else-if="statistics.dataReady">
         <div class="code-chart-grid">
           <article class="chart-card">
-            <header><h3>每日提交频率</h3><p>点击日期筛选提交明细</p></header>
+            <header><h3>每日提交频率</h3><p>按日期统计提交次数</p></header>
             <CodeStatsBarChart
+              :key="chartRangeKey"
               :items="dailyItems"
-              :selected-index="selectedDateIndex"
-              selectable
+              show-details
+              scroll-dates
               unit="（次）"
               aria-label="每日提交频率"
-              @select="selectDailyIndex"
             />
           </article>
-          <article class="chart-card">
-            <header><h3>提交日历热力图</h3><p>颜色越深表示当天提交越多</p></header>
-            <CodeStatsCalendarHeatmap :daily="statistics.daily" :selected-date="selectedDate" @select="selectDate" />
+          <article class="chart-card heatmap-card">
+            <header><h3>提交日历热力图</h3><p>每行一周，颜色越深表示当天提交越多</p></header>
+            <CodeStatsCalendarHeatmap :daily="statistics.daily" />
           </article>
           <article class="chart-card">
             <header><h3>代码行变更趋势</h3><p>绿色新增，红色删除，蓝线为净增</p></header>
-            <CodeStatsLineBarChart :items="statistics.daily" :selected-date="selectedDate" @select="selectDate" />
+            <CodeStatsLineBarChart :key="chartRangeKey" :items="statistics.daily" show-details scroll-dates />
           </article>
           <article class="chart-card">
             <header><h3>提交时段分布</h3><p>按提交时间（Asia/Shanghai）汇总</p></header>
-            <CodeStatsBarChart :items="hourlyItems" color="#56C7C2" unit="（次）" :min-slot-width="23" aria-label="提交时段分布" />
+            <CodeStatsBarChart :items="hourlyItems" color="#56C7C2" unit="（次）" :min-slot-width="23" show-details aria-label="提交时段分布" />
           </article>
           <article class="chart-card">
-            <header><h3>仓库提交频率</h3><p>点击仓库筛选提交明细</p></header>
-            <CodeStatsHorizontalBarChart
-              :items="repositoryItems"
-              :max-items="10"
-              expandable
-              selectable
-              :selected-key="depotId"
-              @select="selectRepository"
-            />
+            <header><h3>仓库提交频率</h3><p>按仓库统计提交次数</p></header>
+            <CodeStatsHorizontalBarChart :items="repositoryItems" :max-items="10" expandable />
           </article>
           <article class="chart-card">
             <header><h3>分支活跃度 Top 10</h3><p>按提交出现的分支分别计次</p></header>
@@ -104,11 +114,9 @@
           :page="entries?.page || null"
           :loading="entriesLoading"
           :error="entriesError"
-          :range-label="entriesRangeLabel"
-          :filters="{ date: selectedDate, depotName, keyword }"
+          :range-label="activeRange.label"
+          :keyword="keyword"
           @page-change="changeEntryPage"
-          @clear-date="clearDate"
-          @clear-depot="clearDepot"
           @search="searchEntries"
         />
       </template>
@@ -169,7 +177,17 @@ import CodeStatsScanBanner from './components/CodeStatsScanBanner.vue'
 import CodeCommitTable from './components/CodeCommitTable.vue'
 import CodeIdentityDialog from './components/CodeIdentityDialog.vue'
 import CodeScanScopeDrawer from './components/CodeScanScopeDrawer.vue'
-import { activeScanMonth, formatCodeClock, formatCodeDuration, formatCodeNumber, formatSignedNumber, latestSuccessfulAt } from './codeStatsPresentation'
+import {
+  activeScanMonth,
+  dailyCodeDetails,
+  formatCodeClock,
+  formatCodeDuration,
+  formatCodeNumber,
+  formatSignedNumber,
+  hasCodeScanIssues,
+  latestSuccessfulAt,
+  scanStatusText
+} from './codeStatsPresentation'
 import { monthText, resolveCodeStatsRange, type ResolvedCodeStatsRange } from '@/services/zhaogangCodeStatsRange'
 import { useCodeStatsScanPolling } from './useCodeStatsScanPolling'
 
@@ -189,10 +207,8 @@ const entriesError = ref('')
 const pageNumber = ref(1)
 const pageSize = 20
 const keyword = ref('')
-const selectedDate = ref('')
-const depotId = ref<number | null>(null)
-const depotName = ref('')
 const identityDialogVisible = ref(false)
+const scanDetailsVisible = ref(false)
 const scanScopeVisible = ref(false)
 const rescanning = ref(false)
 let statisticsSequence = 0
@@ -220,14 +236,28 @@ const polling = useCodeStatsScanPolling({
 const activeMonth = computed(() => activeScanMonth(statistics.value?.scan.months || []))
 const cacheTime = computed(() => formatCodeClock(latestSuccessfulAt(statistics.value?.scan.months || [])))
 const refreshing = computed(() => Boolean(statistics.value?.refreshing))
-const rescanDisabled = computed(() => (Boolean(activeMonth.value) || ['RUNNING', 'QUEUED'].includes(statistics.value?.scan.sync?.status || '')) || (statistics.value?.scan.sync?.retryAfterSeconds ?? statistics.value?.scan.retryAfterSeconds ?? 0) > 0 || rescanning.value)
+const syncInProgress = computed(() => Boolean(activeMonth.value) || ['RUNNING', 'QUEUED'].includes(statistics.value?.scan.sync?.status || ''))
+const rescanDisabled = computed(() => syncInProgress.value || (statistics.value?.scan.sync?.retryAfterSeconds ?? statistics.value?.scan.retryAfterSeconds ?? 0) > 0 || rescanning.value)
 const rescanTip = computed(() => {
   if (activeMonth.value) return '扫描正在进行，可以离开页面，扫描会在后台继续'
   const retry = statistics.value?.scan.sync?.retryAfterSeconds ?? statistics.value?.scan.retryAfterSeconds ?? 0
   if (retry > 0) return `同步冷却中，约 ${formatCodeDuration(retry)} 后可再次同步`
   return ''
 })
-const entriesRangeLabel = computed(() => selectedDate.value || activeRange.value.label)
+const scanDetailStatus = computed(() => {
+  const data = statistics.value
+  if (!data) return ''
+  if (syncInProgress.value) {
+    return scanStatusText(activeMonth.value?.status || data.scan.sync?.status)
+  }
+  if (['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(data.scan.aggregateStatus)) {
+    return scanStatusText(data.scan.aggregateStatus)
+  }
+  return data.scan.aggregateStatus === 'PARTIAL' || hasCodeScanIssues(data.scan, data.coverage) ? '有告警' : ''
+})
+const scanDetailTone = computed(() => scanDetailStatus.value && !syncInProgress.value
+  ? 'warning'
+  : 'primary')
 
 const kpiItems = computed<CodeStatsKpiItem[]>(() => {
   const summary = statistics.value?.summary
@@ -242,10 +272,14 @@ const kpiItems = computed<CodeStatsKpiItem[]>(() => {
   ]
 })
 
+const chartRangeKey = computed(() => {
+  const range = statistics.value?.range
+  return range ? `${range.from}:${range.to}` : ''
+})
 const dailyItems = computed<CodeStatsBarItem[]>(() => (statistics.value?.daily || []).map(item => ({
-  label: item.date.slice(8),
+  label: item.date.slice(5),
   value: item.commitCount,
-  title: `${item.date} · 提交 ${item.commitCount} 次 · 新增 ${item.additions} · 删除 ${item.deletions}`,
+  title: dailyCodeDetails(item),
   rest: item.dayType === 'REST_DAY'
 })))
 const hourlyItems = computed<CodeStatsBarItem[]>(() => (statistics.value?.hourly || []).map(item => ({
@@ -266,7 +300,6 @@ const branchItems = computed<CodeStatsHorizontalItem[]>(() => (statistics.value?
   sublabel: item.depotName,
   value: item.commitCount
 })))
-const selectedDateIndex = computed(() => (statistics.value?.daily || []).findIndex(item => item.date === selectedDate.value))
 
 const loadOptions = async () => {
   optionsError.value = ''
@@ -304,13 +337,10 @@ const loadEntries = async () => {
   const current = ++entriesSequence
   entriesLoading.value = true
   entriesError.value = ''
-  const from = selectedDate.value || activeRange.value.from
-  const to = selectedDate.value || activeRange.value.to
   try {
     const result = await getCodeStatsEntries({
-      from,
-      to,
-      depotId: depotId.value,
+      from: activeRange.value.from,
+      to: activeRange.value.to,
       keyword: keyword.value || undefined,
       pageNumber: pageNumber.value,
       pageSize
@@ -327,48 +357,9 @@ const loadEntries = async () => {
 
 const changeRange = (range: ResolvedCodeStatsRange) => {
   activeRange.value = { from: range.from, to: range.to, label: range.label }
-  selectedDate.value = ''
-  depotId.value = null
-  depotName.value = ''
   keyword.value = ''
   pageNumber.value = 1
   void loadStatistics()
-  void loadEntries()
-}
-
-const selectDailyIndex = (index: number) => {
-  const item = statistics.value?.daily[index]
-  if (item) selectDate(item.date)
-}
-
-const selectDate = (date: string) => {
-  selectedDate.value = selectedDate.value === date ? '' : date
-  pageNumber.value = 1
-  void loadEntries()
-}
-
-const selectRepository = (key: string | number) => {
-  const id = Number(key)
-  if (depotId.value === id) {
-    clearDepot()
-    return
-  }
-  depotId.value = id
-  depotName.value = repositoryItems.value.find(item => item.key === id)?.label || ''
-  pageNumber.value = 1
-  void loadEntries()
-}
-
-const clearDate = () => {
-  selectedDate.value = ''
-  pageNumber.value = 1
-  void loadEntries()
-}
-
-const clearDepot = () => {
-  depotId.value = null
-  depotName.value = ''
-  pageNumber.value = 1
   void loadEntries()
 }
 
@@ -442,6 +433,13 @@ onMounted(async () => {
 .code-loading { padding: 26px; background: #fff; border: 1px solid #e4e9f1; border-radius: 10px; }
 .code-chart-grid { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .chart-card { min-width: 0; padding: 14px 16px; background: #fff; border: 1px solid #e4e9f1; border-radius: 10px; }
+.code-chart-grid :deep(.code-stats-date-scroll::-webkit-scrollbar) { height: 8px; }
+.code-chart-grid :deep(.code-stats-date-scroll::-webkit-scrollbar-track) { background: #f2f5fa; border-radius: 999px; }
+.code-chart-grid :deep(.code-stats-date-scroll::-webkit-scrollbar-thumb) { background: #c1cddc; border-radius: 999px; }
+.code-chart-grid :deep(.code-stats-date-scroll::-webkit-scrollbar-thumb:hover) { background: #8a9cb3; }
+.heatmap-card { display: flex; flex-direction: column; }
+.scan-detail-toggle { margin-left: 6px; }
+.scan-time { color: #7b879a; font-size: 12px; }
 .chart-card header { margin-bottom: 8px; }
 .chart-card h3 { margin: 0; color: #2b3a50; font-size: 15px; }
 .chart-card p { margin: 5px 0 0; color: #8a96a9; font-size: 12px; }

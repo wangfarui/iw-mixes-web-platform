@@ -23,7 +23,9 @@
       </div>
       <div class="header-actions">
         <span v-if="refreshing" class="refreshing-tag">刷新中</span>
-        <span class="cache-time">数据同步 {{ cacheTime || '—' }}</span>
+        <slot name="sync-status">
+          <span class="cache-time">数据同步 {{ cacheTime || '—' }}</span>
+        </slot>
         <el-tooltip :content="rescanTip" :disabled="!rescanTip">
           <span>
             <el-button

@@ -67,6 +67,7 @@ import {
   formatCodeClock,
   formatCodeDuration,
   formatCodePercent,
+  hasCodeScanIssues,
   scanProgressPercent,
   scanStageText,
   scanStatusTagType,
@@ -101,10 +102,7 @@ const lastError = computed(() => {
 const syncWarning = computed(() => codeSyncWarningText(props.scan.sync))
 const branchIssues = computed(() => props.coverage.repoIssues?.filter(issue => issue.reasonCode === 'BRANCH_CHANGED').length || 0)
 const repoReadIssues = computed(() => (props.coverage.repoIssues?.length || 0) - branchIssues.value)
-const hasIssues = computed(() => (props.coverage.failedDiffCount || 0) > 0
-  || (props.coverage.repoIssues?.length || 0) > 0
-  || (props.coverage.memberIssues?.length || 0) > 0
-  || props.coverage.partial || props.coverage.truncated || Boolean(syncWarning.value))
+const hasIssues = computed(() => hasCodeScanIssues(props.scan, props.coverage))
 const bannerType = computed(() => {
   const status: ZhaogangCodeScanStatus = props.scan.aggregateStatus
   if (status === 'FAILED' || status === 'INTERRUPTED') return 'danger'

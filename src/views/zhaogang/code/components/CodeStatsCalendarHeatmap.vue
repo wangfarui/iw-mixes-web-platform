@@ -1,91 +1,80 @@
 <template>
   <div class="heatmap-shell">
-    <div class="heatmap-grid" role="img" :aria-label="`提交日历热力图，共 ${days.length} 天`">
-      <div v-for="weekday in weekdays" :key="weekday" class="heatmap-weekday">{{ weekday }}</div>
-      <button
-        v-for="(day, index) in cells"
-        :key="`${index}-${day?.date || 'empty'}`"
-        type="button"
-        class="heatmap-cell"
-        :class="[day ? `level-${day.level}` : 'empty', { selected: day?.date === selectedDate, rest: day?.rest }]"
-        :disabled="!day"
-        :title="day ? `${day.date} · 提交 ${day.commitCount} 次 · 新增 ${day.additions} · 删除 ${day.deletions}` : ''"
-        :aria-label="day ? `${day.date} 提交 ${day.commitCount} 次` : undefined"
-        @click="day ? $emit('select', day.date) : undefined"
-      />
-    </div>
+    <table class="heatmap-grid" aria-label="提交日历热力图，列为星期，每行一周">
+      <thead>
+        <tr>
+          <th v-for="weekday in weekdays" :key="weekday" scope="col">{{ weekday }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="week in weeks" :key="week.firstDate">
+          <td v-for="(day, index) in week.days" :key="index">
+            <CodeStatsChartTooltip
+              v-if="day"
+              :content="dailyCodeDetails(day)"
+              v-slot="{ pointerEvents }"
+            >
+              <span
+                v-on="pointerEvents"
+                class="heatmap-cell"
+                :class="[`level-${levelOf(day.commitCount)}`, { rest: day.dayType === 'REST_DAY' }]"
+                tabindex="0"
+                :aria-label="dailyCodeDetails(day)"
+              >{{ Number(day.date.slice(8)) }}</span>
+            </CodeStatsChartTooltip>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <div class="heatmap-legend">
-      <span>少</span>
+      <span>提交少</span>
       <i v-for="level in 5" :key="level" :class="`level-${level - 1}`" />
       <span>多</span>
-      <span class="heatmap-hint">周末底色区分</span>
+      <span class="heatmap-hint">金色边框为休息日</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import CodeStatsChartTooltip from './CodeStatsChartTooltip.vue'
 import { computed } from 'vue'
 import type { ZhaogangCodeStatsDaily } from '@/types/zhaogangCodeStats'
+import { dailyCodeDetails } from '../codeStatsPresentation'
 
-interface HeatCell {
-  date: string
-  commitCount: number
-  additions: number
-  deletions: number
-  level: number
-  rest: boolean
-}
+const props = defineProps<{ daily: ZhaogangCodeStatsDaily[] }>()
 
-const props = withDefaults(defineProps<{
-  daily: ZhaogangCodeStatsDaily[]
-  selectedDate?: string
-}>(), { selectedDate: '' })
-
-defineEmits<{ (event: 'select', date: string): void }>()
-
-const weekdays = ['一', '二', '三', '四', '五', '六', '日']
+const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const levelOf = (count: number) => count <= 0 ? 0 : count <= 2 ? 1 : count <= 5 ? 2 : count <= 10 ? 3 : 4
-const cells = computed<Array<HeatCell | null>>(() => {
+const weeks = computed(() => {
   if (!props.daily.length) return []
-  const first = parseDate(props.daily[0].date)
-  const offset = (first.getDay() + 6) % 7
-  const result: Array<HeatCell | null> = Array.from({ length: offset }, () => null)
-  props.daily.forEach(item => result.push({
-    date: item.date,
-    commitCount: item.commitCount,
-    additions: item.additions,
-    deletions: item.deletions,
-    level: levelOf(item.commitCount),
-    rest: item.dayType === 'REST_DAY'
-  }))
-  while (result.length % 7 !== 0) result.push(null)
-  return result
+  const first = new Date(`${props.daily[0].date}T00:00:00Z`)
+  const offset = (first.getUTCDay() + 6) % 7
+  const cells: Array<ZhaogangCodeStatsDaily | null> = [
+    ...Array<null>(offset).fill(null), ...props.daily
+  ]
+  return Array.from({ length: Math.ceil(cells.length / 7) }, (_, row) => {
+    const start = row * 7
+    return {
+      firstDate: props.daily[Math.max(0, start - offset)].date,
+      days: weekdays.map((_, column) => cells[start + column] ?? null)
+    }
+  })
 })
-const days = computed(() => props.daily)
-
-const parseDate = (value: string) => {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
 </script>
 
 <style scoped>
-.heatmap-shell { display: grid; gap: 8px; }
-.heatmap-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 16px); grid-auto-columns: 16px; gap: 4px; justify-content: start; }
-.heatmap-weekday { display: grid; width: 16px; height: 16px; place-items: center; color: #96a1b2; font-size: 10px; }
-.heatmap-cell { width: 16px; height: 16px; padding: 0; background: #eef1f6; border: 1px solid transparent; border-radius: 3px; cursor: pointer; }
-.heatmap-cell.empty { visibility: hidden; cursor: default; }
-.heatmap-cell.level-1 { background: #cfe2ff; }
-.heatmap-cell.level-2 { background: #9cc2fb; }
-.heatmap-cell.level-3 { background: #5e94f1; }
-.heatmap-cell.level-4 { background: #2468e8; }
-.heatmap-cell.rest { border-color: #ecd5a8; }
-.heatmap-cell.selected { outline: 2px solid #2468e8; outline-offset: 1px; }
-.heatmap-legend { display: flex; align-items: center; gap: 5px; color: #8490a4; font-size: 11px; }
+.heatmap-shell { display: flex; flex-direction: column; justify-content: center; flex: 1; gap: 8px; min-width: 0; }
+.heatmap-grid { width: calc(100% + 8px); margin: 0 -4px; border-collapse: separate; border-spacing: 4px; table-layout: fixed; text-align: center; }
+.heatmap-grid th { padding: 0; color: #5c6b80; font-size: 12px; font-weight: 500; }
+.heatmap-grid td { padding: 0; }
+.heatmap-cell { display: grid; min-height: clamp(35px, 3vw, 52px); place-items: center; box-sizing: border-box; border: 1px solid transparent; border-radius: 4px; background: #eef1f6; color: #354761; font-size: 12px; font-variant-numeric: tabular-nums; }
+.heatmap-cell:is(:hover, :focus-visible) { outline: 2px solid #2468e8; outline-offset: -2px; }
+.heatmap-cell.rest { border-color: #c5923d; }
+.heatmap-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; color: #69788e; font-size: 11px; }
 .heatmap-legend i { width: 11px; height: 11px; background: #eef1f6; border-radius: 2px; }
-.heatmap-legend i.level-1 { background: #cfe2ff; }
-.heatmap-legend i.level-2 { background: #9cc2fb; }
-.heatmap-legend i.level-3 { background: #5e94f1; }
-.heatmap-legend i.level-4 { background: #2468e8; }
+.heatmap-shell .level-1 { background: #cfe2ff; }
+.heatmap-shell .level-2 { background: #9cc2fb; }
+.heatmap-shell .level-3 { background: #4274cb; color: #fff; }
+.heatmap-shell .level-4 { background: #1552bd; color: #fff; }
 .heatmap-hint { margin-left: auto; }
 </style>

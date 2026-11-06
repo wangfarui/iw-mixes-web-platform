@@ -1,6 +1,9 @@
 import type {
   ZhaogangCodeScanStage,
   ZhaogangCodeScanStatus,
+  ZhaogangCodeStatsCoverage,
+  ZhaogangCodeStatsDaily,
+  ZhaogangCodeStatsScan,
   ZhaogangCodeStatsSync,
   ZhaogangCodeStatsScanMonth
 } from '@/types/zhaogangCodeStats'
@@ -107,3 +110,10 @@ export const codeSyncWarningText = (sync?: ZhaogangCodeStatsSync) => {
   const details = [repos ? `${repos} 个仓库未完整同步` : '', diffs ? `${diffs} 条提交行数未完整统计` : ''].filter(Boolean)
   return `后台同步（${sync.from} ~ ${sync.to || '今天'}）${details.length ? `：${details.join('，')}` : `：${scanStatusText(sync.status)}`}`
 }
+
+export const dailyCodeDetails = (day: ZhaogangCodeStatsDaily) =>
+  `${day.date} · 提交 ${formatCodeNumber(day.commitCount)} 次 · 新增 ${formatCodeNumber(day.additions)} 行 · 删除 ${formatCodeNumber(day.deletions)} 行 · 净增 ${formatSignedNumber(day.netLines)} 行`
+
+export const hasCodeScanIssues = (scan: ZhaogangCodeStatsScan, coverage: ZhaogangCodeStatsCoverage) =>
+  Boolean(coverage.failedDiffCount || coverage.repoIssues?.length || coverage.memberIssues?.length
+    || coverage.partial || coverage.truncated || codeSyncWarningText(scan.sync))

@@ -6,8 +6,6 @@
         <span v-if="rangeLabel">{{ rangeLabel }}</span>
       </div>
       <div class="commit-filters">
-        <el-tag v-if="filters.date" closable type="primary" effect="plain" @close="$emit('clear-date')">日期 {{ filters.date }}</el-tag>
-        <el-tag v-if="filters.depotName" closable type="success" effect="plain" @close="$emit('clear-depot')">仓库 {{ filters.depotName }}</el-tag>
         <el-input
           v-model="keywordDraft"
           class="keyword-input"
@@ -116,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import type {
   ZhaogangCodeStatsEntry,
@@ -130,24 +128,23 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   error?: string
   rangeLabel?: string
-  filters?: { date?: string; depotName?: string; keyword?: string }
+  keyword?: string
   emptyText?: string
 }>(), {
   loading: false,
   error: '',
   rangeLabel: '',
-  filters: () => ({}),
+  keyword: '',
   emptyText: '当前范围没有已归属提交'
 })
 
 const emit = defineEmits<{
   (event: 'page-change', page: number): void
-  (event: 'clear-date'): void
-  (event: 'clear-depot'): void
   (event: 'search', keyword: string): void
 }>()
 
-const keywordDraft = ref(props.filters.keyword || '')
+const keywordDraft = ref(props.keyword)
+watch(() => props.keyword, value => { keywordDraft.value = value })
 const expandedBranches = ref<Set<string>>(new Set())
 
 const branchSummary = (row: ZhaogangCodeStatsEntry) => row.branches.length
