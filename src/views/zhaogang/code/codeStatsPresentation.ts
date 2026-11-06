@@ -104,6 +104,6 @@ export const codeSyncWarningText = (sync?: ZhaogangCodeStatsSync) => {
   const diffs = Number(sync.unavailableDiffCount || 0)
   if (!repos && !diffs && sync.status !== 'PARTIAL' && sync.status !== 'FAILED'
     && sync.status !== 'INTERRUPTED') return ''
-  const details = [repos ? `${repos} 个仓库读取失败` : '', diffs ? `${diffs} 条提交行数未完整统计` : ''].filter(Boolean)
+  const details = [repos ? `${repos} 个仓库未完整同步` : '', diffs ? `${diffs} 条提交行数未完整统计` : ''].filter(Boolean)
   return `后台同步（${sync.from} ~ ${sync.to || '今天'}）${details.length ? `：${details.join('，')}` : `：${scanStatusText(sync.status)}`}`
 }

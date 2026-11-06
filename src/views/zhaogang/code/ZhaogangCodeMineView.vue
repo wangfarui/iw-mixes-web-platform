@@ -131,6 +131,8 @@
       v-model="scanScopeVisible"
       :scan="statistics.scan"
       :coverage="statistics.coverage"
+      can-retry
+      @retried="refreshAfterDiffRetry"
     />
   </section>
 </template>
@@ -295,6 +297,8 @@ const loadStatistics = async () => {
     if (current === statisticsSequence) statisticsLoading.value = false
   }
 }
+
+const refreshAfterDiffRetry = () => Promise.all([loadStatistics(), loadEntries()])
 
 const loadEntries = async () => {
   const current = ++entriesSequence

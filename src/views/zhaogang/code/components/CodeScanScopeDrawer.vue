@@ -45,7 +45,7 @@
           </p>
         </div>
         <div v-if="coverage.repoIssues.length" class="scope-issues">
-          <strong>仓库读取失败</strong>
+          <strong>仓库与分支同步告警</strong>
           <p v-for="issue in coverage.repoIssues" :key="`${issue.depotName}-${issue.reasonCode}`">
             {{ issue.depotName }}：{{ issue.reason }}
           </p>
@@ -55,21 +55,37 @@
       <section>
         <h3>失败明细（后台任务范围）</h3>
         <p v-if="failures?.from && failures?.to" class="failure-range">{{ failures.from }} ~ {{ failures.to }}，包含该同步范围的全部月份。</p>
+        <p v-if="retryJob" class="failure-range">
+          {{ retryActive ? '正在补算行数' : '补算结果' }}：已处理 {{ retryJob.done }}/{{ retryJob.total }}，仍未统计 {{ retryJob.failed }} 条
+          <template v-if="retryJob.error && !retryActive"> · {{ retryJob.error }}</template>
+          <el-button v-if="retryActive && retryError" text type="primary" @click="pollRetry">重新查询进度</el-button>
+        </p>
+        <p v-if="retryError" class="failure-range">{{ retryError }}</p>
         <el-alert v-if="failureError" type="warning" :closable="false" show-icon :title="failureError" />
         <el-skeleton v-else-if="failureLoading" :rows="3" animated />
         <template v-else-if="failures && (failures.repoFailures.length || failures.diffFailures.length)">
           <div v-if="failures.repoFailures.length" class="failure-block">
-            <strong>仓库失败（{{ failures.repoFailures.length }}）</strong>
+            <strong>仓库与分支告警（{{ failures.repoFailures.length }}）</strong>
             <div v-for="item in failures.repoFailures" :key="`${item.projectName}-${item.depotName}`" class="failure-row">
               <span>{{ item.projectName }} / {{ item.depotName }}</span>
               <small>{{ item.reason }}（{{ item.reasonCode }}）</small>
             </div>
           </div>
           <div v-if="failures.diffFailures.length" class="failure-block">
-            <strong>diff 失败（{{ failures.page.totalRow }}）</strong>
-            <div v-for="item in failures.diffFailures" :key="item.sha" class="failure-row">
+            <div class="failure-actions">
+              <strong>diff 失败（{{ failures.page.totalRow }}）</strong>
+              <el-button v-if="canRetry && failures.diffFailures.every(item => item.depotId)"
+                text type="primary" :loading="retryStarting" :disabled="retryActive"
+                @click="retryFailedDiffs()">{{ failures.page.totalRow <= maxRetrySize ? '补算失败行数' : '补算本页失败行数' }}</el-button>
+            </div>
+            <div v-for="item in failures.diffFailures" :key="`${item.depotId ?? item.projectName + '/' + item.depotName}/${item.sha}`" class="failure-row">
               <span>{{ item.depotName }} · {{ item.commitAt ? formatCodeDateTime(item.commitAt) + ' · ' : '' }}{{ item.authorName || '未知作者' }} · {{ item.sha.slice(0, 8) }}</span>
-              <small>{{ item.reason }}（{{ item.reasonCode }}）</small>
+              <div class="failure-actions">
+                <small>{{ item.reason }}（{{ item.reasonCode }}）</small>
+                <el-button v-if="canRetry && item.depotId" text size="small" type="primary"
+                  :disabled="retryStarting || retryActive" @click="retryFailedDiffs(item)"
+                  :aria-label="`补算提交 ${item.sha.slice(0, 8)}（${item.depotName}）`">补算此提交</el-button>
+              </div>
             </div>
             <el-pagination
               v-if="failures.page.totalPage > 1"
@@ -89,9 +105,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { getCodeStatsFailures } from '@/api/zhaogangCodeStats'
-import type { ZhaogangCodeStatsCoverage, ZhaogangCodeStatsFailures, ZhaogangCodeStatsScan } from '@/types/zhaogangCodeStats'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { getCodeStatsDiffRetry, getCodeStatsFailures, retryCodeStatsDiffs } from '@/api/zhaogangCodeStats'
+import type { ZhaogangCodeStatsCoverage, ZhaogangCodeStatsDiffFailure, ZhaogangCodeStatsDiffRetryJob, ZhaogangCodeStatsFailures, ZhaogangCodeStatsScan } from '@/types/zhaogangCodeStats'
 import {
   formatCodeDateTime,
   formatCodePercent,
@@ -103,15 +119,23 @@ const props = defineProps<{
   modelValue: boolean
   scan: ZhaogangCodeStatsScan
   coverage: ZhaogangCodeStatsCoverage
+  canRetry?: boolean
 }>()
 
-defineEmits<{ (event: 'update:modelValue', value: boolean): void }>()
+const emit = defineEmits<{ (event: 'update:modelValue', value: boolean): void; (event: 'retried'): void }>()
 
 const failures = ref<ZhaogangCodeStatsFailures | null>(null)
 const failureLoading = ref(false)
 const failureError = ref('')
 const failurePage = ref(1)
 const failurePageSize = 20
+const maxRetrySize = 100
+const retryJob = ref<ZhaogangCodeStatsDiffRetryJob | null>(null)
+const retryActive = computed(() => retryJob.value?.status === 'QUEUED' || retryJob.value?.status === 'RUNNING')
+const retryStarting = ref(false)
+const retryError = ref('')
+let retryTimer: ReturnType<typeof setTimeout> | undefined
+let retrySequence = 0
 let sequence = 0
 
 const jobId = computed(() => {
@@ -144,7 +168,67 @@ const changeFailurePage = (page: number) => {
   void loadFailures()
 }
 
-watch(() => [props.modelValue, jobId.value, props.scan.months.find(month => month.jobId === jobId.value)?.status] as const, ([visible]) => {
+const resetRetry = () => {
+  retrySequence += 1
+  clearTimeout(retryTimer)
+  retryJob.value = null
+  retryStarting.value = false
+  retryError.value = ''
+}
+
+const pollRetry = async () => {
+  if (!retryJob.value || !retryActive.value) return
+  clearTimeout(retryTimer)
+  const current = ++retrySequence
+  retryError.value = ''
+  try {
+    const result = await getCodeStatsDiffRetry(retryJob.value.jobId)
+    if (current !== retrySequence) return
+    retryJob.value = result
+    if (retryActive.value) {
+      retryTimer = setTimeout(pollRetry, 2500)
+    } else {
+      failurePage.value = 1
+      if (props.modelValue) void loadFailures()
+      emit('retried')
+    }
+  } catch (error) {
+    if (current === retrySequence) retryError.value = error instanceof Error ? error.message : '查询重试进度失败'
+  }
+}
+
+const retryFailedDiffs = async (selected?: ZhaogangCodeStatsDiffFailure) => {
+  const sourceJob = jobId.value
+  const visibleFailures = failures.value
+  if (!sourceJob || !visibleFailures || !props.canRetry || retryStarting.value || retryActive.value) return
+  const current = ++retrySequence
+  retryStarting.value = true
+  retryError.value = ''
+  try {
+    const batch = selected ? [selected] : visibleFailures.page.totalRow <= maxRetrySize
+      ? (await getCodeStatsFailures(sourceJob, 1, maxRetrySize)).diffFailures
+      : visibleFailures.diffFailures
+    if (current !== retrySequence || sourceJob !== jobId.value) return
+    const targets = batch.flatMap(item => item.depotId ? [{ depotId: item.depotId, sha: item.sha }] : [])
+    if (!targets.length || targets.length !== batch.length) {
+      await loadFailures()
+      return
+    }
+    const result = await retryCodeStatsDiffs(sourceJob, targets)
+    if (current !== retrySequence) return
+    retryJob.value = result
+    retryTimer = setTimeout(pollRetry, 1000)
+  } catch (error) {
+    if (current === retrySequence) retryError.value = error instanceof Error ? error.message : '发起重试失败'
+  } finally {
+    if (current === retrySequence) retryStarting.value = false
+  }
+}
+
+watch([() => props.scan.scope, () => props.scan.workbenchTeamId], resetRetry)
+onBeforeUnmount(resetRetry)
+
+watch([() => props.modelValue, jobId, () => props.scan.months.find(month => month.jobId === jobId.value)?.status], ([visible]) => {
   if (!visible) {
     sequence += 1
     return
@@ -171,6 +255,7 @@ watch(() => [props.modelValue, jobId.value, props.scan.months.find(month => mont
 .scope-issues p { margin: 6px 0 0; }
 .failure-range { color: #6e7c92; font-size: 13px; }
 .failure-block { margin-bottom: 14px; }
+.failure-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .failure-row { display: grid; gap: 3px; padding: 9px 0; border-bottom: 1px solid #edf0f5; font-size: 13px; }
 .failure-row small { color: #8490a4; }
 </style>

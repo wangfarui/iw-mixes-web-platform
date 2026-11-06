@@ -1,6 +1,7 @@
 import { zhaogangRequest } from '@/api/zhaogang'
 import type {
   ZhaogangCodeStatsCreateIdentityCommand,
+  ZhaogangCodeStatsDiffRetryJob,
   ZhaogangCodeStatsEntriesQuery,
   ZhaogangCodeStatsEntryPage,
   ZhaogangCodeStatsFailures,
@@ -61,6 +62,15 @@ export const getCodeStatsFailures = (jobId: number, pageNumber = 1, pageSize = 2
   zhaogangRequest<ZhaogangCodeStatsFailures>(
     `${BASE}/scan/${jobId}/failures?${queryString({ pageNumber, pageSize })}`
   )
+
+export const retryCodeStatsDiffs = (jobId: number, targets: { depotId: number; sha: string }[]) =>
+  zhaogangRequest<ZhaogangCodeStatsDiffRetryJob>(`${BASE}/scan/${jobId}/diff-retry`, {
+    method: 'POST',
+    body: JSON.stringify({ targets })
+  })
+
+export const getCodeStatsDiffRetry = (jobId: number) =>
+  zhaogangRequest<ZhaogangCodeStatsDiffRetryJob>(`${BASE}/diff-retry/${jobId}`)
 
 export const getCodeStatsIdentities = (params: ZhaogangCodeStatsIdentityQuery) =>
   zhaogangRequest<ZhaogangCodeStatsIdentityPage>(`${BASE}/identities?${queryString({ ...params })}`)

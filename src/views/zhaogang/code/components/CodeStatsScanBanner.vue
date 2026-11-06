@@ -37,7 +37,8 @@
         正在遍历各分支，提交按仓库写入；发现全部分支不代表扫描完成。上方统计包含此前已保存的数据，此处显示本轮进度。
       </p>
       <p v-if="coverage.partial" class="banner-cooldown">
-        <template v-if="coverage.repoIssues?.length">部分仓库读取失败（{{ coverage.repoIssues.length }} 个），</template>
+        <template v-if="branchIssues">有 {{ branchIssues }} 个仓库的部分分支待复核。</template>
+        <template v-if="repoReadIssues">有 {{ repoReadIssues }} 个仓库读取未完成。</template>
         当前展示已成功读取的部分数据，提交及行数统计可能尚未完整。
       </p>
       <p v-if="syncWarning" class="banner-cooldown">{{ syncWarning }}。可查看后台同步失败明细。</p>
@@ -98,6 +99,8 @@ const lastError = computed(() => {
   return failed?.error || ''
 })
 const syncWarning = computed(() => codeSyncWarningText(props.scan.sync))
+const branchIssues = computed(() => props.coverage.repoIssues?.filter(issue => issue.reasonCode === 'BRANCH_CHANGED').length || 0)
+const repoReadIssues = computed(() => (props.coverage.repoIssues?.length || 0) - branchIssues.value)
 const hasIssues = computed(() => (props.coverage.failedDiffCount || 0) > 0
   || (props.coverage.repoIssues?.length || 0) > 0
   || (props.coverage.memberIssues?.length || 0) > 0

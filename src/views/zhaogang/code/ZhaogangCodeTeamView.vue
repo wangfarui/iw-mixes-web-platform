@@ -119,6 +119,8 @@
       v-model="scanScopeVisible"
       :scan="statistics.scan"
       :coverage="statistics.coverage"
+      :can-retry="selectedTeam?.administrator || false"
+      @retried="loadStatistics"
     />
   </section>
 </template>

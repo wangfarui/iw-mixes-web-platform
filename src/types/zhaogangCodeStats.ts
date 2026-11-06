@@ -293,6 +293,7 @@ export interface ZhaogangCodeStatsRepoFailure {
 }
 
 export interface ZhaogangCodeStatsDiffFailure {
+  depotId?: number | null
   commitAt?: string | null
   projectName: string
   depotName: string
@@ -300,6 +301,15 @@ export interface ZhaogangCodeStatsDiffFailure {
   authorName: string
   reasonCode: string
   reason: string
+}
+
+export interface ZhaogangCodeStatsDiffRetryJob {
+  jobId: number
+  status: ZhaogangCodeScanStatus
+  total: number
+  done: number
+  failed: number
+  error?: string | null
 }
 
 export interface ZhaogangCodeStatsFailures {
