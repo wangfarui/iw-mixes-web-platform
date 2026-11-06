@@ -2,7 +2,7 @@
   <el-drawer v-model="visible" title="更新日志" size="min(560px, 100%)" direction="rtl">
     <div class="release-history" aria-live="polite">
       <article v-for="release in sortedReleases" :key="release.id" class="release-entry">
-        <header class="release-entry-header"><div><strong>v{{ release.version }}</strong><el-tag v-if="release.id === currentReleaseId" size="small" type="success">当前版本</el-tag></div><time>{{ formatDate(release.publishedAt) }}</time></header>
+        <header class="release-entry-header"><div><strong>v{{ release.version }}</strong><el-tag v-if="release.id === currentReleaseId" size="small" type="success">当前版本</el-tag></div><time :datetime="release.publishedAt">{{ releaseDateFormatter.format(new Date(release.publishedAt)) }}</time></header>
         <ul><li v-for="(item, index) in release.items" :key="`${release.id}-${index}`"><el-tag size="small" effect="plain" :type="typeTag(item.type)">{{ typeLabel(item.type) }}</el-tag><span>{{ item.text }}</span></li></ul>
       </article>
     </div>
@@ -20,7 +20,9 @@ const sortedReleases = computed(() => [...props.releases].sort((a, b) => Date.pa
 const typeLabel = (type: ZhaogangReleaseItemType) => ({ FEATURE: '新增', IMPROVEMENT: '优化', FIX: '修复' } as const)[type]
 const typeTags: Record<ZhaogangReleaseItemType, 'success' | 'warning' | 'danger'> = { FEATURE: 'success', IMPROVEMENT: 'warning', FIX: 'danger' }
 const typeTag = (type: ZhaogangReleaseItemType) => typeTags[type]
-const formatDate = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
+const releaseDateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+})
 </script>
 
 <style scoped>

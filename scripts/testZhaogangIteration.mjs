@@ -235,7 +235,7 @@ assert.match(boardSource, /previousIterationId[\s\S]*nextIterationId/)
 assert.match(boardSource, /sourceStage !== targetStage/)
 assert.match(boardSource, /排序已保存/)
 assert.doesNotMatch(boardSource, /targetStage !== item\.stage/)
-assert.match(boardSource, /\.iteration-card-list \{ min-height: 100%; \}/)
+assert.match(boardSource, /\.iteration-card-list \{ flex: 1 0 auto; \}/)
 assert.match(boardSource, /\.column-state \{[^}]*pointer-events: none;/)
 
 const workbenchSource = await readFile(

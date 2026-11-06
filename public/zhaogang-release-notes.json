@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-06-01",
+  "currentReleaseId": "zg-2026-11-06-02",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -490,6 +490,21 @@
         {
           "type": "IMPROVEMENT",
           "text": "精简 K8s 页，移除顶部说明和“前往设置管理 Token”快捷入口"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-06-02",
+      "version": "1.12.3",
+      "publishedAt": "2026-11-06T14:28:17+08:00",
+      "items": [
+        {
+          "type": "FIX",
+          "text": "修复迭代看板的“已加载全部”提示覆盖卡片的问题。每列加载完当前筛选结果后才在底部显示提示，长列表需滚动到最后一张卡片下方查看。"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "更新日志统一只显示各版本的发布日期。"
         }
       ]
     }

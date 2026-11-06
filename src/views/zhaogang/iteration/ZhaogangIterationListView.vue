@@ -116,27 +116,38 @@ const columns = reactive<Record<TeamIterationStage, ColumnState>>({
   RELEASED: { items: [], total: 0, pageNumber: 0, loading: false, finished: false }
 })
 const transitioningIds = reactive(new Set<number>())
+const columnRequests = new Map<TeamIterationStage, symbol>()
+let appliedFilters: { memberUserId?: number, keyword: string } = { keyword: '' }
 let dragContext: DragContext | undefined
 const loadColumn = async (stage: TeamIterationStage, reset = false) => {
   const column = columns[stage]
-  if (column.loading || (!reset && column.finished)) return
+  if (!reset && (column.loading || column.finished)) return
   if (reset) Object.assign(column, { items: [], total: 0, pageNumber: 0, finished: false })
+  const request = Symbol()
+  columnRequests.set(stage, request)
   column.loading = true
   try {
     const pageNumber = column.pageNumber + 1
     const page = await getTeamIterations({
-      stage, memberUserId: memberUserId.value, keyword: keyword.value.trim(), pageNumber, pageSize: 10
+      stage, ...appliedFilters, pageNumber, pageSize: 10
     })
+    if (columnRequests.get(stage) !== request) return
     column.items.push(...page.items.filter(item => !column.items.some(current => current.id === item.id)))
     column.total = page.total
     column.pageNumber = pageNumber
-    column.finished = column.items.length >= page.total || page.items.length < 10
+    column.finished = column.items.length >= page.total
   } catch (error) {
+    if (columnRequests.get(stage) !== request) return
     ElMessage.error(error instanceof Error ? error.message : `${stageLabel(stage)}加载失败`)
-  } finally { column.loading = false }
+  } finally {
+    if (columnRequests.get(stage) === request) column.loading = false
+  }
 }
 
-const reloadBoard = async () => Promise.all(stages.map(stage => loadColumn(stage.value, true)))
+const reloadBoard = async () => {
+  appliedFilters = { memberUserId: memberUserId.value, keyword: keyword.value.trim() }
+  await Promise.all(stages.map(stage => loadColumn(stage.value, true)))
+}
 
 const onColumnScroll = (event: Event, stage: TeamIterationStage) => {
   const target = event.currentTarget as HTMLElement
@@ -218,8 +229,8 @@ onMounted(async () => { await Promise.all([searchMembers(''), reloadBoard()]) })
 .column-header { display: flex; height: 48px; flex: 0 0 48px; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid #e1e6ee; }
 .column-header>div { display: flex; align-items: center; gap: 8px; }.column-header span:not(.stage-mark) { color: #8a96a8; font-size: 13px; }
 .stage-mark { width: 8px; height: 8px; border-radius: 50%; background: #9aa5b5; }.stage-mark.developing { background: #2878ed; }.stage-mark.testing { background: #e79b20; }.stage-mark.released { background: #28a06a; }
-.column-body { position: relative; min-height: 0; flex: 1; padding: 10px; overflow-y: auto; }
-.iteration-card-list { min-height: 100%; }
+.column-body { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 10px; overflow-y: auto; }
+.iteration-card-list { flex: 1 0 auto; }
 .column-body > :deep(.el-empty) { position: absolute; inset: 42% 0 auto; pointer-events: none; }
 .iteration-card { display: block; width: 100%; min-height: 124px; padding: 14px; margin-bottom: 10px; color: #26344a; text-align: left; background: #fff; border: 1px solid #e1e6ee; border-radius: 6px; cursor: pointer; }
 .iteration-card:not(:disabled) { cursor: grab; }.iteration-card:not(:disabled):active { cursor: grabbing; }
@@ -232,6 +243,6 @@ onMounted(async () => { await Promise.all([searchMembers(''), reloadBoard()]) })
 .iteration-card header strong { min-width: 0; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }.iteration-card header span { color: #66758b; font-size: 12px; white-space: nowrap; }
 .card-meta { margin-top: 18px; color: #7e8999; font-size: 12px; }.card-meta span { display: flex; align-items: center; gap: 4px; }
 .iteration-card footer { padding-top: 12px; margin-top: 12px; color: #8994a4; font-size: 11px; border-top: 1px solid #edf0f4; }
-.column-state { position: absolute; right: 0; bottom: 10px; left: 0; padding: 10px; color: #9aa4b3; font-size: 12px; text-align: center; pointer-events: none; }
+.column-state { flex: none; padding: 10px; color: #9aa4b3; font-size: 12px; text-align: center; pointer-events: none; }
 @media(max-width:900px){.iteration-board-view{height:auto;min-height:100%}.board-toolbar{align-items:stretch;flex-direction:column}.toolbar-filters,.toolbar-actions{flex-wrap:wrap}.board-scroll{min-height:620px}.toolbar-filters :deep(.el-select),.toolbar-filters :deep(.el-input){width:100%}}
 </style>
