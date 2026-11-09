@@ -125,7 +125,7 @@
                     :icon="CopyDocument"
                     title="复制标题"
                     aria-label="复制标题"
-                    @click.stop="copyIssueTitle(scope.row.title)"
+                    @click.stop="copyIssueTitle(scope.row)"
                   />
                 </div>
                 <p v-if="scope.row.description" class="issue-description">{{ scope.row.description }}</p>
@@ -993,9 +993,9 @@ const issueLevels = computed(() => {
 const issueLevel = (issue: TeamIterationIssue) => issueLevels.value.get(issue.id) || 0
 const issueRowClass = ({ row }: { row: TeamIterationIssue }) => `issue-level-${Math.min(issueLevel(row), 2)}`
 const openCoding = (url: string) => window.open(url, '_blank', 'noopener')
-const copyIssueTitle = async (title: string) => {
+const copyIssueTitle = async ({ issueCode, title }: TeamIterationIssue) => {
   try {
-    await navigator.clipboard.writeText(title)
+    await navigator.clipboard.writeText(issueCode ? `#${issueCode} ${title}` : title)
     ElMessage.success('已复制标题')
   } catch {
     ElMessage.error('复制标题失败')

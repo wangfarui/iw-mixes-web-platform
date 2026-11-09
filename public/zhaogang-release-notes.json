@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-06-03",
+  "currentReleaseId": "zg-2026-11-09-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -524,6 +524,17 @@
         {
           "type": "IMPROVEMENT",
           "text": "扫描详情默认收起，可从顶部“数据同步”展开。收起时仍可看到同步状态或告警。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-09-01",
+      "version": "1.12.5",
+      "publishedAt": "2026-11-09T15:02:17+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "迭代事项一键复制时，有 CODING 编号的事项会按“#编号 标题”格式复制，无编号的事项只复制标题。"
         }
       ]
     }
