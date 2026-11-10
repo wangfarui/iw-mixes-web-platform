@@ -42,7 +42,14 @@ const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN'
 const formatTime = (value: string) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value || '—'
-  return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+  return date.toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
 }
 </script>
 

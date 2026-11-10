@@ -99,7 +99,7 @@
     <el-card class="week-card" shadow="never">
       <template #header>
         <div class="week-header">
-          <h3>本周工时登记</h3>
+          <h3>工时记录</h3>
           <div class="entry-controls">
             <el-button-group size="small">
               <el-button :type="entryShortcut === 'week' ? 'primary' : 'default'" :disabled="entriesLoading" @click="setEntryShortcut('week')">本周</el-button>
@@ -119,7 +119,28 @@
               @calendar-change="changeEntryCalendar"
               @change="changeEntryRange"
             />
-            <span>{{ scopeLabel }} · {{ formatHours(entries?.totalHours || 0) }}h</span>
+            <el-select
+              v-if="scope === 'WORKBENCH_TEAM'"
+              v-model="entryMemberId"
+              class="entry-member-select"
+              size="small"
+              aria-label="筛选团队成员"
+              placeholder="全部成员"
+              filterable
+              clearable
+              :value-on-clear="null"
+              :loading="entryMembersLoading"
+              :disabled="!workbenchTeamId"
+              :no-data-text="entryMembersError || '暂无团队成员'"
+            >
+              <el-option
+                v-for="member in entryMembers"
+                :key="member.userId"
+                :label="member.userName"
+                :value="member.userId"
+              />
+            </el-select>
+            <span>{{ entryScopeLabel }} · {{ formatHours(visibleEntries?.totalHours || 0) }}h</span>
           </div>
         </div>
       </template>
@@ -131,7 +152,7 @@
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
       <el-skeleton v-if="entriesLoading && !entries" :rows="6" animated />
       <div v-else-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
-      <WorklogWeekList v-else-if="entries" :scope="scope" :entries="entries" />
+      <WorklogWeekList v-else-if="visibleEntries" :scope="scope" :entries="visibleEntries" />
       <el-empty v-else description="当前范围暂无工时登记" :image-size="80" />
     </el-card>
 
@@ -146,9 +167,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ArrowLeft, ArrowRight, Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
 import { getZhaogangWorklogAbsences, getZhaogangWorklogEntries, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
+import { getWorkbenchTeam } from '@/api/zhaogangTeam'
 import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogRankingMetric,
@@ -157,6 +179,7 @@ import type {
   ZhaogangWorklogStatistics,
   ZhaogangWorklogAbsence
 } from '@/types/zhaogang'
+import type { WorkbenchTeamMember } from '@/types/zhaogangTeam'
 import WorklogTrendChart from './WorklogTrendChart.vue'
 import WorklogRanking from './WorklogRanking.vue'
 import WorklogWeekList from './WorklogWeekList.vue'
@@ -180,6 +203,10 @@ const entries = ref<ZhaogangWorklogEntries | null>(null)
 const entriesKey = ref('')
 const entriesError = ref('')
 const entriesLoading = ref(false)
+const entryMemberId = ref<number | null>(null)
+const entryMembers = ref<WorkbenchTeamMember[]>([])
+const entryMembersLoading = ref(false)
+const entryMembersError = ref('')
 const absenceDialogVisible = ref(false)
 const absenceLoading = ref(false)
 const absenceError = ref('')
@@ -226,12 +253,49 @@ const entriesCoverageMessage = computed(() => {
     ? `部分成员工时暂未取得，失败成员 ${failed} 人`
     : '部分成员工时未完整取得，登记明细可能不完整'
 })
-const scopeLabel = computed(() => scope.value === 'SELF' ? '我的工时' : selectedTeam.value?.name || '团队工时')
+const selectedEntryMember = computed(() => scope.value === 'WORKBENCH_TEAM'
+  ? entryMembers.value.find(member => member.userId === entryMemberId.value)
+  : undefined)
+const entryScopeLabel = computed(() => {
+  if (scope.value === 'SELF') return '我的工时'
+  return selectedEntryMember.value?.userName || selectedTeam.value?.name || '团队工时'
+})
+const visibleEntries = computed(() => {
+  const result = entries.value
+  const member = selectedEntryMember.value
+  if (!result || !member) return result
+
+  const items = result.items.filter(item => item.user.id === member.userId)
+  return { ...result, items, totalHours: items.reduce((sum, item) => sum + Number(item.hours), 0) }
+})
 const syncTimeLabel = computed(() => {
   if (statisticsLoading.value || entriesLoading.value) return '同步中'
   if (!statistics.value?.syncedAt && !entries.value?.syncedAt) return '尚未同步'
   const syncedAt = statistics.value?.syncedAt || entries.value?.syncedAt || ''
   return `同步时间：${formatSyncTime(syncedAt)}`
+})
+
+watch([workbenchTeamId, options], async ([teamId], [previousTeamId], onCleanup) => {
+  if (teamId !== previousTeamId) {
+    entryMemberId.value = null
+    entryMembers.value = []
+  }
+  entryMembersError.value = ''
+  entryMembersLoading.value = !!teamId
+  if (!teamId) return
+
+  let active = true
+  onCleanup(() => { active = false })
+  try {
+    const team = await getWorkbenchTeam(teamId)
+    if (!active) return
+    entryMembers.value = team.members
+    if (!selectedEntryMember.value) entryMemberId.value = null
+  } catch {
+    if (active) entryMembersError.value = '团队成员加载失败，请刷新重试'
+  } finally {
+    if (active) entryMembersLoading.value = false
+  }
 })
 
 const loadOptions = async () => {
@@ -486,6 +550,7 @@ onMounted(async () => {
 .week-header { justify-content: space-between; gap: 16px; }
 .entry-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .entry-controls > span { color: #356ec8; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.entry-member-select { width: 144px; }
 .entry-controls .el-date-editor--daterange {
   --el-date-editor-daterange-width: 220px;
   --el-date-editor-width: 220px;
