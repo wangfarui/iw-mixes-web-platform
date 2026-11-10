@@ -25,41 +25,17 @@ export interface ChildIssueAutoSyncAvailability {
   reason: string
 }
 
-const codingBacked = (issue: TeamIterationIssue) => (issue.issueCode ?? 0) > 0
+export const codingBacked = (issue: TeamIterationIssue) => (issue.issueCode ?? 0) > 0
   && (issue.source === 'CODING' || issue.syncStatus === 'SYNCED')
-
-const issueMap = (issues: TeamIterationIssue[]) => {
-  const result = new Map<number, TeamIterationIssue>()
-  const visit = (items: TeamIterationIssue[]) => items.forEach(issue => {
-    result.set(issue.id, issue)
-    visit(issue.children || [])
-  })
-  visit(issues)
-  return result
-}
 
 export const childIssueAutoSyncAvailability = (
   parent: TeamIterationIssue | undefined,
-  childType: TeamIterationIssueType,
-  issues: TeamIterationIssue[]
+  childType: TeamIterationIssueType
 ): ChildIssueAutoSyncAvailability => {
-  if (!parent || !canSyncWorkbenchIssueType(childType)) {
+  if (!parent || !manualChildTypes[parent.issueType].includes(childType) || !canSyncWorkbenchIssueType(childType)) {
     return { enabled: false, reason: '该事项类型不支持同步到 CODING' }
   }
-  if (childType === 'USER_STORY') {
-    return parent.issueType === 'REQUIREMENT' && codingBacked(parent)
-      ? { enabled: true, reason: '' }
-      : { enabled: false, reason: '父级需求尚未关联 CODING' }
-  }
-  const byId = issueMap(issues)
-  let current: TeamIterationIssue | undefined = parent
-  const visited = new Set<number>()
-  while (current && !visited.has(current.id)) {
-    visited.add(current.id)
-    if (['REQUIREMENT', 'TASK', 'USER_STORY'].includes(current.issueType) && codingBacked(current)) {
-      return { enabled: true, reason: '' }
-    }
-    current = current.parentId ? byId.get(current.parentId) : undefined
-  }
-  return { enabled: false, reason: '上级需求、任务或用户故事尚未关联 CODING' }
+  return codingBacked(parent)
+    ? { enabled: true, reason: '' }
+    : { enabled: false, reason: '父事项尚未关联 CODING，子事项只保存到工作台' }
 }

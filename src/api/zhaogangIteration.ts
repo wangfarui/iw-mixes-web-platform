@@ -91,6 +91,16 @@ export const addTeamIterationCodingIssue = (id: number, url: string, parentIssue
   `/iterations/${id}/coding-issues`, { method: 'POST', body: JSON.stringify({ url, parentIssueId }) }
 )
 
+export const addTeamIterationRootIssue = (id: number, command: Omit<TeamIterationCreateChildIssueCommand, 'syncToCoding'>) =>
+  zhaogangRequest<TeamIterationIssue>(`/iterations/${id}/issues`, {
+    method: 'POST', body: JSON.stringify(command)
+  }).then(normalizeIssue)
+
+export const bindTeamIterationIssue = (id: number, issueId: number, url: string) =>
+  zhaogangRequest<TeamIterationIssue>(`/iterations/${id}/issues/${issueId}/coding-link`, {
+    method: 'PUT', body: JSON.stringify({ url })
+  }).then(normalizeIssue)
+
 export const addTeamIterationChildIssue = (id: number, parentIssueId: number, command: TeamIterationCreateChildIssueCommand) =>
   zhaogangRequest<TeamIterationIssue>(`/iterations/${id}/issues/${parentIssueId}/children`, {
     method: 'POST', body: JSON.stringify(command)

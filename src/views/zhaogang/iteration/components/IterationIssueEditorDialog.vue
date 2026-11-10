@@ -30,12 +30,14 @@
       <div v-if="issue.issueType !== 'REQUIREMENT' && issue.issueType !== 'TASK'" v-loading="optionsLoading" class="typed-fields">
         <template v-if="issue.issueType === 'USER_STORY'">
           <el-form-item label="开发团队" required>
-            <el-select v-model="form.developmentTeam" filterable class="full-control">
+            <el-input v-if="localFields" v-model="form.developmentTeam" maxlength="128" />
+            <el-select v-else v-model="form.developmentTeam" filterable class="full-control">
               <el-option v-for="item in optionsFor('developmentTeams', form.developmentTeam)" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
           <el-form-item label="DoD" required>
-            <el-select v-model="form.definitionOfDone" filterable class="full-control">
+            <el-input v-if="localFields" v-model="form.definitionOfDone" maxlength="256" />
+            <el-select v-else v-model="form.definitionOfDone" filterable class="full-control">
               <el-option v-for="item in optionsFor('definitionsOfDone', form.definitionOfDone)" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
@@ -46,7 +48,8 @@
             <el-input-number v-model="form.estimatedHours" :min="0.01" :max="9999.99" :precision="2" :step="0.5" controls-position="right" class="full-control" />
           </el-form-item>
           <el-form-item label="任务类型" required>
-            <el-select v-model="form.taskType" filterable class="full-control">
+            <el-input v-if="localFields" v-model="form.taskType" maxlength="128" />
+            <el-select v-else v-model="form.taskType" filterable class="full-control">
               <el-option v-for="item in optionsFor('taskTypes', form.taskType)" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
@@ -63,7 +66,7 @@
           </el-form-item>
           <el-form-item label="Bug 优先级" required>
             <el-select v-model="form.bugPriority" class="full-control">
-              <el-option v-for="item in optionsFor('bugPriorities', form.bugPriority)" :key="item.value" :label="item.label" :value="item.value" />
+              <el-option v-for="item in bugPriorities" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
         </template>
@@ -113,14 +116,15 @@ const form = reactive({
 const typeLabels: Record<TeamIterationIssue['issueType'], string> = {
   REQUIREMENT: '需求', TASK: '任务', USER_STORY: '用户故事', SUB_TASK: '子工作项', DEFECT: '缺陷'
 }
+const localFields = computed(() => !props.issue?.parentId && !props.issue?.projectName)
 const typeLabel = computed(() => typeLabels[props.issue?.issueType || 'REQUIREMENT'])
 const dialogTitle = computed(() => `编辑${typeLabel.value}`)
 const prototypeError = computed(() => props.issue?.issueType === 'REQUIREMENT' ? prototypeLinkError(form.prototypeUrl) : '')
 const submitEnabled = computed(() => {
   if (prototypeError.value) return false
   if (!form.title.trim() || !props.issue) return false
-  if (props.issue.issueType === 'USER_STORY') return Boolean(form.developmentTeam && form.definitionOfDone)
-  if (props.issue.issueType === 'SUB_TASK') return form.estimatedHours > 0 && Boolean(form.taskType && form.priority)
+  if (props.issue.issueType === 'USER_STORY') return Boolean(form.developmentTeam.trim() && form.definitionOfDone.trim())
+  if (props.issue.issueType === 'SUB_TASK') return form.estimatedHours > 0 && Boolean(form.taskType.trim() && form.priority)
   if (props.issue.issueType === 'DEFECT') return Boolean(form.bugPriority)
   return true
 })
@@ -131,7 +135,7 @@ const resetOptions = () => Object.assign(options, {
 })
 
 const loadOptions = async () => {
-  if (!props.issue || props.issue.issueType === 'REQUIREMENT' || props.issue.issueType === 'TASK') return
+  if (!props.issue || localFields.value || props.issue.issueType === 'REQUIREMENT' || props.issue.issueType === 'TASK') return
   optionsLoading.value = true
   try { Object.assign(options, await getTeamIterationIssueEditOptions(props.iterationId, props.issue.id)) }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '事项字段加载失败') }
@@ -144,6 +148,10 @@ const optionsFor = (key: OptionKey, current: string): TeamIterationSelectionOpti
     ? [{ value: current, label: current }, ...values]
     : values
 }
+
+const bugPriorities = computed(() => localFields.value
+  ? subTaskPriorityOptions.map(item => ({ label: item.label, value: item.label }))
+  : optionsFor('bugPriorities', form.bugPriority))
 
 const save = async () => {
   if (!props.issue || !submitEnabled.value) return

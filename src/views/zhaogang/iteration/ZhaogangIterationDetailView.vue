@@ -85,7 +85,8 @@
             <div v-if="detail.permissions.canEdit" class="section-actions">
               <el-button type="danger" plain :icon="Delete" :loading="deletingIssues" :disabled="!selectedIssueIds.length" @click="removeSelectedIssues">批量移除</el-button>
               <el-button type="primary" plain :icon="RefreshRight" :loading="syncingCoding" @click="syncCodingIssues">同步 CODING 事项</el-button>
-              <el-button type="primary" :icon="Link" @click="issueDialogVisible = true">关联 CODING 事项</el-button>
+              <el-button type="primary" plain :icon="Link" @click="issueDialogVisible = true">关联 CODING 事项</el-button>
+              <el-button type="primary" :icon="Plus" @click="openRootIssueEditor">新增事项</el-button>
             </div>
           </div>
         </header>
@@ -116,7 +117,7 @@
                   </button>
                   <div v-else class="issue-link static">
                     <strong>{{ scope.row.title }}</strong>
-                    <span>{{ scope.row.projectName }}</span>
+                    <span v-if="scope.row.projectName">{{ scope.row.projectName }}</span>
                   </div>
                   <el-button
                     v-if="scope.row.title?.trim()"
@@ -192,6 +193,7 @@
                     <el-dropdown-item v-if="canSync(scope.row)" :command="`sync:${scope.row.id}`" :icon="RefreshRight">同步到 CODING</el-dropdown-item>
                     <el-dropdown-item v-if="canRegisterWorklog(scope.row)" :command="`worklog:${scope.row.id}`" :icon="Timer">登记工时</el-dropdown-item>
                     <el-dropdown-item v-if="scope.row.issueType === 'REQUIREMENT'" :command="`prototype:${scope.row.id}`" :icon="Link">跳转到需求原型</el-dropdown-item>
+                    <el-dropdown-item v-if="canBindCoding(scope.row)" :command="`bind:${scope.row.id}`" :icon="Link">维护 CODING 链接</el-dropdown-item>
                     <el-dropdown-item v-if="scope.row.url" :command="`open:${scope.row.id}`" :icon="Link">跳转到 CODING</el-dropdown-item>
                     <el-dropdown-item divided :command="`remove:${scope.row.id}`" :icon="Delete">移除</el-dropdown-item>
                   </el-dropdown-menu>
@@ -279,10 +281,25 @@
       <template #footer><el-button @click="issueDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!extractCodingIssueUrls(codingUrl).length" @click="saveCodingIssue">关联</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="childDialogVisible" title="新增子事项" width="min(680px, calc(100% - 28px))">
+    <el-dialog v-model="bindingVisible" title="维护 CODING 链接" width="min(560px, calc(100% - 28px))"
+      :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving">
       <el-form label-position="top">
-        <el-form-item label="父事项"><el-input :model-value="childParent?.title" disabled /></el-form-item>
-        <div class="child-entry-row">
+        <el-form-item label="工作台事项"><el-input :model-value="bindingIssue?.title" disabled /></el-form-item>
+        <el-form-item label="CODING 事项链接" required :error="bindingError">
+          <el-input v-model="bindingUrl" maxlength="1000" placeholder="粘贴已有的同类型 CODING 事项链接" @input="bindingError = ''" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="saving" @click="bindingVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!bindingUrl.trim()" @click="saveCodingLink">绑定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="childDialogVisible" :title="childParent ? '新增子事项' : '新增事项'" width="min(680px, calc(100% - 28px))"
+      :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving">
+      <el-form label-position="top">
+        <el-form-item v-if="childParent" label="父事项"><el-input :model-value="childParent.title" disabled /></el-form-item>
+        <div v-if="childParent" class="child-entry-row">
           <el-form-item label="录入方式"><el-radio-group v-model="childMode"><el-radio-button value="CREATE">人工创建</el-radio-button><el-radio-button value="LINK">关联 CODING</el-radio-button></el-radio-group></el-form-item>
           <el-form-item v-if="childMode === 'CREATE'" label="CODING 同步" class="child-sync-field">
             <div class="child-sync-option">
@@ -305,21 +322,42 @@
           <div v-loading="creationOptionsLoading" class="typed-fields">
             <template v-if="childForm.issueType === 'USER_STORY'">
               <div class="story-field-row">
-                <el-form-item label="开发团队" required><el-select v-model="childForm.developmentTeam" filterable><el-option v-for="item in creationOptions.developmentTeams" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
-                <el-form-item label="DoD" required><el-select v-model="childForm.definitionOfDone" filterable><el-option v-for="item in creationOptions.definitionsOfDone" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+                <el-form-item label="开发团队" required>
+                  <el-input v-if="!childParent" v-model="childForm.developmentTeam" maxlength="128" />
+                  <el-select v-else v-model="childForm.developmentTeam" filterable><el-option v-for="item in creationOptions.developmentTeams" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+                </el-form-item>
+                <el-form-item label="DoD" required>
+                  <el-input v-if="!childParent" v-model="childForm.definitionOfDone" maxlength="256" />
+                  <el-select v-else v-model="childForm.definitionOfDone" filterable><el-option v-for="item in creationOptions.definitionsOfDone" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+                </el-form-item>
               </div>
             </template>
             <template v-if="childForm.issueType === 'SUB_TASK'">
               <div class="sub-task-field-row">
                 <el-form-item label="预估工时（小时）" required><el-input-number v-model="childForm.estimatedHours" :min="0.1" :max="9999.9" :precision="1" :step="0.1" controls-position="right" class="hours-control" /></el-form-item>
-                <el-form-item label="任务类型" required><el-select v-model="childForm.taskType" filterable class="task-type-control"><el-option v-for="item in creationOptions.taskTypes" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+                <el-form-item label="任务类型" required>
+                  <el-input v-if="!childParent" v-model="childForm.taskType" maxlength="128" />
+                  <el-select v-else v-model="childForm.taskType" filterable class="task-type-control"><el-option v-for="item in creationOptions.taskTypes" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+                </el-form-item>
                 <el-form-item label="优先级" required><el-select v-model="childForm.priority" class="full-control"><el-option v-for="item in subTaskPriorityOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+              </div>
+            </template>
+            <template v-if="childForm.issueType === 'DEFECT'">
+              <div class="story-field-row">
+                <el-form-item label="是否线上 Bug" required>
+                  <el-switch v-model="childForm.onlineBug" inline-prompt active-text="是" inactive-text="否" />
+                </el-form-item>
+                <el-form-item label="Bug 优先级" required>
+                  <el-select v-model="childForm.bugPriority" class="full-control">
+                    <el-option v-for="item in subTaskPriorityOptions" :key="item.value" :label="item.label" :value="item.label" />
+                  </el-select>
+                </el-form-item>
               </div>
             </template>
           </div>
         </template>
       </el-form>
-      <template #footer><el-button @click="childDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!childSubmitEnabled" @click="saveChildIssue">{{ childMode === 'LINK' ? '关联' : '创建' }}</el-button></template>
+      <template #footer><el-button :disabled="saving" @click="childDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!childSubmitEnabled || creationOptionsLoading" @click="saveChildIssue">{{ childMode === 'LINK' ? '关联' : '创建' }}</el-button></template>
     </el-dialog>
 
     <el-dialog v-model="worklogDialogVisible" title="登记工时" width="min(520px, calc(100% - 28px))">
@@ -337,15 +375,15 @@
 import { computed, inject, onMounted, reactive, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, CopyDocument, Delete, Edit, Expand, Link, RefreshRight, Timer, UserFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, CopyDocument, Delete, Edit, Expand, Link, Plus, RefreshRight, Timer, UserFilled } from '@element-plus/icons-vue'
 import {
-  addTeamIterationChildIssue, addTeamIterationCodingIssue, deleteTeamIteration, getTeamIteration,
+  addTeamIterationChildIssue, addTeamIterationCodingIssue, addTeamIterationRootIssue, bindTeamIterationIssue, deleteTeamIteration, getTeamIteration,
   getTeamIterationIssueCreationOptions, getTeamIterationIssueStatusOptions, getTeamIterationMemberOptions, getTeamIterations, registerTeamIterationIssueWorklog,
   removeTeamIterationIssue, removeTeamIterationIssues, replaceTeamIterationMembers, retryTeamIterationIssueWorklog,
   syncTeamIterationCodingIssues, syncTeamIterationIssue, updateTeamIteration, updateTeamIterationIssueStatus
 } from '@/api/zhaogangIteration'
 import type {
-  TeamIterationDetail, TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationIssueType, TeamIterationListItem, TeamIterationRole,
+  TeamIterationCreateChildIssueCommand, TeamIterationDetail, TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationIssueType, TeamIterationListItem, TeamIterationRole,
   TeamIterationReleasePlan, TeamIterationSelectionOption, TeamIterationStage, TeamIterationTeamOption, TeamIterationUser
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
@@ -359,7 +397,7 @@ import {
   type CodingIssueAssociationFailure
 } from './codingIssueAssociationFeedback'
 import {
-  canAddChildIssues, canSyncWorkbenchIssueType, childIssueAutoSyncAvailability,
+  canAddChildIssues, canSyncWorkbenchIssueType, childIssueAutoSyncAvailability, codingBacked,
   defaultManualChildIssueType, manualChildIssueTypes
 } from './iterationIssueHierarchy'
 import {
@@ -397,6 +435,10 @@ const memberEditing = ref(false)
 const issueDialogVisible = ref(false)
 const issueEditVisible = ref(false)
 const issueEditing = ref<TeamIterationIssue>()
+const bindingVisible = ref(false)
+const bindingIssue = ref<TeamIterationIssue>()
+const bindingUrl = ref('')
+const bindingError = ref('')
 const prototypeVisible = ref(false)
 const prototypeIssue = ref<TeamIterationIssue>()
 const prototypeIterationId = ref(0)
@@ -432,22 +474,22 @@ const roleOptions: Array<{ value: TeamIterationRole, label: string }> = [
   { value: 'FRONTEND', label: '前端' }, { value: 'QA', label: '测试' }
 ]
 const issueTypeOptions: Array<{ value: TeamIterationIssueType, label: string }> = [
-  { value: 'USER_STORY', label: '用户故事' }, { value: 'SUB_TASK', label: '子工作项' }
+  { value: 'REQUIREMENT', label: '需求' }, { value: 'TASK', label: '任务' },
+  { value: 'USER_STORY', label: '用户故事' }, { value: 'SUB_TASK', label: '子工作项' },
+  { value: 'DEFECT', label: '缺陷' }
 ]
 const childIssueTypeOptions = computed(() => {
-  const allowed = childParent.value ? manualChildIssueTypes(childParent.value.issueType) : []
+  if (!childParent.value) return issueTypeOptions
+  const allowed = manualChildIssueTypes(childParent.value.issueType)
   return issueTypeOptions.filter(item => allowed.includes(item.value))
 })
-const childAutoSyncAvailability = computed(() => childIssueAutoSyncAvailability(
-  childParent.value,
-  childForm.issueType,
-  detail.value?.issues || []
-))
+const childAutoSyncAvailability = computed(() => childIssueAutoSyncAvailability(childParent.value, childForm.issueType))
 const childSubmitEnabled = computed(() => {
   if (childMode.value === 'LINK') return extractCodingIssueUrls(childCodingUrl.value).length > 0
   if (!childForm.title.trim()) return false
-  if (childForm.issueType === 'USER_STORY') return Boolean(childForm.developmentTeam && childForm.definitionOfDone)
-  if (childForm.issueType === 'SUB_TASK') return childForm.estimatedHours > 0 && Boolean(childForm.taskType && childForm.priority)
+  if (childForm.issueType === 'USER_STORY') return Boolean(childForm.developmentTeam.trim() && childForm.definitionOfDone.trim())
+  if (childForm.issueType === 'SUB_TASK') return childForm.estimatedHours > 0 && Boolean(childForm.taskType.trim() && childForm.priority)
+  if (childForm.issueType === 'DEFECT') return Boolean(childForm.bugPriority)
   return true
 })
 const teamById = computed(() => new Map(teamOptions.value.map(team => [team.teamId, team])))
@@ -723,30 +765,58 @@ const saveIssueStatus = async (issue: TeamIterationIssue, statusId: number) => {
   finally { saving.value = false }
 }
 
-const openChildEditor = (issue: TeamIterationIssue) => {
-  childParent.value = issue
+const resetTypedCreationFields = () => Object.assign(childForm, {
+  developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '',
+  priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '中'
+})
+
+const openIssueCreation = (issueType: TeamIterationIssueType, parent?: TeamIterationIssue) => {
+  childParent.value = parent
   childMode.value = 'CREATE'
   childCodingUrl.value = ''
-  const defaultType = defaultManualChildIssueType(issue.issueType)
-  if (!defaultType) return
-  Object.assign(childForm, { issueType: defaultType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
-  childSyncToCoding.value = Boolean(preferencesRef?.value.autoSyncCreatedChildIssue
-    && childIssueAutoSyncAvailability(issue, defaultType, detail.value?.issues || []).enabled)
+  Object.assign(childForm, { issueType, title: '', description: '' })
+  resetTypedCreationFields()
+  childSyncToCoding.value = childAutoSyncAvailability.value.enabled && Boolean(preferencesRef?.value.autoSyncCreatedChildIssue)
   childDialogVisible.value = true
   void loadCreationOptions()
 }
 
+const openRootIssueEditor = () => openIssueCreation('REQUIREMENT')
+const openChildEditor = (issue: TeamIterationIssue) => {
+  const defaultType = defaultManualChildIssueType(issue.issueType)
+  if (defaultType) openIssueCreation(defaultType, issue)
+}
+
+const saveCodingLink = async () => {
+  if (!bindingIssue.value || !bindingUrl.value.trim() || saving.value) return
+  const iterationId = id()
+  saving.value = true
+  bindingError.value = ''
+  try {
+    const updated = await bindTeamIterationIssue(iterationId, bindingIssue.value.id, bindingUrl.value.trim())
+    if (id() !== iterationId) return
+    const issue = findIssue(detail.value?.issues || [], updated.id)
+    if (issue) Object.assign(issue, updated, { children: issue.children })
+    bindingVisible.value = false
+    await load()
+    ElMessage.success('已绑定 CODING 事项')
+  } catch (error) {
+    if (id() === iterationId) bindingError.value = error instanceof Error ? error.message : 'CODING 链接绑定失败'
+  } finally { saving.value = false }
+}
+
 const saveChildIssue = async () => {
-  if (!childParent.value || !childSubmitEnabled.value) return
-  const parentIssueId = childParent.value.id
-  const shouldExpandParent = !visibleExpandedIssueKeys.value.includes(String(parentIssueId))
+  if (!childSubmitEnabled.value || saving.value) return
+  const iterationId = id()
+  const parentIssueId = childParent.value?.id
+  const shouldExpandParent = parentIssueId !== undefined && !visibleExpandedIssueKeys.value.includes(String(parentIssueId))
   saving.value = true
   try {
     if (childMode.value === 'LINK') {
       const urls = extractCodingIssueUrls(childCodingUrl.value)
       const result = await associateCodingIssues(urls, parentIssueId)
       await load()
-      if (result.successCount && shouldExpandParent) expandIssueAfterChildAdded(parentIssueId)
+      if (result.successCount && parentIssueId !== undefined && shouldExpandParent) expandIssueAfterChildAdded(parentIssueId)
       if (!result.failures.length) {
         childCodingUrl.value = ''
         childDialogVisible.value = false
@@ -756,8 +826,8 @@ const saveChildIssue = async () => {
         showCodingIssueAssociationFailures(result.failures)
       }
     } else {
-      const syncRequested = childSyncToCoding.value
-      const created = await addTeamIterationChildIssue(id(), parentIssueId, {
+      const syncRequested = childAutoSyncAvailability.value.enabled && childSyncToCoding.value
+      const command: Omit<TeamIterationCreateChildIssueCommand, 'syncToCoding'> = {
         issueType: childForm.issueType, title: childForm.title.trim(), description: childForm.description || undefined,
         developmentTeam: childForm.issueType === 'USER_STORY' ? childForm.developmentTeam : undefined,
         definitionOfDone: childForm.issueType === 'USER_STORY' ? childForm.definitionOfDone : undefined,
@@ -765,33 +835,36 @@ const saveChildIssue = async () => {
         taskType: childForm.issueType === 'SUB_TASK' ? childForm.taskType : undefined,
         priority: childForm.issueType === 'SUB_TASK' ? childForm.priority : undefined,
         onlineBug: childForm.issueType === 'DEFECT' ? childForm.onlineBug : undefined,
-        bugPriority: undefined,
-        syncToCoding: syncRequested
-      })
+        bugPriority: childForm.issueType === 'DEFECT' ? childForm.bugPriority : undefined
+      }
+      const created = parentIssueId === undefined
+        ? await addTeamIterationRootIssue(iterationId, command)
+        : await addTeamIterationChildIssue(iterationId, parentIssueId, { ...command, syncToCoding: syncRequested })
+      if (id() !== iterationId) return
       childDialogVisible.value = false
       await load()
-      if (shouldExpandParent) expandIssueAfterChildAdded(parentIssueId)
-      if (!syncRequested) ElMessage.success('子事项已创建')
+      if (parentIssueId !== undefined && shouldExpandParent) expandIssueAfterChildAdded(parentIssueId)
+      if (!syncRequested) ElMessage.success(parentIssueId === undefined ? '事项已创建' : '子事项已创建')
       else if (created.syncStatus === 'SYNCED') ElMessage.success('子事项已创建并同步 CODING')
       else if (created.syncStatus === 'UNKNOWN') ElMessage.warning(created.syncMessage || '子事项已创建，CODING 同步结果不确定，请先核对后再处理')
       else ElMessage.warning(created.syncMessage || '子事项已创建，但自动同步 CODING 失败，可通过更多操作重试')
     }
-  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '子事项创建失败') }
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '事项创建失败') }
   finally { saving.value = false }
 }
 
 const loadCreationOptions = async () => {
-  if (!childParent.value || childMode.value !== 'CREATE') return
-  const parentIssueId = childParent.value.id
-  const issueType = childForm.issueType
   const requestId = ++creationOptionsRequestId
+  const issueType = childForm.issueType
   Object.assign(creationOptions, { issueType, developmentTeams: [], definitionsOfDone: [], taskTypes: [], bugPriorities: [] })
-  if (issueType === 'REQUIREMENT') return
+  creationOptionsLoading.value = false
+  const parent = childParent.value
+  if (!parent || childMode.value !== 'CREATE') return
   creationOptionsLoading.value = true
   try {
-    const options = await getTeamIterationIssueCreationOptions(id(), parentIssueId, issueType)
+    const options = await getTeamIterationIssueCreationOptions(id(), parent.id, issueType)
     if (requestId !== creationOptionsRequestId || childMode.value !== 'CREATE'
-      || childParent.value?.id !== parentIssueId || childForm.issueType !== issueType) return
+      || childParent.value?.id !== parent.id || childForm.issueType !== issueType) return
     Object.assign(creationOptions, options)
     if (issueType === 'USER_STORY') {
       const normalizeLabel = (value: string) => value.trim().replace(/\s+/g, '').toLowerCase()
@@ -815,17 +888,21 @@ const loadCreationOptions = async () => {
         : undefined
       childForm.taskType ||= preferredTaskType?.value || creationOptions.taskTypes[0]?.value || ''
     }
-    else if (issueType === 'DEFECT') childForm.bugPriority ||= creationOptions.bugPriorities.find(item => item.label === '中')?.value || creationOptions.bugPriorities[0]?.value || ''
-  } catch (error) { ElMessage.error(error instanceof Error ? error.message : 'CODING 事项字段加载失败') }
-  finally { if (requestId === creationOptionsRequestId) creationOptionsLoading.value = false }
+  } catch (error) {
+    if (requestId === creationOptionsRequestId) {
+      ElMessage.error(error instanceof Error ? error.message : 'CODING 事项字段加载失败')
+    }
+  } finally { if (requestId === creationOptionsRequestId) creationOptionsLoading.value = false }
 }
 
 watch(() => childForm.issueType, () => {
-  Object.assign(childForm, { developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
-  if (!childAutoSyncAvailability.value.enabled) childSyncToCoding.value = false
-  if (childDialogVisible.value && childMode.value === 'CREATE') void loadCreationOptions()
+  resetTypedCreationFields()
+  if (childDialogVisible.value) void loadCreationOptions()
 })
-watch(childMode, mode => { if (mode === 'CREATE') void loadCreationOptions() })
+watch(childMode, () => { if (childDialogVisible.value) void loadCreationOptions() })
+watch(() => childAutoSyncAvailability.value.enabled, enabled => {
+  childSyncToCoding.value = enabled && Boolean(preferencesRef?.value.autoSyncCreatedChildIssue)
+})
 watch(availableIssueStatusFilterValues, availableValues => {
   const retainedFilters = issueStatusFilters.value.filter(value => availableValues.has(value))
   if (retainedFilters.length !== issueStatusFilters.value.length) issueStatusFilters.value = retainedFilters
@@ -877,7 +954,7 @@ const syncIssue = async (issue: TeamIterationIssue) => {
 
 const syncCodingIssues = async () => {
   try {
-    await ElMessageBox.confirm('将以 CODING 最新数据覆盖当前迭代中已关联事项，并自动补齐父级关系。', '同步 CODING 事项', { type: 'warning' })
+    await ElMessageBox.confirm('将以 CODING 最新数据覆盖当前迭代中已关联事项。人工补绑的事项保留工作台父子关系。', '同步 CODING 事项', { type: 'warning' })
     syncingCoding.value = true
     const result = await syncTeamIterationCodingIssues(id())
     await load()
@@ -898,7 +975,12 @@ const handleIssueCommand = (command: string) => {
   const issue = findIssue(detail.value?.issues || [], Number(rawId))
   if (!issue) return
   if (action === 'sync') void syncIssue(issue)
-  else if (action === 'worklog') openWorklogEditor(issue)
+  else if (action === 'bind' && canBindCoding(issue)) {
+    bindingIssue.value = issue
+    bindingUrl.value = ''
+    bindingError.value = ''
+    bindingVisible.value = true
+  } else if (action === 'worklog') openWorklogEditor(issue)
   else if (action === 'prototype') openPrototype(issue)
   else if (action === 'open' && issue.url) openCoding(issue.url)
   else if (action === 'remove') void removeIssue(issue)
@@ -973,7 +1055,9 @@ const removeIteration = async () => {
 
 const canAddChildren = (issue: TeamIterationIssue) => canAddChildIssues(issue.issueType)
 const canSync = (issue: TeamIterationIssue) => issue.source === 'WORKBENCH' && (issue.syncStatus === 'PENDING' || issue.syncStatus === 'FAILED') && canSyncWorkbenchIssueType(issue.issueType)
-const canModifyCoding = (issue: TeamIterationIssue) => Boolean(issue.issueCode) && (issue.source === 'CODING' || issue.syncStatus === 'SYNCED')
+const canBindCoding = (issue: TeamIterationIssue) => issue.source === 'WORKBENCH'
+  && !issue.url && !issue.issueCode && issue.syncStatus !== 'SYNCING'
+const canModifyCoding = codingBacked
 const canRegisterWorklog = (issue: TeamIterationIssue) => issue.issueType === 'SUB_TASK' && canModifyCoding(issue)
 const localWorklogTotal = (issue: TeamIterationIssue) => issue.worklogs.reduce((sum, item) => sum + Number(item.spendHours || 0), 0)
 const worklogTotal = (issue: TeamIterationIssue) => Number(issue.recordedHours ?? localWorklogTotal(issue)).toFixed(2).replace(/\.00$/, '')
@@ -1008,6 +1092,8 @@ const formatDate = (value: string) => value?.replace('T', ' ').slice(0, 16) || '
 onMounted(load)
 watch(() => route.params.iterationId, () => {
   prototypeVisible.value = false
+  bindingVisible.value = false
+  childDialogVisible.value = false
   void load()
 })
 </script>
@@ -1047,7 +1133,8 @@ watch(() => route.params.iterationId, () => {
 .issue-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0; width: max-content; margin-left: auto; white-space: nowrap; }
 .issue-actions :deep(.el-button) { margin: 0; padding-right: 1px; padding-left: 1px; }
 .issue-actions :deep(.el-button > span) { margin-left: 2px; }
-.section-actions { display: flex; align-items: center; gap: 8px; }
+.section-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.section-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .section-header h3 { margin: 0; font-size: 17px; }
 .section-header span { color: #8994a5; font-size: 12px; }
 :deep(.issue-type-column .cell) { padding-right: 4px; padding-left: 8px; text-align: left; white-space: nowrap; }

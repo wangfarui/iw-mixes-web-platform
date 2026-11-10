@@ -55,19 +55,22 @@ assert.equal(hierarchy.canSyncWorkbenchIssueType('TASK'), false)
 const linkedRequirement = {
   id: 1, issueType: 'REQUIREMENT', source: 'CODING', syncStatus: 'SYNCED', issueCode: 7000, children: []
 }
-assert.equal(hierarchy.childIssueAutoSyncAvailability(linkedRequirement, 'USER_STORY', [linkedRequirement]).enabled, true)
+assert.equal(hierarchy.childIssueAutoSyncAvailability(linkedRequirement, 'USER_STORY').enabled, true)
 const localRequirement = {
   id: 2, issueType: 'REQUIREMENT', source: 'WORKBENCH', syncStatus: 'NOT_REQUIRED', children: []
 }
-assert.deepEqual(hierarchy.childIssueAutoSyncAvailability(localRequirement, 'USER_STORY', [localRequirement]), {
+assert.deepEqual(hierarchy.childIssueAutoSyncAvailability(localRequirement, 'USER_STORY'), {
   enabled: false,
-  reason: '父级需求尚未关联 CODING'
+  reason: '父事项尚未关联 CODING，子事项只保存到工作台'
 })
 const localStory = {
   id: 3, parentId: 1, issueType: 'USER_STORY', source: 'WORKBENCH', syncStatus: 'PENDING', children: []
 }
 linkedRequirement.children = [localStory]
-assert.equal(hierarchy.childIssueAutoSyncAvailability(localStory, 'SUB_TASK', [linkedRequirement]).enabled, true)
+assert.equal(hierarchy.childIssueAutoSyncAvailability(localStory, 'SUB_TASK').enabled, false)
+const boundStory = { ...localStory, issueCode: 7001, syncStatus: 'SYNCED' }
+assert.equal(hierarchy.childIssueAutoSyncAvailability(boundStory, 'SUB_TASK').enabled, true)
+assert.equal(hierarchy.childIssueAutoSyncAvailability(boundStory, 'DEFECT').enabled, false)
 
 const preferencesOutfile = path.join(tempDir, 'zhaogang-preferences.mjs')
 await build({
@@ -209,9 +212,9 @@ assert.match(detailSource, /const visibleExpandedIssueKeys = computed\(\(\) => i
 assert.match(detailSource, /@expand-change="handleIssueExpandChange"/)
 assert.doesNotMatch(detailSource, /default-expand-all/)
 assert.match(detailSource, /preserveExpansion[\s\S]*retainExpandedIterationIssueIds\(expandedIssueIds\.value, loadedDetail\.issues\)/)
-assert.match(detailSource, /const shouldExpandParent = !visibleExpandedIssueKeys\.value\.includes\(String\(parentIssueId\)\)/)
-assert.match(detailSource, /if \(result\.successCount && shouldExpandParent\) expandIssueAfterChildAdded\(parentIssueId\)/)
-assert.match(detailSource, /await load\(\)\s+if \(shouldExpandParent\) expandIssueAfterChildAdded\(parentIssueId\)/)
+assert.match(detailSource, /const shouldExpandParent = parentIssueId !== undefined && !visibleExpandedIssueKeys\.value\.includes\(String\(parentIssueId\)\)/)
+assert.match(detailSource, /if \(result\.successCount && parentIssueId !== undefined && shouldExpandParent\) expandIssueAfterChildAdded\(parentIssueId\)/)
+assert.match(detailSource, /await load\(\)\s+if \(parentIssueId !== undefined && shouldExpandParent\) expandIssueAfterChildAdded\(parentIssueId\)/)
 assert.match(detailSource, /暂无匹配事项/)
 assert.doesNotMatch(detailSource, /:model-value="detail\.stage"/)
 assert.match(detailSource, /label="迭代状态" required><el-select v-model="editForm\.stage"/)
@@ -220,6 +223,8 @@ assert.doesNotMatch(detailSource, /editForm\.version/)
 assert.match(detailSource, /v-model="childSyncToCoding"/)
 assert.match(detailSource, /:disabled="!childAutoSyncAvailability\.enabled"/)
 assert.match(detailSource, /syncToCoding: syncRequested/)
+assert.doesNotMatch(detailSource, /字段参考项目|referenceProjectName/)
+assert.match(detailSource, /getTeamIterationIssueCreationOptions\(id\(\), parent\.id, issueType\)/)
 assert.ok(detailSource.indexOf('class="child-entry-row"') < detailSource.indexOf('<template v-if="childMode === \'LINK\'">'))
 assert.match(detailSource, /issue\.recordedHours \?\? localWorklogTotal\(issue\)/)
 assert.match(detailSource, /issue\.recordedWorklogCount \?\? issue\.worklogs\.length/)
