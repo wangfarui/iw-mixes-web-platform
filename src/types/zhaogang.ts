@@ -1,5 +1,12 @@
 import type { TeamIterationRole } from './zhaogangIteration'
 
+export type ZhaogangCodingRole = TeamIterationRole
+
+export interface ZhaogangRolePreference {
+  codingRole: ZhaogangCodingRole | null
+  roleConfigured: boolean
+}
+
 export interface ZhaogangSessionStatus {
   connected: boolean
   userId: number
@@ -9,6 +16,7 @@ export interface ZhaogangSessionStatus {
   tokenHint: string
   tokenRotationRequired: boolean
   warnings: string[]
+  rolePreference: ZhaogangRolePreference
 }
 
 export interface ZhaogangTokenValue {
@@ -38,7 +46,7 @@ export interface ZhaogangPreferences {
   projectFilterId: number | null
   planPageSize: ZhaogangPlanPageSize
   planTableColumnWidths: Partial<Record<ZhaogangPlanTableColumnKey, number>>
-  codingRole: TeamIterationRole | null
+  codingRole: ZhaogangCodingRole | null
   autoSyncCreatedChildIssue: boolean
 }
 

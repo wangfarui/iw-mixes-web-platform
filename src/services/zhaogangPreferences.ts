@@ -1,4 +1,11 @@
-import type { ZhaogangPlanPageSize, ZhaogangPlanTableColumnKey, ZhaogangPreferences } from '@/types/zhaogang'
+import type { ZhaogangCodingRole, ZhaogangPlanPageSize, ZhaogangPlanTableColumnKey, ZhaogangPreferences } from '@/types/zhaogang'
+
+export const codingRoleLabels: Record<ZhaogangCodingRole, string> = {
+  PRODUCT: '产品',
+  BACKEND: '后端开发',
+  FRONTEND: '前端开发',
+  QA: '测试'
+}
 
 const storageKey = (userId: number) => `zhaogang:preferences:${userId}`
 const planTableColumnKeys: ZhaogangPlanTableColumnKey[] = ['service', 'status', 'branch', 'builder', 'duration', 'startedAt']
@@ -60,12 +67,18 @@ export const loadZhaogangPreferences = (userId: number): ZhaogangPreferences => 
   }
 }
 
-export const saveZhaogangPreferences = (userId: number, preferences: ZhaogangPreferences) => {
-  window.localStorage.setItem(storageKey(userId), JSON.stringify(preferences))
+export const saveZhaogangPreferences = (
+  userId: number, { codingRole: _serverRole, ...preferences }: ZhaogangPreferences, discardLegacyRole = false
+) => {
+  const legacyRole = discardLegacyRole ? null : loadZhaogangPreferences(userId).codingRole
+  const stored = legacyRole ? { ...preferences, codingRole: legacyRole } : preferences
+  window.localStorage.setItem(storageKey(userId), JSON.stringify(stored))
 }
 
-export const resetZhaogangPreferences = (userId: number): ZhaogangPreferences => {
-  const preferences = defaultZhaogangPreferences()
-  saveZhaogangPreferences(userId, preferences)
-  return preferences
+export const discardLegacyCodingRole = (userId: number) => {
+  try {
+    saveZhaogangPreferences(userId, loadZhaogangPreferences(userId), true)
+  } catch {
+    // A stale local value cannot override a role already configured on the server.
+  }
 }

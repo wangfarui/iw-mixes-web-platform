@@ -2,6 +2,8 @@
   <section class="code-page">
     <CodeStatsHeader
       active="mine"
+      v-model:scan-details-visible="scanDetailsVisible"
+      :scan-details="statistics"
       :cache-time="cacheTime"
       :rescan-loading="rescanning"
       :rescan-disabled="rescanDisabled"
@@ -9,21 +11,6 @@
       :refreshing="refreshing"
       @rescan="rescan"
     >
-      <template #sync-status>
-        <el-button
-          v-if="statistics"
-          link
-          size="small"
-          :type="scanDetailTone"
-          :aria-expanded="scanDetailsVisible"
-          aria-controls="my-code-scan-details"
-          @click="scanDetailsVisible = !scanDetailsVisible"
-        >
-          数据同步 {{ cacheTime || '—' }}<template v-if="scanDetailStatus"> · {{ scanDetailStatus }}</template>
-          <span class="scan-detail-toggle">{{ scanDetailsVisible ? '收起详情' : '展开详情' }}</span>
-        </el-button>
-        <span v-else class="scan-time">数据同步 —</span>
-      </template>
       <template #controls>
         <CodeStatsRangePicker
           :option="rangeOption"
@@ -49,10 +36,10 @@
 
     <div v-if="!statistics && statisticsLoading" class="code-loading"><el-skeleton :rows="9" animated /></div>
     <template v-else-if="statistics">
-      <CodeStatsKpiCards v-if="statistics.dataReady" :items="kpiItems" />
+      <CodeStatsKpiCards v-if="statistics.dataReady" :summary="statistics.summary" />
       <CodeStatsScanBanner
         v-show="scanDetailsVisible"
-        id="my-code-scan-details"
+        id="mine-code-scan-details"
         :scan="statistics.scan"
         :coverage="statistics.coverage"
         :refreshing="refreshing"
@@ -63,9 +50,9 @@
       <div v-if="!statistics.dataReady" class="code-placeholder">
         <el-icon v-if="activeMonth" :size="30"><Loading /></el-icon>
         <strong v-if="['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(statistics.scan.aggregateStatus)">扫描尚未完成，请展开「数据同步」详情查看原因后重试</strong>
-        <strong v-else-if="!activeMonth">当前范围尚未同步，请点击“立即同步”</strong>
+        <strong v-else-if="!activeMonth">当前范围尚无同步数据</strong>
         <strong v-else>后台正在回补代码数据</strong>
-        <span v-if="activeMonth">扫描会在后台继续，可以离开页面后再回来查看；也可以点击“立即同步”发起回补。</span>
+        <span v-if="activeMonth">扫描会在后台继续，可以离开页面后再回来查看。</span>
       </div>
 
       <div v-if="statistics.dataReady && statistics.summary.commitCount === 0" class="code-placeholder">
@@ -91,7 +78,7 @@
             <CodeStatsCalendarHeatmap :daily="statistics.daily" />
           </article>
           <article class="chart-card">
-            <header><h3>代码行变更趋势</h3><p>绿色新增，红色删除，蓝线为净增</p></header>
+            <header><h3>代码行变更趋势</h3><p>零线上方为新增，下方为删除</p></header>
             <CodeStatsLineBarChart :key="chartRangeKey" :items="statistics.daily" show-details scroll-dates />
           </article>
           <article class="chart-card">
@@ -147,7 +134,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { Loading, User } from '@element-plus/icons-vue'
 import {
   getCodeStatsEntries,
@@ -165,7 +152,6 @@ import type {
 } from '@/types/zhaogangCodeStats'
 import type { CodeStatsBarItem } from './components/CodeStatsBarChart.vue'
 import type { CodeStatsHorizontalItem } from './components/CodeStatsHorizontalBarChart.vue'
-import type { CodeStatsKpiItem } from './components/CodeStatsKpiCards.vue'
 import CodeStatsBarChart from './components/CodeStatsBarChart.vue'
 import CodeStatsCalendarHeatmap from './components/CodeStatsCalendarHeatmap.vue'
 import CodeStatsHeader from './components/CodeStatsHeader.vue'
@@ -183,10 +169,7 @@ import {
   formatCodeClock,
   formatCodeDuration,
   formatCodeNumber,
-  formatSignedNumber,
-  hasCodeScanIssues,
-  latestSuccessfulAt,
-  scanStatusText
+  latestSuccessfulAt
 } from './codeStatsPresentation'
 import { monthText, resolveCodeStatsRange, type ResolvedCodeStatsRange } from '@/services/zhaogangCodeStatsRange'
 import { useCodeStatsScanPolling } from './useCodeStatsScanPolling'
@@ -243,33 +226,6 @@ const rescanTip = computed(() => {
   const retry = statistics.value?.scan.sync?.retryAfterSeconds ?? statistics.value?.scan.retryAfterSeconds ?? 0
   if (retry > 0) return `同步冷却中，约 ${formatCodeDuration(retry)} 后可再次同步`
   return ''
-})
-const scanDetailStatus = computed(() => {
-  const data = statistics.value
-  if (!data) return ''
-  if (syncInProgress.value) {
-    return scanStatusText(activeMonth.value?.status || data.scan.sync?.status)
-  }
-  if (['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(data.scan.aggregateStatus)) {
-    return scanStatusText(data.scan.aggregateStatus)
-  }
-  return data.scan.aggregateStatus === 'PARTIAL' || hasCodeScanIssues(data.scan, data.coverage) ? '有告警' : ''
-})
-const scanDetailTone = computed(() => scanDetailStatus.value && !syncInProgress.value
-  ? 'warning'
-  : 'primary')
-
-const kpiItems = computed<CodeStatsKpiItem[]>(() => {
-  const summary = statistics.value?.summary
-  if (!summary) return []
-  return [
-    { label: '提交次数', value: formatCodeNumber(summary.commitCount), tone: 'blue' },
-    { label: '新增代码行', value: formatCodeNumber(summary.additions), tone: 'green' },
-    { label: '删除代码行', value: formatCodeNumber(summary.deletions), tone: 'red' },
-    { label: '净增代码行', value: formatSignedNumber(summary.netLines), tone: summary.netLines < 0 ? 'red' : 'default' },
-    { label: '活跃天数', value: `${summary.activeDays} 天` },
-    { label: '涉及仓库', value: `${summary.repoCount} 个` }
-  ]
 })
 
 const chartRangeKey = computed(() => {
@@ -380,15 +336,6 @@ const applyScan = (scan: ZhaogangCodeStatsScan) => {
 
 const rescan = async () => {
   if (rescanDisabled.value) return
-  try {
-    await ElMessageBox.confirm('将从 2026-01-01 回补你本人可读的代码数据，并启用每 3 小时后台增量同步。首次回补可能耗时较长。是否继续？', '同步代码', {
-      confirmButtonText: '开始同步',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-  } catch {
-    return
-  }
   rescanning.value = true
   try {
     const result = await triggerCodeStatsScan({
@@ -399,17 +346,19 @@ const rescan = async () => {
     })
     applyScan(result.scan)
     if (result.accepted) {
-      ElMessage.success('已启动后台持续同步，可继续查看已有数据')
+      ElMessage.success('已提交本轮代码同步')
       polling.begin(result.scan)
     } else if (result.reason === 'ALREADY_RUNNING') {
       ElMessage.info('已有扫描任务，正在同步进度')
       polling.begin(result.scan)
+    } else if (result.reason === 'QUEUE_FULL') {
+      ElMessage.warning('同步队列已满，请稍后重试')
     } else {
       const skipped = result.skippedMonths.map(item => `${item.month}：${item.reason}`).join('；')
       ElMessage.warning(skipped || `暂时无法重扫：${result.reason}`)
     }
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '重扫失败')
+    ElMessage.error(error instanceof Error ? error.message : '同步失败')
   } finally {
     rescanning.value = false
   }
@@ -438,8 +387,6 @@ onMounted(async () => {
 .code-chart-grid :deep(.code-stats-date-scroll::-webkit-scrollbar-thumb) { background: #c1cddc; border-radius: 999px; }
 .code-chart-grid :deep(.code-stats-date-scroll::-webkit-scrollbar-thumb:hover) { background: #8a9cb3; }
 .heatmap-card { display: flex; flex-direction: column; }
-.scan-detail-toggle { margin-left: 6px; }
-.scan-time { color: #7b879a; font-size: 12px; }
 .chart-card header { margin-bottom: 8px; }
 .chart-card h3 { margin: 0; color: #2b3a50; font-size: 15px; }
 .chart-card p { margin: 5px 0 0; color: #8a96a9; font-size: 12px; }

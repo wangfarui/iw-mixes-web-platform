@@ -1,9 +1,13 @@
+import type { ZhaogangCodingRole } from './zhaogang'
+
 export interface WorkbenchTeamMember {
   userId: number
   userName: string
   avatar: string
   joinedAt: string
   administrator: boolean
+  codingRole: ZhaogangCodingRole | null
+  lastUsedAt?: string
 }
 
 export interface WorkbenchTeamPermissions {

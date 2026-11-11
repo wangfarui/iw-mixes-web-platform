@@ -12,6 +12,8 @@ import type {
   ZhaogangPlanPageSyncDto,
   ZhaogangProject,
   ZhaogangSessionStatus,
+  ZhaogangCodingRole,
+  ZhaogangRolePreference,
   ZhaogangTokenValue,
   ZhaogangTriggerBuildDto,
   ZhaogangWorklogOptions,
@@ -79,6 +81,11 @@ export const bindZhaogangToken = (token: string) => zhaogangRequest<ZhaogangSess
 })
 
 export const getZhaogangSession = () => zhaogangRequest<ZhaogangSessionStatus>('/session')
+
+export const updateZhaogangCodingRole = (codingRole: ZhaogangCodingRole | null, initializeOnly = false) =>
+  zhaogangRequest<ZhaogangRolePreference>('/profile/coding-role', {
+    method: 'PUT', body: JSON.stringify({ codingRole, initializeOnly })
+  })
 
 export const getZhaogangToken = () => zhaogangRequest<ZhaogangTokenValue>('/session/token', { method: 'POST' })
 

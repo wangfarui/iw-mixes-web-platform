@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-10-02",
+  "currentReleaseId": "zg-2026-11-11-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -577,6 +577,29 @@
         {
           "type": "IMPROVEMENT",
           "text": "明细区更名为「工时记录」，默认查询本周，可切换本月或自选日期范围。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-11-01",
+      "version": "1.13.0",
+      "publishedAt": "2026-11-11T15:57:17+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "个人和团队代码支持自动同步，也可点击「立即同步」更新。"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "团队代码仅统计前后端开发成员，支持查看指定成员的代码汇总。"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "优化代码图表与同步详情展示，将「代码」菜单移至「工时」下方。"
+        },
+        {
+          "type": "FIX",
+          "text": "修复提交明细无法跳转到 CODING 的问题。"
         }
       ]
     }

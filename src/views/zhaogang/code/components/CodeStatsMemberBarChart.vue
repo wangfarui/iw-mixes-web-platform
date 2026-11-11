@@ -1,9 +1,10 @@
 <template>
-  <div class="member-bar-scroll">
+  <div ref="viewport" class="member-chart-scroll">
     <svg
       class="member-bar-chart"
       :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
-      :style="{ minWidth: `${chartWidth}px` }"
+      :width="chartWidth"
+      :height="chartHeight"
       role="img"
       aria-label="团队成员提交次数对比"
     >
@@ -27,24 +28,23 @@
           :y="yFor(member.commitCount)"
           :width="barWidth"
           :height="barHeight(member.commitCount)"
-        >
-          <title>{{ member.user.name }}：提交 {{ member.commitCount }} 次</title>
-        </rect>
+        />
         <text class="bar-value" :x="slotX(index) + slotWidth / 2" :y="yFor(member.commitCount) - 5">{{ member.commitCount }}</text>
         <text class="axis-label axis-label--x" :x="slotX(index) + slotWidth / 2" :y="chartHeight - 9">
           {{ shortName(member.user.name) }}<title>{{ member.user.name }}</title>
         </text>
-        <rect
-          class="hit-area"
-          :x="slotX(index)"
-          :y="plotTop"
-          :width="slotWidth"
-          :height="plotHeight"
-          tabindex="0"
-          :aria-label="`${member.user.name} 提交 ${member.commitCount} 次`"
-          @click="$emit('select', member.user.id)"
-          @keydown.enter="$emit('select', member.user.id)"
-        />
+        <foreignObject :x="slotX(index)" :y="plotTop" :width="slotWidth" :height="plotHeight">
+          <CodeStatsChartTooltip :content="memberDetails(member)" v-slot="{ pointerEvents }">
+            <button
+              v-on="pointerEvents"
+              type="button"
+              class="hit-area"
+              :aria-label="memberDetails(member)"
+              :aria-pressed="selectedMemberId === member.user.id"
+              @click="$emit('select', member.user.id)"
+            />
+          </CodeStatsChartTooltip>
+        </foreignObject>
       </g>
       <text class="axis-unit" :x="plotLeft" y="12">（次）</text>
     </svg>
@@ -54,6 +54,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ZhaogangCodeStatsMember } from '@/types/zhaogangCodeStats'
+import { formatCodeNumber } from '../codeStatsPresentation'
+import CodeStatsChartTooltip from './CodeStatsChartTooltip.vue'
+import { useCodeStatsMemberChart } from './useCodeStatsMemberChart'
 
 const props = withDefaults(defineProps<{
   members: ZhaogangCodeStatsMember[]
@@ -62,30 +65,25 @@ const props = withDefaults(defineProps<{
 
 defineEmits<{ (event: 'select', memberId: number): void }>()
 
-const chartHeight = 260
-const plotLeft = 48
-const plotRight = 18
-const plotTop = 24
-const plotBottom = 42
-const plotHeight = chartHeight - plotTop - plotBottom
-const chartWidth = computed(() => Math.max(680, props.members.length * 62 + plotLeft + plotRight))
-const slotWidth = computed(() => (chartWidth.value - plotLeft - plotRight) / Math.max(1, props.members.length))
+const { viewport, chartWidth, chartHeight, plotLeft, plotRight, plotTop, plotHeight, slotWidth, slotX } =
+  useCodeStatsMemberChart(() => props.members.length)
 const barWidth = computed(() => Math.max(8, Math.min(24, slotWidth.value * 0.48)))
 const maxValue = computed(() => Math.max(4, Math.ceil(Math.max(1, ...props.members.map(member => member.commitCount)) / 4) * 4))
 const ticks = computed(() => Array.from({ length: 5 }, (_, index) => {
   const value = Math.round(maxValue.value * index / 4 * 10) / 10
   return { value, y: yFor(value) }
 }).reverse())
-const slotX = (index: number) => plotLeft + slotWidth.value * index
 const barX = (index: number) => slotX(index) + (slotWidth.value - barWidth.value) / 2
 const yFor = (value: number) => plotTop + plotHeight - (Math.max(0, value) / maxValue.value) * plotHeight
 const barHeight = (value: number) => value <= 0 ? 0 : Math.max(1, (value / maxValue.value) * plotHeight)
 const shortName = (value: string) => Array.from(value).length > 5 ? `${Array.from(value).slice(0, 5).join('')}…` : value
+const memberDetails = (member: ZhaogangCodeStatsMember) =>
+  `${member.user.name} · 提交 ${formatCodeNumber(member.commitCount)} 次`
 </script>
 
 <style scoped>
-.member-bar-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; }
-.member-bar-chart { display: block; width: 100%; height: 260px; }
+.member-chart-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; }
+.member-bar-chart { display: block; }
 .grid-line { stroke: #e7ebf2; stroke-width: 1; stroke-dasharray: 3 2; }
 .selected-bg { fill: rgb(36 104 232 / 8%); }
 .bar { fill: #409EFF; rx: 2px; }
@@ -95,6 +93,6 @@ const shortName = (value: string) => Array.from(value).length > 5 ? `${Array.fro
 .axis-label--y { text-anchor: end; }
 .axis-label--x { text-anchor: middle; }
 .axis-unit { fill: #98a2b3; font-size: 11px; }
-.hit-area { fill: transparent; cursor: pointer; outline: none; }
-.hit-area:focus { fill: rgb(36 104 232 / 6%); }
+.hit-area { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.hit-area:focus-visible { background: rgb(36 104 232 / 6%); outline: none; }
 </style>

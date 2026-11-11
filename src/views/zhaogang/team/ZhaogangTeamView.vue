@@ -71,6 +71,21 @@
             <el-table-column label="加入时间" min-width="155">
               <template #default="scope">{{ formatDate(scope.row.joinedAt) }}</template>
             </el-table-column>
+            <el-table-column label="角色" min-width="170">
+              <template #default="{ row }">
+                {{ roleLabel(row.codingRole) }}
+                <el-button
+                  v-if="detail.permissions.administrator"
+                  link
+                  type="primary"
+                  :disabled="saving || detailLoading"
+                  @click="openRoleEditor(row)"
+                >修改角色</el-button>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="detail.permissions.administrator" label="最近使用时间" min-width="155">
+              <template #default="{ row }">{{ formatDate(row.lastUsedAt) }}</template>
+            </el-table-column>
             <el-table-column v-if="detail.permissions.canRemoveMembers" label="操作" width="150" fixed="right">
               <template #default="scope">
                 <el-button v-if="!scope.row.administrator" link type="primary" @click="openTransfer(scope.row.userId)">转交管理员</el-button>
@@ -107,6 +122,34 @@
       <template #footer><el-button @click="renameVisible = false">取消</el-button><el-button type="primary" :loading="saving" @click="renameTeam">保存</el-button></template>
     </el-dialog>
 
+    <el-dialog
+      v-model="roleEditorVisible"
+      title="修改成员角色"
+      width="min(460px, calc(100% - 28px))"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!saving"
+      :show-close="!saving"
+    >
+      <el-form v-if="roleEditor" label-position="top">
+        <el-form-item :label="roleEditor.member.userName">
+          <el-select
+            v-model="roleEditor.codingRole"
+            class="full-control"
+            :value-on-clear="null"
+            :disabled="saving"
+            clearable
+            placeholder="请选择角色"
+          >
+            <el-option v-for="(label, role) in codingRoleLabels" :key="role" :label="label" :value="role" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="saving" @click="roleEditorVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveMemberRole">保存</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="successorVisible" :title="successorMode === 'leave' ? '转交并退出' : '转交管理员'" width="min(460px, calc(100% - 28px))" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="继任管理员" required>
@@ -134,10 +177,14 @@ import {
   removeWorkbenchTeamMember,
   reorderWorkbenchTeams,
   renameWorkbenchTeam,
-  transferWorkbenchTeamAdministrator
+  transferWorkbenchTeamAdministrator,
+  updateWorkbenchTeamMemberRole
 } from '@/api/zhaogangTeam'
+import { codingRoleLabels } from '@/services/zhaogangPreferences'
+import type { ZhaogangCodingRole } from '@/types/zhaogang'
 import type { WorkbenchTeamDetail, WorkbenchTeamListItem, WorkbenchTeamMember } from '@/types/zhaogangTeam'
 
+const emit = defineEmits<{ 'coding-role-updated': [userId: number, codingRole: ZhaogangCodingRole | null] }>()
 const route = useRoute()
 const router = useRouter()
 const teams = ref<WorkbenchTeamListItem[]>([])
@@ -154,6 +201,9 @@ const renameVisible = ref(false)
 const renameName = ref('')
 const successorVisible = ref(false)
 const successorUserId = ref<number | null>(null)
+const roleEditorVisible = ref(false)
+const roleEditor = ref<{ teamId: number, member: WorkbenchTeamMember, codingRole: ZhaogangCodingRole | null } | null>(null)
+let detailRequestId = 0
 const successorMode = ref<'transfer' | 'leave'>('transfer')
 
 const inviteUrl = computed(() => detail.value
@@ -178,17 +228,24 @@ const loadTeams = async () => {
 }
 
 const selectTeam = async (teamId: number, updateRoute = true) => {
+  if (selectedTeamId.value !== teamId) roleEditorVisible.value = false
+  const requestId = ++detailRequestId
   selectedTeamId.value = teamId
   detailLoading.value = true
   try {
-    detail.value = await getWorkbenchTeam(teamId)
+    const next = await getWorkbenchTeam(teamId)
+    if (requestId !== detailRequestId) return
+    if (detail.value?.id !== teamId || detail.value.versionNo <= next.versionNo) detail.value = next
     if (updateRoute && Number(route.query.teamId) !== teamId) {
       await router.replace({ path: '/zhaogang/teams', query: { teamId: String(teamId) } })
     }
   } catch (error) {
+    if (requestId !== detailRequestId) return
     detail.value = null
     ElMessage.error(error instanceof Error ? error.message : '团队详情加载失败')
-  } finally { detailLoading.value = false }
+  } finally {
+    if (requestId === detailRequestId) detailLoading.value = false
+  }
 }
 
 const moveTeam = async (index: number, offset: -1 | 1) => {
@@ -279,6 +336,36 @@ const confirmSuccessor = async () => {
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '管理员转交失败') } finally { saving.value = false }
 }
 
+const roleLabel = (role?: ZhaogangCodingRole | null) => role ? codingRoleLabels[role] : '—'
+
+const openRoleEditor = (member: WorkbenchTeamMember) => {
+  if (!detail.value?.permissions.administrator) return
+  roleEditor.value = { teamId: detail.value.id, member, codingRole: member.codingRole ?? null }
+  roleEditorVisible.value = true
+}
+
+const saveMemberRole = async () => {
+  const editor = roleEditor.value
+  const current = detail.value
+  if (!editor || !current?.permissions.administrator || current.id !== editor.teamId || saving.value) return
+  saving.value = true
+  try {
+    const next = await updateWorkbenchTeamMemberRole(current.id, editor.member.userId, current.versionNo, editor.codingRole)
+    if (selectedTeamId.value === next.id && detail.value?.id === next.id && detail.value.versionNo <= next.versionNo) {
+      detail.value = next
+    }
+    const updated = next.members.find(member => member.userId === editor.member.userId)
+    if (updated) emit('coding-role-updated', updated.userId, updated.codingRole)
+    roleEditorVisible.value = false
+    ElMessage.success('成员角色已更新')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '成员角色保存失败')
+    if (selectedTeamId.value === current.id) await selectTeam(current.id, false)
+  } finally {
+    saving.value = false
+  }
+}
+
 const removeMember = async (member: WorkbenchTeamMember) => {
   if (!detail.value) return
   try {
@@ -317,7 +404,7 @@ const removeCurrentSelection = async (message: string) => {
   ElMessage.success(message)
 }
 
-const formatDate = (value: string) => value?.replace('T', ' ').slice(0, 16) || '—'
+const formatDate = (value?: string) => value?.replace('T', ' ').slice(0, 16) || '—'
 
 onMounted(loadTeams)
 </script>

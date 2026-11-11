@@ -2,6 +2,8 @@
   <section class="code-page">
     <CodeStatsHeader
       active="team"
+      v-model:scan-details-visible="scanDetailsVisible"
+      :scan-details="statistics"
       :cache-time="cacheTime"
       :rescan-loading="rescanning"
       :rescan-disabled="rescanDisabled"
@@ -30,6 +32,7 @@
           @update:custom-range="customRange = $event"
           @change="changeRange"
         />
+        <span v-if="teamId" class="code-note">仅统计角色为后端开发或前端开发的成员</span>
       </template>
       <template #actions>
         <el-button size="small" :icon="User" @click="myIdentityVisible = true">我的 Git 身份</el-button>
@@ -51,8 +54,9 @@
     </div>
     <div v-else-if="!statistics && statisticsLoading" class="code-loading"><el-skeleton :rows="9" animated /></div>
     <template v-else-if="statistics">
-      <CodeStatsKpiCards :items="kpiItems" />
       <CodeStatsScanBanner
+        v-show="scanDetailsVisible"
+        id="team-code-scan-details"
         :scan="statistics.scan"
         :coverage="statistics.coverage"
         :refreshing="refreshing"
@@ -60,10 +64,14 @@
         @cancelled="loadStatistics"
       />
 
-      <div v-if="!statistics.dataReady" class="code-placeholder">
+      <div v-if="!statistics.members.length" class="code-placeholder">
+        <el-empty description="当前团队没有配置为后端开发或前端开发的成员" :image-size="80" />
+        <el-button type="primary" plain @click="openTeams">前往团队页</el-button>
+      </div>
+      <div v-else-if="!statistics.dataReady" class="code-placeholder">
         <el-icon v-if="activeMonth" :size="30"><Loading /></el-icon>
-        <strong v-if="['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(statistics.scan.aggregateStatus)">扫描尚未完成，请查看上方原因后重试</strong>
-        <strong v-else-if="!activeMonth">当前范围尚未同步，请点击“立即同步”</strong>
+        <strong v-if="['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(statistics.scan.aggregateStatus)">扫描尚未完成，请展开「数据同步」详情查看原因后重试</strong>
+        <strong v-else-if="!activeMonth">当前范围尚无同步数据</strong>
         <strong v-else>正在准备团队代码统计</strong>
         <span v-if="activeMonth">扫描会覆盖团队全部成员可读的仓库和分支，在后台继续；可以离开页面后再回来查看。</span>
       </div>
@@ -85,8 +93,6 @@
             <CodeStatsMemberDivergingChart :members="statistics.members" :selected-member-id="selectedMemberId" @select="selectMember" />
           </article>
         </div>
-        <p class="code-note">0 提交成员保留在成员列表末尾；仅统计成员已绑定身份命中的提交；代码量不等于工作量。</p>
-
         <CodeStatsSelectedMemberPanel
           :key="panelKey"
           v-model:selected-member-id="selectedMemberId"
@@ -128,7 +134,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { Loading, User } from '@element-plus/icons-vue'
 import {
   getCodeStatsOptions,
@@ -142,9 +148,7 @@ import type {
   ZhaogangCodeStatsScan,
   ZhaogangCodeStatsTeamStatistics
 } from '@/types/zhaogangCodeStats'
-import type { CodeStatsKpiItem } from './components/CodeStatsKpiCards.vue'
 import CodeStatsHeader from './components/CodeStatsHeader.vue'
-import CodeStatsKpiCards from './components/CodeStatsKpiCards.vue'
 import CodeStatsMemberBarChart from './components/CodeStatsMemberBarChart.vue'
 import CodeStatsMemberDivergingChart from './components/CodeStatsMemberDivergingChart.vue'
 import CodeStatsRangePicker from './components/CodeStatsRangePicker.vue'
@@ -152,7 +156,7 @@ import CodeStatsScanBanner from './components/CodeStatsScanBanner.vue'
 import CodeStatsSelectedMemberPanel from './components/CodeStatsSelectedMemberPanel.vue'
 import CodeIdentityDialog from './components/CodeIdentityDialog.vue'
 import CodeScanScopeDrawer from './components/CodeScanScopeDrawer.vue'
-import { activeScanMonth, formatCodeClock, formatCodeDuration, formatCodeNumber, formatSignedNumber, latestSuccessfulAt } from './codeStatsPresentation'
+import { activeScanMonth, formatCodeClock, formatCodeDuration, latestSuccessfulAt } from './codeStatsPresentation'
 import { monthText, resolveCodeStatsRange, type ResolvedCodeStatsRange } from '@/services/zhaogangCodeStatsRange'
 import { useCodeStatsScanPolling } from './useCodeStatsScanPolling'
 
@@ -173,6 +177,7 @@ const selectedMemberId = ref<number | null>(null)
 const identityDialogVisible = ref(false)
 const myIdentityVisible = ref(false)
 const scanScopeVisible = ref(false)
+const scanDetailsVisible = ref(false)
 const rescanning = ref(false)
 const panelKey = ref(0)
 let statisticsSequence = 0
@@ -209,19 +214,6 @@ const rescanTip = computed(() => {
   const retry = statistics.value?.scan.sync?.retryAfterSeconds ?? statistics.value?.scan.retryAfterSeconds ?? 0
   if (retry > 0) return `同步冷却中，约 ${formatCodeDuration(retry)} 后可再次同步`
   return ''
-})
-
-const kpiItems = computed<CodeStatsKpiItem[]>(() => {
-  const summary = statistics.value?.summary
-  if (!summary) return []
-  return [
-    { label: '提交次数', value: formatCodeNumber(summary.commitCount), tone: 'blue' },
-    { label: '新增代码行', value: formatCodeNumber(summary.additions), tone: 'green' },
-    { label: '删除代码行', value: formatCodeNumber(summary.deletions), tone: 'red' },
-    { label: '净增代码行', value: formatSignedNumber(summary.netLines), tone: summary.netLines < 0 ? 'red' : 'default' },
-    { label: '活跃成员', value: `${summary.activeMembers} / ${summary.memberCount}`, hint: '提交次数大于 0 的成员' },
-    { label: '已扫描仓库', value: formatCodeNumber(statistics.value?.coverage.repoCount || 0) }
-  ]
 })
 
 const loadOptions = async () => {
@@ -298,15 +290,6 @@ const applyScan = (scan: ZhaogangCodeStatsScan) => {
 
 const rescan = async () => {
   if (rescanDisabled.value || !teamId.value) return
-  try {
-    await ElMessageBox.confirm('将从 2026-01-01 回补团队代码数据，并启用每 3 小时后台增量同步。首次回补可能耗时较长。是否继续？', '同步团队代码', {
-      confirmButtonText: '开始同步',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-  } catch {
-    return
-  }
   rescanning.value = true
   try {
     const result = await triggerCodeStatsScan({
@@ -318,17 +301,19 @@ const rescan = async () => {
     })
     applyScan(result.scan)
     if (result.accepted) {
-      ElMessage.success('已启动团队后台持续同步，可继续查看已有数据')
+      ElMessage.success('已提交本轮团队代码同步')
       polling.begin(result.scan)
     } else if (result.reason === 'ALREADY_RUNNING') {
       ElMessage.info('已有扫描任务，正在同步进度')
       polling.begin(result.scan)
+    } else if (result.reason === 'QUEUE_FULL') {
+      ElMessage.warning('同步队列已满，请稍后重试')
     } else {
       const skipped = result.skippedMonths.map(item => `${item.month}：${item.reason}`).join('；')
       ElMessage.warning(skipped || `暂时无法重扫：${result.reason}`)
     }
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '重扫失败')
+    ElMessage.error(error instanceof Error ? error.message : '同步失败')
   } finally {
     rescanning.value = false
   }
@@ -357,6 +342,10 @@ onMounted(async () => {
 .chart-card header { margin-bottom: 8px; }
 .chart-card h3 { margin: 0; color: #2b3a50; font-size: 15px; }
 .chart-card p { margin: 5px 0 0; color: #8a96a9; font-size: 12px; }
+.code-page :deep(:is(.member-chart-scroll, .bar-chart-scroll, .line-bar-scroll)::-webkit-scrollbar) { height: 8px; }
+.code-page :deep(:is(.member-chart-scroll, .bar-chart-scroll, .line-bar-scroll)::-webkit-scrollbar-track) { background: #f2f5fa; border-radius: 999px; }
+.code-page :deep(:is(.member-chart-scroll, .bar-chart-scroll, .line-bar-scroll)::-webkit-scrollbar-thumb) { background: #c1cddc; border-radius: 999px; }
+.code-page :deep(:is(.member-chart-scroll, .bar-chart-scroll, .line-bar-scroll)::-webkit-scrollbar-thumb:hover) { background: #8a9cb3; }
 .code-note { margin: 0; color: #8a96a9; font-size: 12px; line-height: 1.6; }
 .code-placeholder { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 10px; padding: 28px; color: #7b879a; background: #fff; border: 1px dashed #d8e2ef; border-radius: 10px; text-align: center; }
 .code-placeholder strong { color: #44536a; font-size: 16px; }

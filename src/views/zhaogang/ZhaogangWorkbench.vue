@@ -108,13 +108,13 @@
           <el-icon><Tickets /></el-icon>
           <span class="workspace-nav-label">迭代</span>
         </button>
-        <button :class="{ active: activeTab === 'code' }" type="button" aria-label="代码" :title="navCollapsed ? '代码' : undefined" @click="navigateTab('code')">
-          <el-icon><DataAnalysis /></el-icon>
-          <span class="workspace-nav-label">代码</span>
-        </button>
         <button :class="{ active: activeTab === 'worklog' }" type="button" aria-label="工时" :title="navCollapsed ? '工时' : undefined" @click="navigateTab('worklog')">
           <el-icon><Timer /></el-icon>
           <span class="workspace-nav-label">工时</span>
+        </button>
+        <button :class="{ active: activeTab === 'code' }" type="button" aria-label="代码" :title="navCollapsed ? '代码' : undefined" @click="navigateTab('code')">
+          <el-icon><DataAnalysis /></el-icon>
+          <span class="workspace-nav-label">代码</span>
         </button>
         <button :class="{ active: activeTab === 'team' }" type="button" aria-label="团队" :title="navCollapsed ? '团队' : undefined" @click="navigateTab('team')">
           <el-icon><UserFilled /></el-icon>
@@ -154,7 +154,7 @@
         <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'code' || activeTab === 'calendar' || activeTab === 'services' || route.name === '找钢 Agent 使用教程'">
           <router-view v-slot="{ Component }">
             <Suspense>
-              <component :is="Component" />
+              <component :is="Component" @coding-role-updated="syncOwnCodingRole" />
               <template #fallback>
                 <div class="route-loading-state" role="status" aria-live="polite">
                   <el-icon class="route-loading-icon" :size="28"><Loading /></el-icon>
@@ -308,7 +308,7 @@
                 </template>
               </el-alert>
               <header class="settings-heading">
-                <div><h3>CODING 连接</h3><p>当前工作台使用的账号与个人访问令牌。</p></div>
+                <div><h3>CODING 连接</h3><p>管理当前账号、个人访问令牌和角色。角色在同一 CODING 团队下同步。</p></div>
                 <el-tag type="success" effect="light">连接正常</el-tag>
               </header>
               <div class="connection-profile">
@@ -318,6 +318,23 @@
               <dl class="connection-details">
                 <div><dt>绑定令牌</dt><dd><code>{{ session.tokenHint || '已安全绑定' }}</code></dd></div>
                 <div><dt>用户 ID</dt><dd>{{ session.userId }}</dd></div>
+                <div>
+                  <dt><label for="zhaogang-coding-role">当前 CODING 角色</label></dt>
+                  <dd class="connection-role">
+                    <el-select
+                      id="zhaogang-coding-role"
+                      :model-value="preferences.codingRole"
+                      :value-on-clear="null"
+                      :loading="savingCodingRole"
+                      :disabled="savingCodingRole"
+                      clearable
+                      placeholder="请选择角色"
+                      @change="saveCodingRole"
+                    >
+                      <el-option v-for="(label, role) in codingRoleLabels" :key="role" :label="label" :value="role" />
+                    </el-select>
+                  </dd>
+                </div>
               </dl>
               <div class="settings-actions">
                 <el-button :icon="DocumentCopy" :loading="copyingToken" @click="copyBoundToken">复制令牌</el-button>
@@ -328,7 +345,7 @@
                 </section>
 
                 <section class="settings-section">
-                  <header class="settings-heading"><div><h3>工作台偏好</h3><p>设置仅保存在当前浏览器，并按 CODING 用户隔离。</p></div></header>
+                  <header class="settings-heading"><div><h3>工作台偏好</h3><p>偏好保存在当前浏览器。</p></div></header>
                   <el-form label-position="left" label-width="150px" class="preferences-form">
                     <el-form-item label="默认首页">
                       <el-radio-group v-model="preferences.defaultTab" @change="savePreferences">
@@ -347,14 +364,6 @@
                         <el-radio-button value="card">卡片</el-radio-button>
                       </el-radio-group>
                     </el-form-item>
-                    <el-form-item label="当前 CODING 角色">
-                      <el-select v-model="preferences.codingRole" clearable placeholder="请选择角色" @change="savePreferences">
-                        <el-option label="产品" value="PRODUCT" />
-                        <el-option label="后端开发" value="BACKEND" />
-                        <el-option label="前端开发" value="FRONTEND" />
-                        <el-option label="测试" value="QA" />
-                      </el-select>
-                    </el-form-item>
                     <el-form-item label="新增子事项">
                       <el-switch v-model="preferences.autoSyncCreatedChildIssue" active-text="默认同步 CODING" @change="savePreferences" />
                     </el-form-item>
@@ -363,7 +372,7 @@
                     </el-form-item>
                   </el-form>
                   <div class="settings-actions">
-                    <el-button :icon="RefreshLeft" @click="resetPreferences">恢复默认设置</el-button>
+                    <el-button :icon="RefreshLeft" @click="resetPreferences">恢复本地默认设置</el-button>
                   </div>
                 </section>
               </div>
@@ -549,14 +558,15 @@ import {
   getZhaogangToken,
   searchZhaogangBranches,
   syncZhaogangPlanPage,
-  triggerZhaogangBuild
+  triggerZhaogangBuild,
+  updateZhaogangCodingRole
 } from '@/api/zhaogang'
 import { clearZhaogangFavorites, loadZhaogangFavorites, planFavoriteKey, toggleZhaogangFavorite } from '@/services/zhaogangFavorites'
 import {
   ZHAOGANG_PERMISSION_EVENT,
   type ZhaogangPermissionPromptDetail
 } from '@/services/zhaogangPermissionPrompt'
-import { defaultZhaogangPreferences, loadZhaogangPreferences, resetZhaogangPreferences, saveZhaogangPreferences } from '@/services/zhaogangPreferences'
+import { codingRoleLabels, defaultZhaogangPreferences, discardLegacyCodingRole, loadZhaogangPreferences, saveZhaogangPreferences } from '@/services/zhaogangPreferences'
 import { acknowledgeCurrentZhaogangRelease, loadCurrentZhaogangRelease, zhaogangReleaseLocalPrefix } from '@/services/zhaogangReleaseNotes'
 import {
   queryPlanK8sStatuses,
@@ -565,7 +575,7 @@ import {
   type PlanK8sStatuses,
   type ReleaseK8sStatus
 } from '@/services/zhaogangReleaseK8s'
-import type { ZhaogangBranch, ZhaogangBuildPlan, ZhaogangPlanDetail, ZhaogangPlanPageSize, ZhaogangPlanTableColumnKey, ZhaogangPreferences, ZhaogangProject, ZhaogangSessionStatus } from '@/types/zhaogang'
+import type { ZhaogangBranch, ZhaogangBuildPlan, ZhaogangCodingRole, ZhaogangPlanDetail, ZhaogangPlanPageSize, ZhaogangPlanTableColumnKey, ZhaogangPreferences, ZhaogangProject, ZhaogangSessionStatus } from '@/types/zhaogang'
 import type { ZgK8sEnvironment } from '@/types/zhaogangService'
 import type { ZhaogangReleaseCheck } from '@/types/zhaogangRelease'
 import WorklogDashboard from './components/worklog/WorklogDashboard.vue'
@@ -606,6 +616,8 @@ const planTableColumnMinimumWidths: Record<ZhaogangPlanTableColumnKey, number> =
 }
 const sessionLoading = ref(true)
 const session = ref<ZhaogangSessionStatus | null>(null)
+const roleUpdateSession = ref<ZhaogangSessionStatus | null>(null)
+const savingCodingRole = computed(() => session.value !== null && session.value === roleUpdateSession.value)
 const tokenInput = ref('')
 const binding = ref(false)
 const bindError = ref('')
@@ -841,8 +853,9 @@ const copyBoundToken = async () => {
   }
 }
 
-const applyUserPreferences = (userId: number, applyDefaultTab = true) => {
-  preferences.value = loadZhaogangPreferences(userId)
+const applyUserPreferences = async (current: ZhaogangSessionStatus, applyDefaultTab = true) => {
+  const local = loadZhaogangPreferences(current.userId)
+  preferences.value = { ...local, codingRole: current.rolePreference?.codingRole ?? null }
   const explicitTab = routeTab()
   if (explicitTab !== 'release') {
     activeTab.value = explicitTab
@@ -856,6 +869,31 @@ const applyUserPreferences = (userId: number, applyDefaultTab = true) => {
   projectFilter.value = preferences.value.rememberProjectFilter && preferences.value.projectFilterId
     ? preferences.value.projectFilterId
     : 'all'
+  if (local.codingRole && current.rolePreference) {
+    if (current.rolePreference.roleConfigured) discardLegacyCodingRole(current.userId)
+    else await saveCodingRole(local.codingRole, true)
+  }
+}
+
+const syncOwnCodingRole = (userId: number, codingRole: ZhaogangCodingRole | null) => {
+  if (session.value?.userId !== userId) return
+  session.value.rolePreference = { codingRole, roleConfigured: true }
+  preferences.value.codingRole = codingRole
+  discardLegacyCodingRole(userId)
+}
+
+const saveCodingRole = async (value: ZhaogangCodingRole | null, initializeOnly = false) => {
+  const current = session.value
+  if (!current || savingCodingRole.value) return
+  roleUpdateSession.value = current
+  try {
+    const updated = await updateZhaogangCodingRole(value ?? null, initializeOnly)
+    if (session.value === current) syncOwnCodingRole(current.userId, updated.codingRole)
+  } catch (error) {
+    if (session.value === current) ElMessage.error(error instanceof Error ? error.message : '角色保存失败')
+  } finally {
+    if (roleUpdateSession.value === current) roleUpdateSession.value = null
+  }
 }
 
 const savePreferences = () => {
@@ -910,12 +948,13 @@ const changeRememberProjectFilter = () => {
 
 const resetPreferences = () => {
   if (!session.value) return
-  preferences.value = resetZhaogangPreferences(session.value.userId)
+  preferences.value = { ...defaultZhaogangPreferences(), codingRole: preferences.value.codingRole }
+  savePreferences()
   favoriteOnly.value = false
   viewMode.value = preferences.value.planView
   pageSize.value = preferences.value.planPageSize
   projectFilter.value = 'all'
-  ElMessage.success('工作台设置已恢复默认')
+  ElMessage.success('本地设置已恢复默认')
 }
 
 const bindToken = async () => {
@@ -927,7 +966,7 @@ const bindToken = async () => {
     permissionPrompt.value = null
     tokenInput.value = ''
     favorites.value = loadZhaogangFavorites(session.value.userId)
-    applyUserPreferences(session.value.userId)
+    await applyUserPreferences(session.value)
     ElMessage.success('CODING 令牌已绑定')
     void checkRelease()
     await loadCatalog()
@@ -944,7 +983,7 @@ const restoreSession = async () => {
     session.value = await getZhaogangSession()
     rotationPromptVisible.value = session.value.tokenRotationRequired
     favorites.value = loadZhaogangFavorites(session.value.userId)
-    applyUserPreferences(session.value.userId)
+    await applyUserPreferences(session.value)
     void checkRelease()
     await loadCatalog()
   } catch {
@@ -997,7 +1036,7 @@ const replaceToken = async () => {
     rotationPromptVisible.value = false
     permissionPrompt.value = null
     favorites.value = loadZhaogangFavorites(nextSession.userId)
-    applyUserPreferences(nextSession.userId, false)
+    await applyUserPreferences(session.value, false)
     replaceTokenVisible.value = false
     void checkRelease()
     await loadCatalog()
@@ -1339,6 +1378,7 @@ onBeforeUnmount(() => {
 .release-toolbar { flex: 0 0 auto; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 11px; background: #fff; border: 1px solid #e5eaf2; border-bottom: 0; border-radius: 12px 12px 0 0; }.toolbar-left { gap: 6px; flex-wrap: wrap; }.toolbar-right { justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-left: auto; }.sync-time { color: #8490a4; font-size: 12px; white-space: nowrap; }.sync-time.is-syncing { color: #2468e8; }.service-search { width: 230px; }.project-filter { width: 150px; }.buildability-filter { width: 120px; }.partial-alert { flex: 0 0 auto; margin: 0; }.plan-list-viewport { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #fff; }.plan-table { width: 100%; height: 100%; border: 1px solid #e5eaf2; border-radius: 0; }.plan-list-empty { height: 100%; margin: 0; border: 1px solid #e5eaf2; }.plan-name { display: grid; gap: 4px; }.plan-name strong { color: #26344a; font-weight: 600; }.plan-name small { color: #8b96a7; }.favorite-button { padding: 0; color: #e5a126; font-size: 20px; }.pagination-row { box-sizing: border-box; flex: 0 0 auto; justify-content: space-between; min-height: 64px; padding: 12px 16px; color: #7b879a; background: #f8faff; border-top: 1px solid #e5eaf2; font-size: 13px; }
 .plan-cards { display: grid; box-sizing: border-box; height: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 12px; padding: 14px; overflow-y: auto; background: #fff; border: 1px solid #e5eaf2; border-radius: 0; }.plan-card { min-width: 0; padding: 16px; color: inherit; text-align: left; background: #fbfcff; border: 1px solid #e8edf5; border-radius: 10px; cursor: pointer; }.plan-card:hover { border-color: #9bbcf7; box-shadow: 0 8px 16px rgba(53, 96, 173, .09); }.plan-card > div { display: flex; justify-content: space-between; gap: 8px; }.plan-card > .build-status-cell { display: block; }.plan-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.card-star { color: #e5a126; font-size: 18px; }.plan-card small { display: block; margin: 7px 0 14px; color: #8b96a7; }.plan-card .build-status-cell small { margin: 4px 0 0; }.plan-card p { margin: 13px 0 0; color: #6e7c92; font-size: 12px; }
 .settings-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.settings-section { min-width: 0; padding: 20px; background: #fff; border: 1px solid #e4e9f1; border-radius: 8px; }.token-rotation-alert { margin-bottom: 16px; }.rotation-prompt-copy { margin: 0; color: #4f5e74; line-height: 1.7; }.settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #edf0f5; }.settings-heading h3 { margin: 0; font-size: 17px; }.settings-heading p { margin: 6px 0 0; color: #7d899c; font-size: 13px; line-height: 1.5; }.connection-profile { display: flex; align-items: center; gap: 12px; padding: 18px 0 14px; }.connection-profile strong, .connection-profile span { display: block; }.connection-profile span { margin-top: 4px; color: #8490a4; font-size: 13px; }.connection-details { margin: 0 0 18px; }.connection-details > div { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid #edf0f5; }.connection-details dt { color: #7c899c; font-size: 13px; }.connection-details dd { min-width: 0; margin: 0; color: #344158; font-weight: 600; text-align: right; }.connection-details code { display: inline-block; max-width: 100%; padding: 4px 7px; overflow: hidden; color: #31527e; background: #f1f5fb; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }.settings-actions { display: flex; gap: 9px; flex-wrap: wrap; }.preferences-form { padding-top: 18px; }.preferences-form :deep(.el-form-item) { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #edf0f5; }.preferences-form :deep(.el-form-item__label) { color: #4f5e74; }.local-data-section { grid-column: 1 / -1; }.local-data-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 17px; }.local-data-row strong, .local-data-row span { display: block; }.local-data-row span { margin-top: 5px; color: #8490a4; font-size: 13px; }
+.connection-role { flex: 0 1 160px; }
 .settings-center { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
 .settings-nav { position: sticky; z-index: 3; top: -1px; display: flex; gap: 5px; padding: 7px; overflow-x: auto; background: #fff; border: 1px solid #e4e9f1; border-radius: 8px; scrollbar-width: thin; }
 .settings-nav button { display: flex; min-width: 140px; min-height: 44px; flex: 1 0 140px; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; color: #5f6e83; background: transparent; border: 0; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }

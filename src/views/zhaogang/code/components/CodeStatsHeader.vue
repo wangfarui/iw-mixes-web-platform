@@ -23,9 +23,19 @@
       </div>
       <div class="header-actions">
         <span v-if="refreshing" class="refreshing-tag">刷新中</span>
-        <slot name="sync-status">
-          <span class="cache-time">数据同步 {{ cacheTime || '—' }}</span>
-        </slot>
+        <el-button
+          v-if="scanDetails"
+          link
+          size="small"
+          :type="scanDetailStatus && !syncInProgress ? 'warning' : 'primary'"
+          :aria-expanded="scanDetailsVisible"
+          :aria-controls="`${active}-code-scan-details`"
+          @click="scanDetailsVisible = !scanDetailsVisible"
+        >
+          数据同步 {{ cacheTime || '—' }}<template v-if="scanDetailStatus"> · {{ scanDetailStatus }}</template>
+          <span class="scan-detail-toggle">{{ scanDetailsVisible ? '收起详情' : '展开详情' }}</span>
+        </el-button>
+        <span v-else class="cache-time">数据同步 {{ cacheTime || '—' }}</span>
         <el-tooltip :content="rescanTip" :disabled="!rescanTip">
           <span>
             <el-button
@@ -51,19 +61,35 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Refresh } from '@element-plus/icons-vue'
+import type { ZhaogangCodeStatsCoverage, ZhaogangCodeStatsScan } from '@/types/zhaogangCodeStats'
+import { activeScanMonth, hasCodeScanIssues, scanStatusText } from '../codeStatsPresentation'
 
-defineProps<{
+const props = defineProps<{
   active: 'mine' | 'team'
   cacheTime: string
+  scanDetails: { scan: ZhaogangCodeStatsScan; coverage: ZhaogangCodeStatsCoverage } | null
   rescanLoading?: boolean
   rescanDisabled?: boolean
   rescanTip?: string
   refreshing?: boolean
 }>()
 
+const scanDetailsVisible = defineModel<boolean>('scanDetailsVisible', { required: true })
 defineEmits<{ (event: 'rescan'): void }>()
+
+const activeMonth = computed(() => activeScanMonth(props.scanDetails?.scan.months))
+const syncInProgress = computed(() => Boolean(activeMonth.value)
+  || ['RUNNING', 'QUEUED'].includes(props.scanDetails?.scan.sync?.status || ''))
+const scanDetailStatus = computed(() => {
+  if (!props.scanDetails) return ''
+  const { scan, coverage } = props.scanDetails
+  if (syncInProgress.value) return scanStatusText(activeMonth.value?.status || scan.sync?.status)
+  if (['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(scan.aggregateStatus)) return scanStatusText(scan.aggregateStatus)
+  return scan.aggregateStatus === 'PARTIAL' || hasCodeScanIssues(scan, coverage) ? '有告警' : ''
+})
 
 const router = useRouter()
 const openTab = (path: string) => { void router.push(path) }
@@ -77,6 +103,7 @@ const openTab = (path: string) => { void router.push(path) }
 .code-tabs button.active { color: #2468e8; background: #fff; box-shadow: 0 1px 4px rgb(36 104 232 / 14%); font-weight: 600; }
 .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cache-time, .refreshing-tag { color: #7b879a; font-size: 12px; white-space: nowrap; }
+.scan-detail-toggle { margin-left: 6px; }
 .refreshing-tag { padding: 2px 8px; color: #2468e8; background: #edf3ff; border-radius: 999px; }
 .header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 @media (max-width: 760px) {

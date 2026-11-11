@@ -2,7 +2,7 @@
   <section class="scan-banner" :class="`banner-${bannerType}`">
     <div class="banner-main">
       <p v-if="scan.sync" class="banner-progress">
-        回补起点 {{ scan.sync.from }} · {{ scan.sync.enabled ? '后台每 3 小时增量同步' : '尚未启用持续同步' }}
+        回补起点 {{ scan.sync.from }} · {{ scan.sync.enabled ? '后台每 3 小时增量同步' : '自动同步未启用' }}
         <template v-if="scan.sync.enabled && scan.sync.nextSyncAt"> · 下次 {{ formatCodeClock(scan.sync.nextSyncAt) }}</template>
       </p>
       <div class="banner-title">
@@ -26,7 +26,7 @@
       </p>
       <el-progress v-if="activeMonth" :indeterminate="activeMonth.stage === 'COMMITS'" :percentage="activeMonth.stage === 'COMMITS' ? 50 : scanProgressPercent(activeMonth)" :stroke-width="8" :show-text="false" />
       <p v-else-if="scan.aggregateStatus === 'NOT_STARTED'" class="banner-progress">
-        当前范围尚未完成同步。查看月份只读取本地数据，不会自动扫描；可点击“立即同步”回补。
+        当前范围尚无同步数据。
       </p>
       <p v-else-if="lastError" class="banner-error">{{ lastError }}</p>
       <p v-else class="banner-progress">

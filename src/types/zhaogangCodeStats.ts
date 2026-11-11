@@ -144,16 +144,6 @@ export interface ZhaogangCodeStatsCoverage {
   repoIssues: ZhaogangCodeStatsRepoIssue[]
 }
 
-export interface ZhaogangCodeStatsTeamSummary {
-  commitCount: number
-  additions: number
-  deletions: number
-  netLines: number
-  activeMembers: number
-  memberCount: number
-  unmappedCommitCount: number
-}
-
 export interface ZhaogangCodeStatsSelfSummary {
   commitCount: number
   additions: number
@@ -216,7 +206,6 @@ export interface ZhaogangCodeStatsTeamStatistics {
   range: ZhaogangCodeStatsRange
   scan: ZhaogangCodeStatsScan
   coverage: ZhaogangCodeStatsCoverage
-  summary: ZhaogangCodeStatsTeamSummary
   members: ZhaogangCodeStatsMember[]
 }
 

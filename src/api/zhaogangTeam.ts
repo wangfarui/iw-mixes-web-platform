@@ -1,4 +1,5 @@
 import { zhaogangRequest } from '@/api/zhaogang'
+import type { ZhaogangCodingRole } from '@/types/zhaogang'
 import type {
   WorkbenchTeamDetail,
   WorkbenchTeamInvitationPreview,
@@ -22,6 +23,12 @@ export const getWorkbenchTeam = (teamId: number) => zhaogangRequest<WorkbenchTea
 export const renameWorkbenchTeam = (teamId: number, versionNo: number, name: string) => zhaogangRequest<WorkbenchTeamDetail>(
   `/workbench-teams/${teamId}`, { method: 'PATCH', body: JSON.stringify({ versionNo, name }) }
 )
+
+export const updateWorkbenchTeamMemberRole = (
+  teamId: number, userId: number, versionNo: number, codingRole: ZhaogangCodingRole | null
+) => zhaogangRequest<WorkbenchTeamDetail>(`/workbench-teams/${teamId}/members/${userId}/coding-role`, {
+  method: 'PUT', body: JSON.stringify({ versionNo, codingRole })
+})
 
 export const removeWorkbenchTeamMember = (teamId: number, userId: number, versionNo: number) => zhaogangRequest<WorkbenchTeamDetail>(
   `/workbench-teams/${teamId}/members/${userId}`, {
