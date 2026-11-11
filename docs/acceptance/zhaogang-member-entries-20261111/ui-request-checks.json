@@ -1,0 +1,10 @@
+{
+  "onlyReadRequests": true,
+  "sortBeforePageRequest": true,
+  "singleSortFieldPerRequest": true,
+  "repositoryAndKeywordCombined": true,
+  "filtersAndSortingDoNotReloadCharts": true,
+  "retryPreservesFilters": true,
+  "memberChangeResetsFiltersPageAndSort": true,
+  "zeroCommitMemberQueried": true
+}

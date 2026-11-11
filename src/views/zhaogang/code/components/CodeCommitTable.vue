@@ -6,6 +6,23 @@
         <span v-if="rangeLabel">{{ rangeLabel }}</span>
       </div>
       <div class="commit-filters">
+        <el-select
+          v-if="showRepositoryFilter"
+          :model-value="depotId"
+          class="repository-filter"
+          filterable
+          clearable
+          placeholder="全部仓库"
+          aria-label="筛选仓库"
+          @update:model-value="$emit('depot-change', $event || null)"
+        >
+          <el-option
+            v-for="repository in repositories"
+            :key="repository.depotId"
+            :value="repository.depotId"
+            :label="`${repository.depotName}（${repository.projectDisplayName || repository.projectName}）`"
+          />
+        </el-select>
         <el-input
           v-model="keywordDraft"
           class="keyword-input"
@@ -19,16 +36,20 @@
         </el-input>
       </div>
     </header>
-    <el-alert v-if="error" type="error" :closable="false" show-icon :title="error" />
+    <el-alert v-if="error" type="error" :closable="false" show-icon :title="error">
+      <template v-if="showRepositoryFilter" #default><el-button link type="primary" @click="$emit('retry')">重试</el-button></template>
+    </el-alert>
     <el-table
       v-loading="loading"
       :data="items"
-      row-key="sha"
+      :row-key="entryKey"
+      :default-sort="sortable ? { prop: 'commitAt', order: 'descending' } : undefined"
+      @sort-change="changeSort"
       border
       class="commit-table"
       :empty-text="emptyText"
     >
-      <el-table-column label="时间" width="150">
+      <el-table-column label="时间" prop="commitAt" :sortable="sortable ? 'custom' : false" :sort-orders="['descending', 'ascending', null]" width="150">
         <template #default="scope">{{ formatCodeDateTime(scope.row.commitAt) }}</template>
       </el-table-column>
       <el-table-column label="仓库" min-width="170">
@@ -50,11 +71,11 @@
               link
               type="primary"
               size="small"
-              @click="toggleBranches(scope.row.sha)"
+              @click="toggleBranches(entryKey(scope.row))"
             >
-              {{ expandedBranches.has(scope.row.sha) ? '收起' : `等 ${scope.row.branchCount} 个` }}
+              {{ expandedBranches.has(entryKey(scope.row)) ? '收起' : `等 ${scope.row.branchCount} 个` }}
             </el-button>
-            <small v-if="expandedBranches.has(scope.row.sha)" class="branch-full">{{ scope.row.branches.join('、') }}</small>
+            <small v-if="expandedBranches.has(entryKey(scope.row))" class="branch-full">{{ scope.row.branches.join('、') }}</small>
             <small v-if="scope.row.branchTruncated" class="branch-truncated">分支名超过 50 个，仅展示前 50 个</small>
           </div>
         </template>
@@ -64,7 +85,7 @@
           <span class="commit-message" :title="scope.row.message">{{ scope.row.message || '（无提交说明）' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="新增" width="82" align="right">
+      <el-table-column label="新增" prop="additions" :sortable="sortable ? 'custom' : false" :sort-orders="['descending', 'ascending', null]" :width="sortable ? 100 : 82" align="right">
         <template #default="scope">
           <span v-if="scope.row.additions !== null" class="add-text">+{{ formatCodeNumber(scope.row.additions) }}</span>
           <el-tooltip v-else :content="diffHint(scope.row.diffStatus)">
@@ -72,7 +93,7 @@
           </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="删除" width="82" align="right">
+      <el-table-column label="删除" prop="deletions" :sortable="sortable ? 'custom' : false" :sort-orders="['descending', 'ascending', null]" :width="sortable ? 100 : 82" align="right">
         <template #default="scope">
           <span v-if="scope.row.deletions !== null" class="delete-text">-{{ formatCodeNumber(scope.row.deletions) }}</span>
           <el-tooltip v-else :content="diffHint(scope.row.diffStatus)">
@@ -80,7 +101,7 @@
           </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="文件数" width="74" align="right">
+      <el-table-column label="文件数" prop="filesChanged" :sortable="sortable ? 'custom' : false" :sort-orders="['descending', 'ascending', null]" :width="sortable ? 100 : 74" align="right">
         <template #default="scope">
           <span v-if="scope.row.filesChanged !== null">{{ scope.row.filesChanged }}</span>
           <span v-else class="muted">—</span>
@@ -118,6 +139,9 @@ import { ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import type {
   ZhaogangCodeStatsEntry,
+  ZhaogangCodeStatsEntrySort,
+  ZhaogangCodeStatsSortOrder,
+  ZhaogangCodeStatsRepository,
   ZhaogangCodeStatsPage
 } from '@/types/zhaogangCodeStats'
 import { diffStatusText, formatCodeDateTime, formatCodeNumber } from '../codeStatsPresentation'
@@ -129,23 +153,48 @@ const props = withDefaults(defineProps<{
   error?: string
   rangeLabel?: string
   keyword?: string
+  showRepositoryFilter?: boolean
+  repositories?: ZhaogangCodeStatsRepository[]
+  depotId?: number | null
+  sortable?: boolean
   emptyText?: string
 }>(), {
   loading: false,
   error: '',
   rangeLabel: '',
   keyword: '',
+  showRepositoryFilter: false,
+  repositories: () => [],
+  depotId: null,
+  sortable: false,
   emptyText: '当前范围没有已归属提交'
 })
 
 const emit = defineEmits<{
   (event: 'page-change', page: number): void
   (event: 'search', keyword: string): void
+  (event: 'depot-change', depotId: number | null): void
+  (event: 'sort-change', field: ZhaogangCodeStatsEntrySort, order: ZhaogangCodeStatsSortOrder): void
+  (event: 'retry'): void
 }>()
+
+const changeSort = ({ prop, order }: { prop: string; order: string | null }) => {
+  if (!props.sortable) return
+  if (!order) {
+    emit('sort-change', 'COMMIT_AT', 'DESC')
+    return
+  }
+  const fields: Record<string, ZhaogangCodeStatsEntrySort> = {
+    commitAt: 'COMMIT_AT', additions: 'ADDITIONS', deletions: 'DELETIONS', filesChanged: 'FILES_CHANGED'
+  }
+  if (fields[prop]) emit('sort-change', fields[prop], order === 'ascending' ? 'ASC' : 'DESC')
+}
 
 const keywordDraft = ref(props.keyword)
 watch(() => props.keyword, value => { keywordDraft.value = value })
 const expandedBranches = ref<Set<string>>(new Set())
+
+const entryKey = (row: ZhaogangCodeStatsEntry) => `${row.depotId}:${row.sha}`
 
 const branchSummary = (row: ZhaogangCodeStatsEntry) => row.branches.length
   ? row.branches.slice(0, 2).join('、')
@@ -172,6 +221,7 @@ const search = () => emit('search', keywordDraft.value.trim())
 .commit-title span { color: #8490a4; font-size: 12px; }
 .commit-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .keyword-input { width: 240px; }
+.repository-filter { width: 260px; }
 .commit-table { width: 100%; }
 .repo-cell strong, .repo-cell small { display: block; }
 .repo-cell small { margin-top: 2px; color: #96a1b2; font-size: 11px; }
@@ -187,7 +237,7 @@ const search = () => emit('search', keywordDraft.value.trim())
 .commit-sha { color: #6e7c92; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .commit-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; color: #7b879a; font-size: 12px; }
 @media (max-width: 760px) {
-  .keyword-input { width: 100%; }
+  .keyword-input, .repository-filter { width: 100%; }
   .commit-filters { width: 100%; }
   .commit-pagination { align-items: flex-start; flex-direction: column; }
 }

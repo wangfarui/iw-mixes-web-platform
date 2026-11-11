@@ -1,0 +1,24 @@
+{"method": "GET", "path": "/code-stats/options"}
+{"method": "GET", "path": "/code-stats/statistics", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001"}
+{"method": "GET", "path": "/code-stats/member-statistics", "from": "2026-11-01", "to": "2026-11-11", "workbenchTeamId": "93001", "memberUserId": "91001"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "1", "pageSize": "20", "sortBy": "COMMIT_AT", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/options"}
+{"method": "GET", "path": "/code-stats/statistics", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001"}
+{"method": "GET", "path": "/code-stats/member-statistics", "from": "2026-11-01", "to": "2026-11-11", "workbenchTeamId": "93001", "memberUserId": "91001"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "1", "pageSize": "20", "sortBy": "COMMIT_AT", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "1", "pageSize": "20", "sortBy": "ADDITIONS", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "2", "pageSize": "20", "sortBy": "ADDITIONS", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "1", "pageSize": "20", "sortBy": "DELETIONS", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "1", "pageSize": "20", "sortBy": "DELETIONS", "sortOrder": "ASC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "pageNumber": "1", "pageSize": "20", "sortBy": "FILES_CHANGED", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "depotId": "92001", "pageNumber": "1", "pageSize": "20", "sortBy": "FILES_CHANGED", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "depotId": "92001", "keyword": "fix", "pageNumber": "1", "pageSize": "20", "sortBy": "FILES_CHANGED", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "depotId": "92001", "keyword": "请求失败", "pageNumber": "1", "pageSize": "20", "sortBy": "FILES_CHANGED", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91001", "depotId": "92001", "keyword": "请求失败", "pageNumber": "1", "pageSize": "20", "sortBy": "FILES_CHANGED", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/member-statistics", "from": "2026-11-01", "to": "2026-11-11", "workbenchTeamId": "93001", "memberUserId": "91002"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91002", "pageNumber": "1", "pageSize": "20", "sortBy": "COMMIT_AT", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/member-statistics", "from": "2026-11-01", "to": "2026-11-11", "workbenchTeamId": "93001", "memberUserId": "91003"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "scope": "WORKBENCH_TEAM", "workbenchTeamId": "93001", "memberUserId": "91003", "pageNumber": "1", "pageSize": "20", "sortBy": "COMMIT_AT", "sortOrder": "DESC"}
+{"method": "GET", "path": "/code-stats/options"}
+{"method": "GET", "path": "/code-stats/statistics", "from": "2026-11-01", "to": "2026-11-11", "scope": "SELF"}
+{"method": "GET", "path": "/code-stats/entries", "from": "2026-11-01", "to": "2026-11-11", "pageNumber": "1", "pageSize": "20"}

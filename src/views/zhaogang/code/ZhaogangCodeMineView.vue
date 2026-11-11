@@ -94,7 +94,6 @@
             <CodeStatsHorizontalBarChart :items="branchItems" :max-items="10" />
           </article>
         </div>
-        <p class="code-note">代码量不等于工作量；行数受格式化、生成代码和锁文件影响。仅统计已绑定 Git 身份命中的提交；合并提交不计数、不统计行数。</p>
 
         <CodeCommitTable
           :items="entries?.items || []"
@@ -390,7 +389,6 @@ onMounted(async () => {
 .chart-card header { margin-bottom: 8px; }
 .chart-card h3 { margin: 0; color: #2b3a50; font-size: 15px; }
 .chart-card p { margin: 5px 0 0; color: #8a96a9; font-size: 12px; }
-.code-note { margin: 0; color: #8a96a9; font-size: 12px; line-height: 1.6; }
 .code-placeholder { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 10px; padding: 28px; color: #7b879a; background: #fff; border: 1px dashed #d8e2ef; border-radius: 10px; text-align: center; }
 .code-placeholder strong { color: #44536a; font-size: 16px; }
 .code-placeholder span { font-size: 12px; line-height: 1.6; }

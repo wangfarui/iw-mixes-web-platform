@@ -1,0 +1,13 @@
+External reactor package and tests
+[INFO] Tests run: 395, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+
+Controller contract tests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+
+Final Web type-check
+vue-tsc --build --force: exit 0
+
+Final Web production build
+✓ built in 15.07s (including neutral-sort reset fix)

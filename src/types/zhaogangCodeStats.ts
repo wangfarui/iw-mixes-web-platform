@@ -235,7 +235,11 @@ export interface ZhaogangCodeStatsPage {
   totalPage: number
 }
 
+export type ZhaogangCodeStatsEntrySort = 'COMMIT_AT' | 'ADDITIONS' | 'DELETIONS' | 'FILES_CHANGED'
+export type ZhaogangCodeStatsSortOrder = 'ASC' | 'DESC'
+
 export interface ZhaogangCodeStatsEntry {
+  depotId: number
   sha: string
   shortSha: string
   commitAt: string
@@ -257,6 +261,7 @@ export interface ZhaogangCodeStatsEntryPage {
   range: ZhaogangCodeStatsRange
   page: ZhaogangCodeStatsPage
   items: ZhaogangCodeStatsEntry[]
+  repositories: ZhaogangCodeStatsRepository[]
 }
 
 export interface ZhaogangCodeStatsSkippedMonth {
@@ -354,6 +359,11 @@ export interface ZhaogangCodeStatsMemberStatisticsQuery {
 export interface ZhaogangCodeStatsEntriesQuery {
   from: string
   to: string
+  scope?: ZhaogangCodeStatsScope
+  workbenchTeamId?: number | null
+  memberUserId?: number | null
+  sortBy?: ZhaogangCodeStatsEntrySort
+  sortOrder?: ZhaogangCodeStatsSortOrder
   depotId?: number | null
   keyword?: string
   pageNumber?: number
