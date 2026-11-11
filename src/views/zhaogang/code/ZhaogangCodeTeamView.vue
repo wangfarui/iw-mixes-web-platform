@@ -88,7 +88,7 @@
           <article class="chart-card">
             <header>
               <h3>团队代码行变更</h3>
-              <p>绿色新增、红色删除；悬浮可查看净增</p>
+              <p>按新增代码行降序；绿色新增、红色删除，悬浮可查看净增</p>
             </header>
             <CodeStatsMemberDivergingChart :members="statistics.members" :selected-member-id="selectedMemberId" @select="selectMember" />
           </article>

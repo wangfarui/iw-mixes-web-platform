@@ -13,7 +13,7 @@
           <line class="grid-line" :x1="plotLeft" :x2="chartWidth - plotRight" :y1="tick.y" :y2="tick.y" />
           <text class="axis-label axis-label--y" :x="plotLeft - 8" :y="tick.y + 4">{{ tick.value }}</text>
         </g>
-        <g v-for="(member, index) in members" :key="member.user.id">
+        <g v-for="(member, index) in sortedMembers" :key="member.user.id">
           <rect
             v-if="selectedMemberId === member.user.id"
             class="selected-bg"
@@ -64,6 +64,7 @@ const props = withDefaults(defineProps<{
 
 defineEmits<{ (event: 'select', memberId: number): void }>()
 
+const sortedMembers = computed(() => [...props.members].sort((a, b) => b.additions - a.additions))
 const { viewport, chartWidth, chartHeight, plotLeft, plotRight, plotTop, plotHeight, slotWidth, slotX } =
   useCodeStatsMemberChart(() => props.members.length)
 const barWidth = computed(() => Math.max(5, Math.min(13, slotWidth.value * 0.22)))
