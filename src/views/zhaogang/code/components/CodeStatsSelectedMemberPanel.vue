@@ -38,7 +38,11 @@
       <div v-if="data.fileTypes && data.commitChanges" class="panel-grid">
         <div class="chart-panel">
           <h4>文件类型变更占比</h4>
-          <CodeStatsFileTypePie :items="data.fileTypes" :changed-lines="data.summary.additions + data.summary.deletions" />
+          <CodeStatsFileTypePie
+            :items="data.fileTypes"
+            :additions="data.summary.additions"
+            :deletions="data.summary.deletions"
+          />
         </div>
         <div class="chart-panel">
           <h4>单次提交变更规模</h4>
