@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-11-01",
+  "currentReleaseId": "zg-2026-11-12-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -600,6 +600,17 @@
         {
           "type": "FIX",
           "text": "修复提交明细无法跳转到 CODING 的问题。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-12-01",
+      "version": "1.13.1",
+      "publishedAt": "2026-11-12T10:28:40+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "指定成员分析新增文件类型占比饼图和提交规模散点图。"
         }
       ]
     }

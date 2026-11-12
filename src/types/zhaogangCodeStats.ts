@@ -226,6 +226,26 @@ export interface ZhaogangCodeStatsMemberStatistics {
   member: ZhaogangCodeStatsUser
   summary: ZhaogangCodeStatsSelfSummary
   daily: ZhaogangCodeStatsDaily[]
+  fileTypes?: ZhaogangCodeStatsFileType[]
+  commitChanges?: ZhaogangCodeStatsCommitChange[]
+}
+
+export interface ZhaogangCodeStatsFileType {
+  type: string
+  additions: number
+  deletions: number
+}
+
+export interface ZhaogangCodeStatsCommitChange {
+  sha: string
+  depotName: string
+  depotId: number
+  commitAt: string
+  message: string
+  additions: number
+  deletions: number
+  filesChanged: number
+  commitUrl: string
 }
 
 export interface ZhaogangCodeStatsPage {

@@ -35,6 +35,16 @@
           <CodeStatsLineBarChart :items="data.daily" show-details aria-label="指定成员代码行变更趋势" />
         </div>
       </div>
+      <div v-if="data.fileTypes && data.commitChanges" class="panel-grid">
+        <div class="chart-panel">
+          <h4>文件类型变更占比</h4>
+          <CodeStatsFileTypePie :items="data.fileTypes" :changed-lines="data.summary.additions + data.summary.deletions" />
+        </div>
+        <div class="chart-panel">
+          <h4>单次提交变更规模</h4>
+          <CodeStatsCommitScatter :items="data.commitChanges" />
+        </div>
+      </div>
     </template>
     <el-empty v-else-if="!error" description="选择成员后查看汇总和趋势" :image-size="70" />
     <CodeCommitTable
@@ -72,6 +82,8 @@ import CodeCommitTable from './CodeCommitTable.vue'
 import CodeStatsBarChart, { type CodeStatsBarItem } from './CodeStatsBarChart.vue'
 import CodeStatsKpiCards from './CodeStatsKpiCards.vue'
 import CodeStatsLineBarChart from './CodeStatsLineBarChart.vue'
+import CodeStatsFileTypePie from './CodeStatsFileTypePie.vue'
+import CodeStatsCommitScatter from './CodeStatsCommitScatter.vue'
 import { dailyCodeDetails } from '../codeStatsPresentation'
 
 const props = defineProps<{
