@@ -161,10 +161,10 @@ import { monthText, resolveCodeStatsRange, type ResolvedCodeStatsRange } from '@
 import { useCodeStatsScanPolling } from './useCodeStatsScanPolling'
 
 const router = useRouter()
-const rangeOption = ref<ZhaogangCodeStatsRangeOption>('month')
+const rangeOption = ref<ZhaogangCodeStatsRangeOption>('week')
 const month = ref(monthText())
 const customRange = ref<[string, string] | null>(null)
-const initialRange = resolveCodeStatsRange('month', month.value, null)
+const initialRange = resolveCodeStatsRange(rangeOption.value, month.value, customRange.value)
 const activeRange = ref({ from: initialRange.from, to: initialRange.to, label: initialRange.label })
 const options = ref<ZhaogangCodeStatsOptions | null>(null)
 const optionsLoading = ref(false)
