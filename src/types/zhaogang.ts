@@ -219,6 +219,16 @@ export interface ZhaogangWorklogItem {
   issueUrl: string
 }
 
+export interface ZhaogangWorklogIssueCheck {
+  deletionRevision: number
+  checkId: string | null
+}
+
+export interface ZhaogangWorklogIssueCheckStatus {
+  deletionRevision: number
+  pending: boolean
+}
+
 export interface ZhaogangWorklogStatistics {
   coverage: ZhaogangWorklogCoverage
   month: string
@@ -227,6 +237,7 @@ export interface ZhaogangWorklogStatistics {
   summary: ZhaogangWorklogSummary
   dailyTotals: ZhaogangWorklogDailyTotal[]
   memberDailyTotals: ZhaogangWorklogMemberDailyTotal[]
+  issueCheck?: ZhaogangWorklogIssueCheck | null
 }
 
 export interface ZhaogangWorklogEntries {
@@ -236,6 +247,7 @@ export interface ZhaogangWorklogEntries {
   syncedAt: string
   totalHours: number
   items: ZhaogangWorklogItem[]
+  issueCheck?: ZhaogangWorklogIssueCheck | null
 }
 
 export interface ZhaogangWorklogAbsenceDay {
@@ -256,6 +268,7 @@ export interface ZhaogangWorklogAbsence {
   toExclusive: string
   syncedAt: string
   members: ZhaogangWorklogMemberAbsence[]
+  issueCheck?: ZhaogangWorklogIssueCheck | null
 }
 
 export interface ZhaogangTriggerBuildDto {

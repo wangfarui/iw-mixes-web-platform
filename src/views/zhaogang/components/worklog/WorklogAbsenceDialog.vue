@@ -7,7 +7,7 @@
     destroy-on-close
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-skeleton v-if="loading" :rows="5" animated />
+    <el-skeleton v-if="loading && !report" :rows="5" animated />
     <el-alert v-else-if="error" type="error" :closable="false" show-icon :title="error" />
     <template v-else-if="report">
       <div class="absence-meta">

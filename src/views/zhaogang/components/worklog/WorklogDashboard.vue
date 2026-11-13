@@ -96,7 +96,7 @@
       <el-empty v-else description="暂无工时数据" :image-size="80" />
     </el-card>
 
-    <el-card class="week-card" shadow="never">
+    <el-card ref="entriesCard" class="week-card" shadow="never">
       <template #header>
         <div class="week-header">
           <h3>工时记录</h3>
@@ -140,7 +140,7 @@
                 :value="member.userId"
               />
             </el-select>
-            <span>{{ entryScopeLabel }} · {{ formatHours(visibleEntries?.totalHours || 0) }}h</span>
+            <span v-if="visibleEntries">{{ entryScopeLabel }} · {{ formatHours(visibleEntries.totalHours) }}h</span>
           </div>
         </div>
       </template>
@@ -150,10 +150,9 @@
         :title="entriesCoverageMessage"
       />
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
-      <el-skeleton v-if="entriesLoading && !entries" :rows="6" animated />
-      <div v-else-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
+      <div v-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
+      <el-skeleton v-else-if="!entries && !entriesError" :rows="6" animated />
       <WorklogWeekList v-else-if="visibleEntries" :scope="scope" :entries="visibleEntries" />
-      <el-empty v-else description="当前范围暂无工时登记" :image-size="80" />
     </el-card>
 
     <WorklogAbsenceDialog
@@ -169,10 +168,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ArrowLeft, ArrowRight, Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
-import { getZhaogangWorklogAbsences, getZhaogangWorklogEntries, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
+import { getZhaogangWorklogAbsences, getZhaogangWorklogEntries, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
 import { getWorkbenchTeam } from '@/api/zhaogangTeam'
 import type {
   ZhaogangWorklogOptions,
+  ZhaogangWorklogIssueCheck,
   ZhaogangWorklogRankingMetric,
   ZhaogangWorklogScope,
   ZhaogangWorklogEntries,
@@ -199,6 +199,8 @@ const statistics = ref<ZhaogangWorklogStatistics | null>(null)
 const statisticsKey = ref('')
 const statisticsError = ref('')
 const statisticsLoading = ref(false)
+const entriesCard = ref<{ $el: HTMLElement } | null>(null)
+const dashboardLoading = ref(true)
 const entries = ref<ZhaogangWorklogEntries | null>(null)
 const entriesKey = ref('')
 const entriesError = ref('')
@@ -216,6 +218,7 @@ const entryRangeStart = ref<string | null>(null)
 const entryShortcut = ref<'week' | 'month' | null>('week')
 let statisticsRequestSequence = 0
 let entriesRequestSequence = 0
+let entriesRefreshPending = false
 let absenceRequestSequence = 0
 
 const monthLabel = computed(() => {
@@ -305,10 +308,7 @@ const loadOptions = async () => {
     options.value = await getZhaogangWorklogOptions()
     if (workbenchTeamId.value && !options.value.teams.some(team => team.id === workbenchTeamId.value)) {
       workbenchTeamId.value = null
-      statistics.value = null
-      statisticsKey.value = ''
-      entries.value = null
-      entriesKey.value = ''
+      resetScopeResults()
     }
     if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value && options.value.teams.length) {
       workbenchTeamId.value = options.value.teams[0].id
@@ -340,20 +340,29 @@ const loadStatistics = async (refresh = false) => {
   }
 }
 
-const loadEntries = async (refresh = false) => {
+const currentEntriesKey = () => {
+  const [from, to] = entryRange.value
+  return `${from}:${to}:${scope.value}:${workbenchTeamId.value || ''}`
+}
+
+let ignoredEntriesCheckId: string | null = null
+
+const loadEntries = async (refresh = entriesRefreshPending, observeIssueCheck = true) => {
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
   const [from, to] = entryRange.value
   if (!from || !to) return
-  const key = `${from}:${to}:${scope.value}:${workbenchTeamId.value || ''}`
+  const key = currentEntriesKey()
   if (entriesKey.value !== key) entries.value = null
+  entriesKey.value = key
+  entriesRefreshPending = false
   const sequence = ++entriesRequestSequence
   entriesLoading.value = true
   entriesError.value = ''
   try {
     const result = await getZhaogangWorklogEntries(from, to, scope.value, workbenchTeamId.value, refresh)
     if (sequence !== entriesRequestSequence) return
+    ignoredEntriesCheckId = observeIssueCheck ? null : result.issueCheck?.checkId ?? null
     entries.value = result
-    entriesKey.value = key
   } catch (error) {
     if (sequence !== entriesRequestSequence) return
     entriesError.value = error instanceof Error ? error.message : '工时登记加载失败，请稍后重试'
@@ -362,16 +371,36 @@ const loadEntries = async (refresh = false) => {
   }
 }
 
-const loadBoth = async (refresh = false) => {
-  await Promise.all([loadStatistics(refresh), loadEntries(refresh)])
-}
+watch([entriesCard, dashboardLoading, statisticsLoading], ([card, initializing, loading], _, onCleanup) => {
+  if (!card || initializing || loading) return
+  const loadIfNeeded = () => {
+    if (!entriesLoading.value && (entriesRefreshPending || entriesKey.value !== currentEntriesKey())) {
+      void loadEntries()
+    }
+  }
 
-const openAbsenceDialog = async () => {
+  if (typeof IntersectionObserver === 'undefined') {
+    loadIfNeeded()
+    return
+  }
+
+  const observer = new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) loadIfNeeded()
+  })
+  observer.observe(card.$el)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
+
+const openAbsenceDialog = () => {
   if ((scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) || absenceLoading.value) return
   absenceDialogVisible.value = true
+  void loadAbsence()
+}
+
+const loadAbsence = async (keepReport = false) => {
   absenceLoading.value = true
   absenceError.value = ''
-  absenceReport.value = null
+  if (!keepReport) absenceReport.value = null
   const sequence = ++absenceRequestSequence
   try {
     const result = await getZhaogangWorklogAbsences(month.value, scope.value, workbenchTeamId.value)
@@ -385,6 +414,71 @@ const openAbsenceDialog = async () => {
   }
 }
 
+const pollIssueCheck = (
+  check: ZhaogangWorklogIssueCheck | null | undefined,
+  onCleanup: (cleanup: () => void) => void,
+  onFinished: (deletionRevision: number) => void
+) => {
+  const checkId = check?.checkId
+  if (!checkId) return
+  const currentScope = scope.value
+  const teamId = workbenchTeamId.value
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout>
+  let attempts = 0
+  onCleanup(() => {
+    controller.abort()
+    clearTimeout(timer)
+  })
+
+  const poll = async () => {
+    attempts += 1
+    try {
+      const status = await getZhaogangWorklogIssueCheck(checkId, currentScope, teamId, controller.signal)
+      if (controller.signal.aborted) return
+      if (!status.pending) {
+        onFinished(status.deletionRevision)
+        return
+      }
+    } catch {
+      if (controller.signal.aborted) return
+    }
+    if (attempts < 15) timer = setTimeout(poll, 2000)
+  }
+  timer = setTimeout(poll, 1000)
+}
+
+const reloadChangedReports = (revision: number) => {
+  if (!statisticsLoading.value && (statistics.value?.issueCheck?.deletionRevision ?? revision) < revision) {
+    void loadStatistics()
+  }
+  if (absenceDialogVisible.value && !absenceLoading.value &&
+      (absenceReport.value?.issueCheck?.deletionRevision ?? revision) < revision) {
+    void loadAbsence(true)
+  }
+  if (!entriesLoading.value && (entries.value?.issueCheck?.deletionRevision ?? revision) < revision) {
+    void loadEntries(false)
+  }
+}
+
+watch(() => statisticsLoading.value ? null : statistics.value?.issueCheck, (check, _, onCleanup) => {
+  pollIssueCheck(check, onCleanup, reloadChangedReports)
+})
+
+watch(() => absenceDialogVisible.value && !absenceLoading.value ? absenceReport.value?.issueCheck : null,
+  (check, _, onCleanup) => {
+    pollIssueCheck(check, onCleanup, reloadChangedReports)
+  })
+
+watch(() => entriesLoading.value ? null : entries.value?.issueCheck, (check, _, onCleanup) => {
+  if (check?.checkId === ignoredEntriesCheckId) return
+  pollIssueCheck(check, onCleanup, revision => {
+    reloadChangedReports(revision)
+    // 同一删除版本也需要重读一次，补齐已加载明细的事项信息。
+    if (!entriesLoading.value) void loadEntries(false, false)
+  })
+})
+
 const resetAbsence = () => {
   absenceRequestSequence += 1
   absenceDialogVisible.value = false
@@ -394,30 +488,40 @@ const resetAbsence = () => {
 }
 
 const refreshDashboard = async () => {
-  await loadOptions()
-  await loadBoth(true)
+  dashboardLoading.value = true
+  try {
+    await loadOptions()
+    entriesRefreshPending = true
+    await loadStatistics(true)
+  } finally {
+    dashboardLoading.value = false
+  }
+}
+
+const resetScopeResults = () => {
+  statisticsRequestSequence += 1
+  entriesRequestSequence += 1
+  statistics.value = null
+  statisticsKey.value = ''
+  statisticsError.value = ''
+  statisticsLoading.value = false
+  entries.value = null
+  entriesKey.value = ''
+  entriesError.value = ''
+  entriesLoading.value = false
+  entriesRefreshPending = false
+  resetAbsence()
 }
 
 const changeScope = (value: string | number | boolean | undefined) => {
-  resetAbsence()
   if (value === 'WORKBENCH_TEAM') {
     workbenchTeamId.value = options.value?.teams[0]?.id || null
-    statistics.value = null
-    statisticsKey.value = ''
-    entries.value = null
-    entriesKey.value = ''
-    statisticsError.value = ''
-    entriesError.value = ''
-    if (workbenchTeamId.value) void loadBoth()
-    return
+  } else {
+    presentationMode.value = 'TREND'
+    workbenchTeamId.value = null
   }
-  presentationMode.value = 'TREND'
-  workbenchTeamId.value = null
-  statistics.value = null
-  statisticsKey.value = ''
-  entries.value = null
-  entriesKey.value = ''
-  void loadBoth()
+  resetScopeResults()
+  void loadStatistics()
 }
 
 const togglePresentation = () => {
@@ -425,14 +529,8 @@ const togglePresentation = () => {
 }
 
 const changeTeam = () => {
-  resetAbsence()
-  statistics.value = null
-  statisticsKey.value = ''
-  entries.value = null
-  entriesKey.value = ''
-  statisticsError.value = ''
-  entriesError.value = ''
-  if (workbenchTeamId.value) void loadBoth()
+  resetScopeResults()
+  void loadStatistics()
 }
 
 const shiftMonth = (offset: number) => {
@@ -528,8 +626,12 @@ const formatSyncTime = (value: string) => {
 }
 
 onMounted(async () => {
-  await loadOptions()
-  await loadBoth()
+  try {
+    await loadOptions()
+    await loadStatistics()
+  } finally {
+    dashboardLoading.value = false
+  }
 })
 </script>
 

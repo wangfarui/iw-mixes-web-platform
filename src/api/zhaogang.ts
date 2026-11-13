@@ -19,6 +19,7 @@ import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogScope,
   ZhaogangWorklogStatistics,
+  ZhaogangWorklogIssueCheckStatus,
   ZhaogangWorklogEntries,
   ZhaogangWorklogAbsence
 } from '@/types/zhaogang'
@@ -266,6 +267,17 @@ export const getZhaogangWorklogEntries = (
   if (scope === 'WORKBENCH_TEAM' && workbenchTeamId) params.set('workbenchTeamId', String(workbenchTeamId))
   if (refresh) params.set('refresh', 'true')
   return zhaogangRequest<ZhaogangWorklogEntries>(`/worklogs/entries?${params.toString()}`)
+}
+
+export const getZhaogangWorklogIssueCheck = (
+  checkId: string,
+  scope: ZhaogangWorklogScope,
+  workbenchTeamId: number | null,
+  signal: AbortSignal
+) => {
+  const params = new URLSearchParams({ checkId, scope })
+  if (scope === 'WORKBENCH_TEAM' && workbenchTeamId) params.set('workbenchTeamId', String(workbenchTeamId))
+  return zhaogangRequest<ZhaogangWorklogIssueCheckStatus>(`/worklogs/issue-check?${params}`, { signal })
 }
 
 export const getZhaogangWorklogAbsences = (
