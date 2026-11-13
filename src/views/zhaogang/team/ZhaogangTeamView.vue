@@ -94,6 +94,8 @@
             </el-table-column>
           </el-table>
 
+          <TeamWorklogNotification v-if="detail.permissions.administrator" :key="detail.id" :team-id="detail.id" />
+
           <footer class="team-actions">
             <el-button
               v-if="detail.permissions.administrator && detail.permissions.canLeave"
@@ -164,6 +166,7 @@
 </template>
 
 <script setup lang="ts">
+import TeamWorklogNotification from './TeamWorklogNotification.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
