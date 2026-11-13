@@ -7,6 +7,7 @@ import type {
   TeamIterationIssue,
   TeamIterationIssueCreationOptions,
   TeamIterationIssueType,
+  TeamIterationParentIssueOption,
   TeamIterationIssueWorklog,
   TeamIterationSelectionOption,
   TeamIterationMemberInput,
@@ -33,6 +34,7 @@ const queryString = (query: Record<string, unknown>) => {
 
 const normalizeIssue = (issue: TeamIterationIssue): TeamIterationIssue => ({
   ...issue,
+  manuallyLinked: Boolean(issue.manuallyLinked),
   worklogs: Array.isArray(issue.worklogs) ? issue.worklogs : [],
   children: Array.isArray(issue.children) ? issue.children.map(normalizeIssue) : []
 })
@@ -140,6 +142,16 @@ export const getTeamIterationIssueStatusOptions = (id: number, issueId: number) 
 export const updateTeamIterationIssueStatus = (id: number, issueId: number, statusId: number) =>
   zhaogangRequest<TeamIterationIssue>(`/iterations/${id}/issues/${issueId}/status`, {
     method: 'PUT', body: JSON.stringify({ statusId })
+  }).then(normalizeIssue)
+
+export const searchTeamIterationParentIssues = (id: number, issueId: number, keyword: string) =>
+  zhaogangRequest<TeamIterationParentIssueOption[]>(
+    `/iterations/${id}/issues/${issueId}/parent-options${queryString({ keyword })}`
+  )
+
+export const updateTeamIterationIssueParent = (id: number, issueId: number, parentIssueCode: number) =>
+  zhaogangRequest<TeamIterationIssue>(`/iterations/${id}/issues/${issueId}/parent`, {
+    method: 'PUT', body: JSON.stringify({ parentIssueCode })
   }).then(normalizeIssue)
 
 export const registerTeamIterationIssueWorklog = (id: number, issueId: number,

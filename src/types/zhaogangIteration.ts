@@ -45,6 +45,13 @@ export interface TeamIterationPermissions {
   canDelete: boolean
 }
 
+export interface TeamIterationParentIssueOption {
+  issueCode: number
+  title: string
+  issueType: TeamIterationIssueType
+  issueTypeName: string
+}
+
 export interface TeamIterationIssue {
   id: number
   parentId?: number
@@ -76,6 +83,7 @@ export interface TeamIterationIssue {
   worklogs: TeamIterationIssueWorklog[]
   recordedHours?: number
   recordedWorklogCount?: number
+  manuallyLinked?: boolean
   children: TeamIterationIssue[]
 }
 

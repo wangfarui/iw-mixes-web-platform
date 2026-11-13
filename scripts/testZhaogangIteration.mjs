@@ -71,6 +71,9 @@ assert.equal(hierarchy.childIssueAutoSyncAvailability(localStory, 'SUB_TASK').en
 const boundStory = { ...localStory, issueCode: 7001, syncStatus: 'SYNCED' }
 assert.equal(hierarchy.childIssueAutoSyncAvailability(boundStory, 'SUB_TASK').enabled, true)
 assert.equal(hierarchy.childIssueAutoSyncAvailability(boundStory, 'DEFECT').enabled, false)
+assert.equal(hierarchy.canOfferParentChange({ issueType: 'USER_STORY', projectName: 'app' }), true)
+assert.equal(hierarchy.canOfferParentChange({ issueType: 'TASK', projectName: 'app' }), false)
+assert.equal(hierarchy.canOfferParentChange({ issueType: 'SUB_TASK', projectName: '  ' }), false)
 
 const preferencesOutfile = path.join(tempDir, 'zhaogang-preferences.mjs')
 await build({

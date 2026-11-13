@@ -39,3 +39,6 @@ export const childIssueAutoSyncAvailability = (
     ? { enabled: true, reason: '' }
     : { enabled: false, reason: '父事项尚未关联 CODING，子事项只保存到工作台' }
 }
+
+export const canOfferParentChange = (issue: Pick<TeamIterationIssue, 'issueType' | 'projectName'>) =>
+  issue.issueType !== 'TASK' && Boolean(issue.projectName?.trim())

@@ -195,6 +195,7 @@
                     <el-dropdown-item v-if="scope.row.issueType === 'REQUIREMENT'" :command="`prototype:${scope.row.id}`" :icon="Link">跳转到需求原型</el-dropdown-item>
                     <el-dropdown-item v-if="canBindCoding(scope.row)" :command="`bind:${scope.row.id}`" :icon="Link">维护 CODING 链接</el-dropdown-item>
                     <el-dropdown-item v-if="scope.row.url" :command="`open:${scope.row.id}`" :icon="Link">跳转到 CODING</el-dropdown-item>
+                    <el-dropdown-item v-if="canChangeParent(scope.row)" :command="`parent:${scope.row.id}`" :icon="Connection">更改父事项</el-dropdown-item>
                     <el-dropdown-item divided :command="`remove:${scope.row.id}`" :icon="Delete">移除</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -360,6 +361,25 @@
       <template #footer><el-button :disabled="saving" @click="childDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!childSubmitEnabled || creationOptionsLoading" @click="saveChildIssue">{{ childMode === 'LINK' ? '关联' : '创建' }}</el-button></template>
     </el-dialog>
 
+    <el-dialog v-model="parentDialogVisible" title="更改父事项" width="min(640px, calc(100% - 28px))"
+      :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving" @closed="resetParentSearch">
+      <div class="parent-search-row">
+        <el-input v-model="parentKeyword" placeholder="输入父事项 ID 或标题" clearable :disabled="saving" @input="scheduleParentSearch">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-button :disabled="saving" @click="parentDialogVisible = false">取消</el-button>
+      </div>
+      <p v-if="parentSearchLoading" class="muted-text parent-error">搜索中</p>
+      <p v-else-if="parentKeyword.trim() && !parentError && !parentCandidates.length" class="muted-text parent-error">没有匹配的父事项</p>
+      <div v-else-if="parentCandidates.length" class="parent-results">
+        <button v-for="item in parentCandidates" :key="item.issueCode" type="button" class="parent-result" :disabled="saving" @click="changeIssueParent(item)">
+          <el-tag size="small" :type="issueTagType(item.issueType)" effect="light">{{ item.issueTypeName }}</el-tag>
+          <span><strong v-if="item.issueCode">#{{ item.issueCode }}</strong>{{ item.title }}</span>
+        </button>
+      </div>
+      <p v-if="parentError" class="warning-text parent-error">{{ parentError }}</p>
+    </el-dialog>
+
     <el-dialog v-model="worklogDialogVisible" title="登记工时" width="min(520px, calc(100% - 28px))">
       <el-form label-position="top">
         <el-form-item label="子工作项"><el-input :model-value="worklogIssue?.title" disabled /></el-form-item>
@@ -375,16 +395,16 @@
 import { computed, inject, onMounted, reactive, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, CopyDocument, Delete, Edit, Expand, Link, Plus, RefreshRight, Timer, UserFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Connection, CopyDocument, Delete, Edit, Expand, Link, Plus, RefreshRight, Search, Timer, UserFilled } from '@element-plus/icons-vue'
 import {
   addTeamIterationChildIssue, addTeamIterationCodingIssue, addTeamIterationRootIssue, bindTeamIterationIssue, deleteTeamIteration, getTeamIteration,
   getTeamIterationIssueCreationOptions, getTeamIterationIssueStatusOptions, getTeamIterationMemberOptions, getTeamIterations, registerTeamIterationIssueWorklog,
   removeTeamIterationIssue, removeTeamIterationIssues, replaceTeamIterationMembers, retryTeamIterationIssueWorklog,
-  syncTeamIterationCodingIssues, syncTeamIterationIssue, updateTeamIteration, updateTeamIterationIssueStatus
+  searchTeamIterationParentIssues, syncTeamIterationCodingIssues, syncTeamIterationIssue, updateTeamIteration, updateTeamIterationIssueParent, updateTeamIterationIssueStatus
 } from '@/api/zhaogangIteration'
 import type {
   TeamIterationCreateChildIssueCommand, TeamIterationDetail, TeamIterationIssue, TeamIterationIssueCreationOptions, TeamIterationIssueType, TeamIterationListItem, TeamIterationRole,
-  TeamIterationReleasePlan, TeamIterationSelectionOption, TeamIterationStage, TeamIterationTeamOption, TeamIterationUser
+  TeamIterationParentIssueOption, TeamIterationReleasePlan, TeamIterationSelectionOption, TeamIterationStage, TeamIterationTeamOption, TeamIterationUser
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
 import IterationIssueEditorDialog from './components/IterationIssueEditorDialog.vue'
@@ -397,7 +417,7 @@ import {
   type CodingIssueAssociationFailure
 } from './codingIssueAssociationFeedback'
 import {
-  canAddChildIssues, canSyncWorkbenchIssueType, childIssueAutoSyncAvailability, codingBacked,
+  canAddChildIssues, canOfferParentChange, canSyncWorkbenchIssueType, childIssueAutoSyncAvailability, codingBacked,
   defaultManualChildIssueType, manualChildIssueTypes
 } from './iterationIssueHierarchy'
 import {
@@ -455,6 +475,14 @@ let creationOptionsRequestId = 0
 const creationOptions = reactive<TeamIterationIssueCreationOptions>({ issueType: 'SUB_TASK', developmentTeams: [], definitionsOfDone: [], taskTypes: [], bugPriorities: [] })
 const worklogDialogVisible = ref(false)
 const worklogIssue = ref<TeamIterationIssue>()
+const parentDialogVisible = ref(false)
+const parentIssue = ref<TeamIterationIssue>()
+const parentKeyword = ref('')
+const parentError = ref('')
+const parentSearchLoading = ref(false)
+const parentCandidates = ref<TeamIterationParentIssueOption[]>([])
+let parentSearchRequest = 0
+let parentSearchTimer = 0
 const codingUrl = ref('')
 const membersLoading = ref(false)
 const teamOptions = ref<TeamIterationTeamOption[]>([])
@@ -716,6 +744,85 @@ const expandIssueAfterChildAdded = (issueId: number) => {
 }
 
 const issueSaved = () => { void load() }
+
+const findIssueByCode = (issues: TeamIterationIssue[], issueCode: number): TeamIterationIssue | undefined => {
+  for (const issue of issues) {
+    if (issue.issueCode === issueCode) return issue
+    const nested = findIssueByCode(issue.children || [], issueCode)
+    if (nested) return nested
+  }
+  return undefined
+}
+
+const resetParentSearch = () => {
+  window.clearTimeout(parentSearchTimer)
+  parentSearchRequest += 1
+  parentKeyword.value = ''
+  parentError.value = ''
+  parentSearchLoading.value = false
+  parentCandidates.value = []
+}
+
+const scheduleParentSearch = () => {
+  window.clearTimeout(parentSearchTimer)
+  parentError.value = ''
+  const keyword = parentKeyword.value.trim()
+  const moving = parentIssue.value
+  if (!keyword || !moving) {
+    parentSearchRequest += 1
+    parentSearchLoading.value = false
+    parentCandidates.value = []
+    return
+  }
+  parentSearchTimer = window.setTimeout(() => { void runParentSearch(moving.id, keyword) }, 300)
+}
+
+const runParentSearch = async (issueId: number, keyword: string) => {
+  const requestId = ++parentSearchRequest
+  const iterationId = id()
+  parentSearchLoading.value = true
+  try {
+    const options = await searchTeamIterationParentIssues(iterationId, issueId, keyword)
+    if (requestId !== parentSearchRequest || id() !== iterationId || parentKeyword.value.trim() !== keyword) return
+    parentCandidates.value = options
+  } catch (error) {
+    if (requestId === parentSearchRequest && id() === iterationId) {
+      parentCandidates.value = []
+      parentError.value = error instanceof Error ? error.message : '查询 CODING 父事项失败'
+    }
+  } finally {
+    if (requestId === parentSearchRequest) parentSearchLoading.value = false
+  }
+}
+
+const openParentDialog = (issue: TeamIterationIssue) => {
+  parentIssue.value = issue
+  resetParentSearch()
+  parentDialogVisible.value = true
+}
+
+const changeIssueParent = async (parent: TeamIterationParentIssueOption) => {
+  const moving = parentIssue.value
+  if (!moving || saving.value) return
+  const iterationId = id()
+  saving.value = true
+  parentError.value = ''
+  try {
+    await updateTeamIterationIssueParent(iterationId, moving.id, parent.issueCode)
+    if (id() !== iterationId) return
+    parentDialogVisible.value = false
+    await load()
+    const localParent = (detail.value?.issues || []).length
+      ? findIssueByCode(detail.value?.issues || [], parent.issueCode)
+      : undefined
+    if (localParent) expandIssueAfterChildAdded(localParent.id)
+    ElMessage.success(codingBacked(moving) && !moving.manuallyLinked ? '已更换父事项并同步 CODING' : '已更换父事项')
+  } catch (error) {
+    if (id() === iterationId) parentError.value = error instanceof Error ? error.message : '更换父事项失败'
+  } finally {
+    saving.value = false
+  }
+}
 
 const releasePlanAdded = (releasePlan: TeamIterationReleasePlan) => {
   if (!detail.value || detail.value.releasePlans.some(item => item.id === releasePlan.id)) return
@@ -983,6 +1090,7 @@ const handleIssueCommand = (command: string) => {
   } else if (action === 'worklog') openWorklogEditor(issue)
   else if (action === 'prototype') openPrototype(issue)
   else if (action === 'open' && issue.url) openCoding(issue.url)
+  else if (action === 'parent' && canChangeParent(issue)) openParentDialog(issue)
   else if (action === 'remove') void removeIssue(issue)
 }
 
@@ -1054,6 +1162,7 @@ const removeIteration = async () => {
 }
 
 const canAddChildren = (issue: TeamIterationIssue) => canAddChildIssues(issue.issueType)
+const canChangeParent = (issue: TeamIterationIssue) => canOfferParentChange(issue)
 const canSync = (issue: TeamIterationIssue) => issue.source === 'WORKBENCH' && (issue.syncStatus === 'PENDING' || issue.syncStatus === 'FAILED') && canSyncWorkbenchIssueType(issue.issueType)
 const canBindCoding = (issue: TeamIterationIssue) => issue.source === 'WORKBENCH'
   && !issue.url && !issue.issueCode && issue.syncStatus !== 'SYNCING'
@@ -1130,6 +1239,13 @@ watch(() => route.params.iterationId, () => {
 .section-toolbar { justify-content: flex-end; flex-wrap: wrap; }
 .issue-status-filter { width: 280px; }
 .filter-result { color: #7b8798; font-size: 12px; white-space: nowrap; }
+.parent-search-row { display: flex; gap: 8px; }
+.parent-search-row .el-input { flex: 1; }
+.parent-results { margin-top: 8px; max-height: 320px; overflow: auto; border: 1px solid var(--el-border-color); }
+.parent-result { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.parent-result:hover { background: var(--el-fill-color-light); }
+.parent-result strong { margin-right: 6px; }
+.parent-error { margin: 8px 0 0; }
 .issue-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0; width: max-content; margin-left: auto; white-space: nowrap; }
 .issue-actions :deep(.el-button) { margin: 0; padding-right: 1px; padding-left: 1px; }
 .issue-actions :deep(.el-button > span) { margin-left: 2px; }
