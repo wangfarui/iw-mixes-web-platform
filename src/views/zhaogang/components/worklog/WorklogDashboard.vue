@@ -129,15 +129,15 @@
               filterable
               clearable
               :value-on-clear="null"
-              :loading="entryMembersLoading"
+              :loading="optionsLoading"
               :disabled="!workbenchTeamId"
-              :no-data-text="entryMembersError || '暂无团队成员'"
+              :no-data-text="optionsError || '暂无参与工时统计的成员'"
             >
               <el-option
                 v-for="member in entryMembers"
-                :key="member.userId"
-                :label="member.userName"
-                :value="member.userId"
+                :key="member.id"
+                :label="member.name"
+                :value="member.id"
               />
             </el-select>
             <span v-if="visibleEntries">{{ entryScopeLabel }} · {{ formatHours(visibleEntries.totalHours) }}h</span>
@@ -169,7 +169,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ArrowLeft, ArrowRight, Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
 import { getZhaogangWorklogAbsences, getZhaogangWorklogEntries, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
-import { getWorkbenchTeam } from '@/api/zhaogangTeam'
 import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogIssueCheck,
@@ -179,7 +178,6 @@ import type {
   ZhaogangWorklogStatistics,
   ZhaogangWorklogAbsence
 } from '@/types/zhaogang'
-import type { WorkbenchTeamMember } from '@/types/zhaogangTeam'
 import WorklogTrendChart from './WorklogTrendChart.vue'
 import WorklogRanking from './WorklogRanking.vue'
 import WorklogWeekList from './WorklogWeekList.vue'
@@ -206,9 +204,6 @@ const entriesKey = ref('')
 const entriesError = ref('')
 const entriesLoading = ref(false)
 const entryMemberId = ref<number | null>(null)
-const entryMembers = ref<WorkbenchTeamMember[]>([])
-const entryMembersLoading = ref(false)
-const entryMembersError = ref('')
 const absenceDialogVisible = ref(false)
 const absenceLoading = ref(false)
 const absenceError = ref('')
@@ -226,6 +221,7 @@ const monthLabel = computed(() => {
   return `${year} 年 ${value} 月`
 })
 const selectedTeam = computed(() => options.value?.teams.find(item => item.id === workbenchTeamId.value))
+const entryMembers = computed(() => selectedTeam.value?.members ?? [])
 const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择工作台团队' : '还没有加入工作台团队')
 const monthTotal = computed(() => statistics.value?.dailyTotals.reduce((sum, item) => sum + Number(item.hours || 0), 0) || 0)
 const teamSelectWidth = computed(() => {
@@ -239,7 +235,7 @@ const teamStatistics = computed(() => statistics.value?.summary || emptyStatisti
 const summary = computed(() => {
   if (scope.value === 'WORKBENCH_TEAM') {
     if (!workbenchTeamId.value) return teamSelectionHint.value
-    const count = statistics.value?.coverage.memberCount || selectedTeam.value?.memberCount || 0
+    const count = statistics.value?.coverage.memberCount ?? selectedTeam.value?.memberCount ?? 0
     return `总计工时 ${formatHours(monthTotal.value)}h · ${count} 人 · 加班天数 ${teamStatistics.value.overtimeDays}天 · 加班工时 ${formatHours(teamStatistics.value.overtimeHours)}h · 平均工时 ${formatAverageHours(teamStatistics.value.averageHours)}h`
   }
   return `总计工时 ${formatHours(monthTotal.value)}h · 加班天数 ${personalStatistics.value.overtimeDays}天 · 加班工时 ${formatHours(personalStatistics.value.overtimeHours)}h · 平均工时 ${formatAverageHours(personalStatistics.value.averageHours)}h`
@@ -257,18 +253,18 @@ const entriesCoverageMessage = computed(() => {
     : '部分成员工时未完整取得，登记明细可能不完整'
 })
 const selectedEntryMember = computed(() => scope.value === 'WORKBENCH_TEAM'
-  ? entryMembers.value.find(member => member.userId === entryMemberId.value)
+  ? entryMembers.value.find(member => member.id === entryMemberId.value)
   : undefined)
 const entryScopeLabel = computed(() => {
   if (scope.value === 'SELF') return '我的工时'
-  return selectedEntryMember.value?.userName || selectedTeam.value?.name || '团队工时'
+  return selectedEntryMember.value?.name || selectedTeam.value?.name || '团队工时'
 })
 const visibleEntries = computed(() => {
   const result = entries.value
   const member = selectedEntryMember.value
   if (!result || !member) return result
 
-  const items = result.items.filter(item => item.user.id === member.userId)
+  const items = result.items.filter(item => item.user.id === member.id)
   return { ...result, items, totalHours: items.reduce((sum, item) => sum + Number(item.hours), 0) }
 })
 const syncTimeLabel = computed(() => {
@@ -278,27 +274,8 @@ const syncTimeLabel = computed(() => {
   return `同步时间：${formatSyncTime(syncedAt)}`
 })
 
-watch([workbenchTeamId, options], async ([teamId], [previousTeamId], onCleanup) => {
-  if (teamId !== previousTeamId) {
-    entryMemberId.value = null
-    entryMembers.value = []
-  }
-  entryMembersError.value = ''
-  entryMembersLoading.value = !!teamId
-  if (!teamId) return
-
-  let active = true
-  onCleanup(() => { active = false })
-  try {
-    const team = await getWorkbenchTeam(teamId)
-    if (!active) return
-    entryMembers.value = team.members
-    if (!selectedEntryMember.value) entryMemberId.value = null
-  } catch {
-    if (active) entryMembersError.value = '团队成员加载失败，请刷新重试'
-  } finally {
-    if (active) entryMembersLoading.value = false
-  }
+watch([workbenchTeamId, entryMembers], ([teamId], [previousTeamId]) => {
+  if (teamId !== previousTeamId || !selectedEntryMember.value) entryMemberId.value = null
 })
 
 const loadOptions = async () => {

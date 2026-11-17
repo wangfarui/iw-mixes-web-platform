@@ -32,6 +32,12 @@ export const updateWorkbenchTeamMemberRole = (
   method: 'PUT', body: JSON.stringify({ versionNo, codingRole })
 })
 
+export const updateWorkbenchTeamMemberStatistics = (
+  teamId: number, userId: number, versionNo: number, ignoreTeamStatistics: boolean
+) => zhaogangRequest<WorkbenchTeamDetail>(`/workbench-teams/${teamId}/members/${userId}/team-statistics`, {
+  method: 'PUT', body: JSON.stringify({ versionNo, ignoreTeamStatistics })
+})
+
 export const removeWorkbenchTeamMember = (teamId: number, userId: number, versionNo: number) => zhaogangRequest<WorkbenchTeamDetail>(
   `/workbench-teams/${teamId}/members/${userId}`, {
     method: 'DELETE',

@@ -10,6 +10,7 @@ export interface WorkbenchTeamMember {
   mobile: string | null
   lastUsedAt?: string
   managedStatistics: boolean
+  ignoreTeamStatistics?: boolean
 }
 
 export interface WorkbenchTeamPermissions {

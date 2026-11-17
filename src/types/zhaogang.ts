@@ -146,6 +146,7 @@ export interface ZhaogangWorklogTeamOption {
   id: number
   name: string
   memberCount: number
+  members: ZhaogangWorklogUser[]
 }
 
 export interface ZhaogangWorklogOptions {

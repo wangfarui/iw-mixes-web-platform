@@ -108,6 +108,22 @@
             <el-table-column v-if="detail.permissions.administrator" label="最近使用时间" min-width="155">
               <template #default="{ row }">{{ formatDate(row.lastUsedAt) }}</template>
             </el-table-column>
+            <el-table-column v-if="detail.permissions.administrator" label="忽略团队统计" width="134">
+              <template #header>
+                <el-tooltip content="开启后，该成员的工时和代码均不计入本团队统计" placement="top">
+                  <span>忽略团队统计</span>
+                </el-tooltip>
+              </template>
+              <template #default="{ row }">
+                <el-switch
+                  :model-value="row.ignoreTeamStatistics === true"
+                  :aria-label="`忽略 ${row.userName} 的团队工时和代码统计`"
+                  :loading="statisticsSavingMemberId === row.userId"
+                  :disabled="saving || detailLoading"
+                  @change="saveMemberStatistics(row, $event === true)"
+                />
+              </template>
+            </el-table-column>
             <el-table-column v-if="detail.permissions.canRemoveMembers" label="操作" width="150" fixed="right">
               <template #default="scope">
                 <el-button v-if="!scope.row.administrator" link type="primary" @click="openTransfer(scope.row.userId)">转交管理员</el-button>
@@ -220,7 +236,8 @@ import {
   renameWorkbenchTeam,
   transferWorkbenchTeamAdministrator,
   updateWorkbenchTeamMemberRole,
-  updateWorkbenchTeamMemberMobile
+  updateWorkbenchTeamMemberMobile,
+  updateWorkbenchTeamMemberStatistics
 } from '@/api/zhaogangTeam'
 import { codingRoleLabels } from '@/services/zhaogangPreferences'
 import type { ZhaogangCodingRole } from '@/types/zhaogang'
@@ -241,6 +258,7 @@ const createName = ref('')
 const createRequestId = ref('')
 const renameVisible = ref(false)
 const statisticsDialog = ref<'token' | 'members' | null>(null)
+const statisticsSavingMemberId = ref<number | null>(null)
 const renameName = ref('')
 const successorVisible = ref(false)
 const successorUserId = ref<number | null>(null)
@@ -445,6 +463,26 @@ const saveMemberMobile = async () => {
     ElMessage.error(error instanceof Error ? error.message : '成员手机号保存失败')
     if (selectedTeamId.value === current.id) await selectTeam(current.id, false)
   } finally { saving.value = false }
+}
+
+const saveMemberStatistics = async (member: WorkbenchTeamMember, ignored: boolean) => {
+  const current = detail.value
+  if (!current?.permissions.administrator || current.id !== selectedTeamId.value || saving.value || detailLoading.value) return
+  saving.value = true
+  statisticsSavingMemberId.value = member.userId
+  try {
+    const next = await updateWorkbenchTeamMemberStatistics(current.id, member.userId, current.versionNo, ignored)
+    if (selectedTeamId.value === next.id && detail.value?.id === next.id && detail.value.versionNo <= next.versionNo) {
+      detail.value = next
+    }
+    ElMessage.success(ignored ? '已忽略该成员的团队工时和代码统计' : '已恢复该成员的团队统计')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '团队统计设置保存失败')
+    if (selectedTeamId.value === current.id) await selectTeam(current.id, false)
+  } finally {
+    statisticsSavingMemberId.value = null
+    saving.value = false
+  }
 }
 
 const removeMember = async (member: WorkbenchTeamMember) => {

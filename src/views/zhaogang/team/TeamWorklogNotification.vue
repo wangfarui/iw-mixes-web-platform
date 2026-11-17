@@ -7,7 +7,7 @@
       </div>
       <el-button text :disabled="busy || webhookDialogVisible" @click="load">刷新</el-button>
     </div>
-    <p>工作台日历中的工作日，每天 17:00（北京时间）发送团队报告，再逐人发送今日工时明细。</p>
+    <p>工作台日历中的工作日，每天 17:00（北京时间）发送团队报告，再逐人发送参与统计成员的今日工时明细。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-form v-if="config" label-position="top" @submit.prevent>
       <el-form-item label="汇总提醒成员">
