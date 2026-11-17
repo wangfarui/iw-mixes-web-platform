@@ -112,22 +112,26 @@
           <h3>工时记录</h3>
           <div class="entry-controls">
             <el-button-group size="small">
-              <el-button :type="entryShortcut === 'week' ? 'primary' : 'default'" :disabled="entriesLoading" @click="setEntryShortcut('week')">本周</el-button>
-              <el-button :type="entryShortcut === 'month' ? 'primary' : 'default'" :disabled="entriesLoading" @click="setEntryShortcut('month')">本月</el-button>
+              <el-button
+                v-for="shortcut in entryShortcuts"
+                :key="shortcut.value"
+                :type="entryShortcut === shortcut.value ? 'primary' : 'default'"
+                :disabled="entriesLoading"
+                @click="setEntryShortcut(shortcut.value)"
+              >{{ shortcut.label }}</el-button>
             </el-button-group>
             <el-date-picker
               v-model="entryRange"
+              class="entry-date-picker"
               type="daterange"
               size="small"
               value-format="YYYY-MM-DD"
               range-separator="至"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
-              :disabled-date="disableEntryDate"
               :clearable="false"
               :disabled="entriesLoading"
-              @calendar-change="changeEntryCalendar"
-              @change="changeEntryRange"
+              @change="loadEntries()"
             />
             <el-select
               v-if="scope === 'WORKBENCH_TEAM'"
@@ -155,6 +159,15 @@
         </div>
       </template>
       <el-alert
+        v-if="entryRangeTooLong"
+        class="view-error"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="工时统计范围不能超过一个月（31 天）"
+        :description="entries ? `当前显示上次查询结果（${entries.from} 至 ${addDays(entries.toExclusive, -1)}）` : undefined"
+      />
+      <el-alert
         v-if="selectedEntryMember && memberEntriesIssue"
         class="view-error"
         type="warning"
@@ -170,7 +183,7 @@
       />
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
       <div v-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
-      <el-skeleton v-else-if="!entries && !entriesError" :rows="6" animated />
+      <el-skeleton v-else-if="!entries && !entriesError && !entryRangeTooLong" :rows="6" animated />
       <el-empty v-else-if="memberEntriesUnavailable" description="该成员的工时记录暂不可用" :image-size="80" />
       <WorklogWeekList v-else-if="visibleEntries" :scope="scope" :entries="visibleEntries" />
     </el-card>
@@ -228,9 +241,27 @@ const absenceDialogVisible = ref(false)
 const absenceLoading = ref(false)
 const absenceError = ref('')
 const absenceReport = ref<ZhaogangWorklogAbsence | null>(null)
-const entryRange = ref<[string, string]>([mondayOfCurrentWeek(), addDays(mondayOfCurrentWeek(), 6)])
-const entryRangeStart = ref<string | null>(null)
-const entryShortcut = ref<'week' | 'month' | null>('week')
+const entryShortcuts = [
+  { value: 'week', label: '本周' },
+  { value: 'lastWeek', label: '上周' },
+  { value: 'month', label: '本月' },
+  { value: 'lastMonth', label: '上月' }
+] as const
+type EntryShortcut = (typeof entryShortcuts)[number]['value']
+type EntryRange = [string, string]
+const entryRange = ref<EntryRange | null>(entryShortcutRanges().week)
+const entryRangeTooLong = computed(() => {
+  if (!entryRange.value) return false
+  const [from, to] = entryRange.value
+  // ISO 日期按 UTC 零点比较，起止日期均计入。
+  return Date.parse(to) - Date.parse(from) > 30 * 86_400_000
+})
+const entryShortcut = computed(() => {
+  if (!entryRange.value) return undefined
+  const [from, to] = entryRange.value
+  const ranges = entryShortcutRanges()
+  return entryShortcuts.find(({ value }) => ranges[value][0] === from && ranges[value][1] === to)?.value
+})
 let statisticsRequestSequence = 0
 let entriesRequestSequence = 0
 let entriesRefreshPending = false
@@ -344,13 +375,13 @@ const loadStatistics = async (refresh = false) => {
 }
 
 const currentEntriesKey = () => {
-  const [from, to] = entryRange.value
-  return `${from}:${to}:${scope.value}:${workbenchTeamId.value || ''}`
+  return `${entryRange.value?.join(':') ?? ''}:${scope.value}:${workbenchTeamId.value || ''}`
 }
 
 let ignoredEntriesCheckId: string | null = null
 
 const loadEntries = async (refresh = entriesRefreshPending, observeIssueCheck = true) => {
+  if (!entryRange.value || entryRangeTooLong.value) return
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
   const [from, to] = entryRange.value
   if (!from || !to) return
@@ -545,71 +576,39 @@ const shiftMonth = (offset: number) => {
   void loadStatistics()
 }
 
-const setEntryShortcut = (shortcut: 'week' | 'month') => {
+const setEntryShortcut = (shortcut: EntryShortcut) => {
   if (entriesLoading.value) return
-  const today = new Date()
-  if (shortcut === 'week') {
-    const from = mondayOfCurrentWeek()
-    entryRange.value = [from, addDays(from, 6)]
-  } else {
-    const from = dateText(new Date(today.getFullYear(), today.getMonth(), 1))
-    const to = dateText(new Date(today.getFullYear(), today.getMonth() + 1, 0))
-    entryRange.value = [from, to]
-  }
-  entryRangeStart.value = null
-  entryShortcut.value = shortcut
+  entryRange.value = entryShortcutRanges()[shortcut]
   void loadEntries()
-}
-
-const changeEntryCalendar = (dates: [Date, Date] | [Date, null] | null) => {
-  entryRangeStart.value = dates?.[0] ? dateText(dates[0]) : null
-}
-
-const changeEntryRange = (value: string[] | null) => {
-  if (entriesLoading.value) return
-  entryRangeStart.value = null
-  if (!value || value.length !== 2) return
-  const [from, to] = value
-  if (!from || !to) return
-  entryRange.value = [from, to]
-  const weekFrom = mondayOfCurrentWeek()
-  const weekTo = addDays(weekFrom, 6)
-  const today = new Date()
-  const monthFrom = dateText(new Date(today.getFullYear(), today.getMonth(), 1))
-  const monthTo = dateText(new Date(today.getFullYear(), today.getMonth() + 1, 0))
-  entryShortcut.value = from === weekFrom && to === weekTo ? 'week'
-    : from === monthFrom && to === monthTo ? 'month' : null
-  void loadEntries()
-}
-
-const disableEntryDate = (date: Date) => {
-  const start = entryRangeStart.value || entryRange.value?.[0]
-  if (!start) return false
-  const difference = Math.abs(Math.round((date.getTime() - parseDate(start).getTime()) / 86400000))
-  return difference > 30
 }
 
 const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-function parseDate(value: string) {
-  return new Date(`${value}T00:00:00`)
-}
 const formatAverageHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
 })
-function dateText(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
 function addDays(value: string, days: number) {
-  const date = parseDate(value)
-  date.setDate(date.getDate() + days)
-  return dateText(date)
+  const date = new Date(value)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
 }
-function mondayOfCurrentWeek() {
-  const date = new Date()
-  const day = date.getDay() || 7
-  date.setDate(date.getDate() - day + 1)
-  return dateText(date)
+function entryShortcutRanges(): Record<EntryShortcut, EntryRange> {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric', day: 'numeric'
+  }).formatToParts(new Date())
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find(item => item.type === type)?.value)
+  const year = part('year')
+  const monthIndex = part('month') - 1
+  const date = new Date(Date.UTC(year, monthIndex, part('day')))
+  const today = date.toISOString().slice(0, 10)
+  const monday = addDays(today, 1 - (date.getUTCDay() || 7))
+  const monthDate = (month: number, day: number) => new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10)
+  return {
+    week: [monday, addDays(monday, 6)],
+    lastWeek: [addDays(monday, -7), addDays(monday, -1)],
+    month: [monthDate(monthIndex, 1), monthDate(monthIndex + 1, 0)],
+    lastMonth: [monthDate(monthIndex - 1, 1), monthDate(monthIndex, 0)]
+  }
 }
 const formatSyncTime = (value: string) => {
   const date = new Date(value)
@@ -653,23 +652,20 @@ onMounted(async () => {
 .selection-placeholder { display: grid; min-height: 260px; place-items: center; color: #8a96a9; }
 .view-error { margin-bottom: 12px; }
 .week-header { justify-content: space-between; gap: 16px; }
+.week-header h3 { flex-shrink: 0; }
 .entry-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .entry-controls > span { color: #356ec8; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .entry-member-select { width: 144px; }
-.entry-controls .el-date-editor--daterange {
-  --el-date-editor-daterange-width: 220px;
-  --el-date-editor-width: 220px;
-  width: 220px;
+.entry-controls :deep(.entry-date-picker) {
+  --el-date-editor-daterange-width: 200px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 @media (max-width: 760px) {
   .trend-header, .week-header { align-items: flex-start; flex-direction: column; }
   .scope-controls { width: 100%; justify-content: flex-start; }
   .team-select { width: 100% !important; }
   .entry-controls { width: 100%; justify-content: flex-start; }
-  .entry-controls .el-date-editor--daterange {
-    --el-date-editor-daterange-width: 100%;
-    --el-date-editor-width: 100%;
-    width: 100%;
-  }
 }
 </style>
