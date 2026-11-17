@@ -7,6 +7,7 @@ export interface WorkbenchTeamMember {
   joinedAt: string
   administrator: boolean
   codingRole: ZhaogangCodingRole | null
+  mobile: string | null
   lastUsedAt?: string
 }
 

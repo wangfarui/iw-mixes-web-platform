@@ -83,6 +83,13 @@
                 >修改角色</el-button>
               </template>
             </el-table-column>
+            <el-table-column label="手机号" min-width="210">
+              <template #default="{ row }">
+                {{ row.mobile || '—' }}
+                <el-button v-if="detail.permissions.administrator" link type="primary"
+                  :disabled="saving || detailLoading" @click="openMobileEditor(row)">修改手机号</el-button>
+              </template>
+            </el-table-column>
             <el-table-column v-if="detail.permissions.administrator" label="最近使用时间" min-width="155">
               <template #default="{ row }">{{ formatDate(row.lastUsedAt) }}</template>
             </el-table-column>
@@ -94,7 +101,7 @@
             </el-table-column>
           </el-table>
 
-          <TeamWorklogNotification v-if="detail.permissions.administrator" :key="detail.id" :team-id="detail.id" />
+          <TeamWorklogNotification v-if="detail.permissions.administrator" :key="detail.id" :team-id="detail.id" :members="detail.members" />
 
           <footer class="team-actions">
             <el-button
@@ -152,6 +159,21 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="mobileEditorVisible" title="修改成员手机号"
+      width="min(460px, calc(100% - 28px))" :close-on-click-modal="false"
+      :close-on-press-escape="!saving" :show-close="!saving">
+      <el-form v-if="mobileEditor" label-position="top" @submit.prevent="saveMemberMobile">
+        <el-form-item :label="mobileEditor.member.userName">
+          <el-input v-model="mobileEditor.mobile" inputmode="tel" maxlength="11" clearable
+            :disabled="saving" placeholder="企微登记的11位手机号" @keyup.enter="saveMemberMobile" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="saving" @click="mobileEditorVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveMemberMobile">保存</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="successorVisible" :title="successorMode === 'leave' ? '转交并退出' : '转交管理员'" width="min(460px, calc(100% - 28px))" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="继任管理员" required>
@@ -181,7 +203,8 @@ import {
   reorderWorkbenchTeams,
   renameWorkbenchTeam,
   transferWorkbenchTeamAdministrator,
-  updateWorkbenchTeamMemberRole
+  updateWorkbenchTeamMemberRole,
+  updateWorkbenchTeamMemberMobile
 } from '@/api/zhaogangTeam'
 import { codingRoleLabels } from '@/services/zhaogangPreferences'
 import type { ZhaogangCodingRole } from '@/types/zhaogang'
@@ -204,6 +227,8 @@ const renameVisible = ref(false)
 const renameName = ref('')
 const successorVisible = ref(false)
 const successorUserId = ref<number | null>(null)
+const mobileEditorVisible = ref(false)
+const mobileEditor = ref<{ teamId: number, member: WorkbenchTeamMember, mobile: string } | null>(null)
 const roleEditorVisible = ref(false)
 const roleEditor = ref<{ teamId: number, member: WorkbenchTeamMember, codingRole: ZhaogangCodingRole | null } | null>(null)
 let detailRequestId = 0
@@ -231,7 +256,10 @@ const loadTeams = async () => {
 }
 
 const selectTeam = async (teamId: number, updateRoute = true) => {
-  if (selectedTeamId.value !== teamId) roleEditorVisible.value = false
+  if (selectedTeamId.value !== teamId) {
+    roleEditorVisible.value = false
+    mobileEditorVisible.value = false
+  }
   const requestId = ++detailRequestId
   selectedTeamId.value = teamId
   detailLoading.value = true
@@ -367,6 +395,30 @@ const saveMemberRole = async () => {
   } finally {
     saving.value = false
   }
+}
+
+const openMobileEditor = (member: WorkbenchTeamMember) => {
+  if (!detail.value?.permissions.administrator) return
+  mobileEditor.value = { teamId: detail.value.id, member, mobile: member.mobile ?? '' }
+  mobileEditorVisible.value = true
+}
+
+const saveMemberMobile = async () => {
+  const editor = mobileEditor.value
+  const current = detail.value
+  if (!editor || !current?.permissions.administrator || current.id !== editor.teamId || saving.value) return
+  const mobile = editor.mobile.trim()
+  if (mobile && !/^1[3-9]\d{9}$/.test(mobile)) { ElMessage.warning('请输入有效的11位手机号，或留空清除'); return }
+  saving.value = true
+  try {
+    const next = await updateWorkbenchTeamMemberMobile(current.id, editor.member.userId, current.versionNo, mobile)
+    if (selectedTeamId.value === next.id && detail.value?.id === next.id && detail.value.versionNo <= next.versionNo) detail.value = next
+    mobileEditorVisible.value = false
+    ElMessage.success('成员手机号已更新')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '成员手机号保存失败')
+    if (selectedTeamId.value === current.id) await selectTeam(current.id, false)
+  } finally { saving.value = false }
 }
 
 const removeMember = async (member: WorkbenchTeamMember) => {

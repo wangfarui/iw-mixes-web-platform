@@ -62,3 +62,9 @@ export const getWorkbenchTeamInvitation = (inviteCode: string) => zhaogangReques
 export const joinWorkbenchTeam = (inviteCode: string) => zhaogangRequest<WorkbenchTeamDetail>(
   `/workbench-team-invitations/${encodeURIComponent(inviteCode)}/join`, { method: 'POST' }
 )
+
+export const updateWorkbenchTeamMemberMobile = (
+  teamId: number, userId: number, versionNo: number, mobile: string
+) => zhaogangRequest<WorkbenchTeamDetail>(`/workbench-teams/${teamId}/members/${userId}/mobile`, {
+  method: 'PUT', body: JSON.stringify({ versionNo, mobile })
+})

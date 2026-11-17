@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-17-01",
+  "currentReleaseId": "zg-2026-11-17-02",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -674,6 +674,25 @@
         {
           "type": "IMPROVEMENT",
           "text": "Skills 页面支持列表与卡片切换、列宽调整并记忆，优化宽屏铺满和窄屏表格内滚动体验。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-17-02",
+      "version": "1.14.2",
+      "publishedAt": "2026-11-17T10:55:55+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "团队工时通知支持按手机号提醒指定汇总接收人及缺时成员。"
+        },
+        {
+          "type": "FEATURE",
+          "text": "团队成员新增手机号，管理员可维护成员号码，成员可在通用设置修改本人号码。"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "简化工时群通知配置，支持弹框更换和测试 Webhook、自动保存配置及查看最近3条发送记录。"
         }
       ]
     }

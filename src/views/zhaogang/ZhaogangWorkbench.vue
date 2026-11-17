@@ -339,6 +339,7 @@
                     </el-select>
                   </dd>
                 </div>
+                <ZhaogangMobileSettings :key="`${session.team}-${session.userId}`" />
               </dl>
               <div class="settings-actions">
                 <el-button :icon="DocumentCopy" :loading="copyingToken" @click="copyBoundToken">复制令牌</el-button>
@@ -553,6 +554,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Collection, Calendar, DataAnalysis, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 import ToolboxIcon from '@/assets/icons/toolbox.svg'
+import ZhaogangMobileSettings from './settings/ZhaogangMobileSettings.vue'
 import {
   bindZhaogangToken,
   clearZhaogangSession,
