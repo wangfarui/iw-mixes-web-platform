@@ -9,11 +9,13 @@ export interface WorkbenchTeamMember {
   codingRole: ZhaogangCodingRole | null
   mobile: string | null
   lastUsedAt?: string
+  managedStatistics: boolean
 }
 
 export interface WorkbenchTeamPermissions {
   administrator: boolean
   canRename: boolean
+  canManageStatistics: boolean
   canRemoveMembers: boolean
   canTransferAdministrator: boolean
   canLeave: boolean
@@ -41,6 +43,7 @@ export interface WorkbenchTeamDetail {
   creatorUserId: number
   administratorUserId: number
   versionNo: number
+  memberSourceProjectId?: number
   members: WorkbenchTeamMember[]
   permissions: WorkbenchTeamPermissions
   createTime: string
@@ -53,4 +56,24 @@ export interface WorkbenchTeamInvitationPreview {
   codingTeamKey: string
   memberCount: number
   alreadyMember: boolean
+}
+
+export interface WorkbenchTeamManagementTokenStatus {
+  configured: boolean
+  ownerUserId: number | null
+  ownerName: string | null
+  verifiedAt: string | null
+}
+
+export interface WorkbenchTeamMemberCandidates {
+  members: WorkbenchTeamMemberCandidate[]
+  projectId: number
+  projectName: string
+  versionNo: number
+}
+
+export interface WorkbenchTeamMemberCandidate {
+  userId: number
+  userName: string
+  avatar: string | null
 }

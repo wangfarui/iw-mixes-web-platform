@@ -44,7 +44,11 @@
               </div>
               <p>{{ detail.codingTeamKey }} · {{ detail.members.length }} 人</p>
             </div>
-            <el-button v-if="detail.permissions.canRename" :icon="EditPen" @click="openRename">重命名</el-button>
+            <div class="detail-heading-actions">
+              <el-button v-if="detail.permissions.canManageStatistics" :icon="Key"
+                @click="statisticsDialog = 'token'">管理令牌</el-button>
+              <el-button v-if="detail.permissions.canRename" :icon="EditPen" @click="openRename">重命名</el-button>
+            </div>
           </header>
 
           <div class="invite-section">
@@ -58,13 +62,24 @@
             </el-input>
           </div>
 
-          <div class="member-heading"><h4>成员</h4><span>{{ detail.members.length }} 人</span></div>
+          <div class="member-heading">
+            <div class="member-heading-actions"><h4>成员</h4><span>{{ detail.members.length }} 人</span></div>
+            <el-button v-if="detail.permissions.canManageStatistics" :icon="Plus"
+              @click="statisticsDialog = 'members'">添加成员</el-button>
+          </div>
+          <TeamStatisticsDialogs
+            v-if="detail.permissions.canManageStatistics && detail.id === selectedTeamId"
+            :key="detail.id" :team="detail" v-model:mode="statisticsDialog"
+            @updated="updateStatisticsTeam"
+          />
           <el-table :data="detail.members" row-key="userId" border class="member-table">
             <el-table-column label="成员" min-width="230">
               <template #default="scope">
                 <div class="member-profile">
                   <el-avatar :size="34" :src="scope.row.avatar">{{ scope.row.userName.slice(0, 1) }}</el-avatar>
                   <strong>{{ scope.row.userName }}</strong>
+                  <el-tag v-if="detail.permissions.canManageStatistics && scope.row.managedStatistics"
+                    size="small" effect="plain" type="info">管理令牌统计</el-tag>
                 </div>
               </template>
             </el-table-column>
@@ -189,10 +204,11 @@
 
 <script setup lang="ts">
 import TeamWorklogNotification from './TeamWorklogNotification.vue'
+import TeamStatisticsDialogs from './TeamStatisticsDialogs.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, ArrowUp, CircleClose, Delete, DocumentCopy, EditPen, Plus, Refresh, Sort } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, CircleClose, Delete, DocumentCopy, EditPen, Key, Plus, Refresh, Sort } from '@element-plus/icons-vue'
 import {
   createWorkbenchTeam,
   dissolveWorkbenchTeam,
@@ -224,6 +240,7 @@ const createVisible = ref(false)
 const createName = ref('')
 const createRequestId = ref('')
 const renameVisible = ref(false)
+const statisticsDialog = ref<'token' | 'members' | null>(null)
 const renameName = ref('')
 const successorVisible = ref(false)
 const successorUserId = ref<number | null>(null)
@@ -259,6 +276,7 @@ const selectTeam = async (teamId: number, updateRoute = true) => {
   if (selectedTeamId.value !== teamId) {
     roleEditorVisible.value = false
     mobileEditorVisible.value = false
+    statisticsDialog.value = null
   }
   const requestId = ++detailRequestId
   selectedTeamId.value = teamId
@@ -314,6 +332,14 @@ const createTeam = async () => {
     await router.replace({ path: '/zhaogang/teams', query: { teamId: String(created.id) } })
     ElMessage.success('团队已创建')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '团队创建失败') } finally { saving.value = false }
+}
+
+const updateStatisticsTeam = (updated: WorkbenchTeamDetail) => {
+  if (selectedTeamId.value !== updated.id) return
+  if (detail.value?.id !== updated.id || detail.value.versionNo <= updated.versionNo) detail.value = updated
+  teams.value = teams.value.map(team => team.id === updated.id && team.versionNo <= updated.versionNo
+    ? { ...team, memberCount: updated.members.length, versionNo: updated.versionNo, updateTime: updated.updateTime }
+    : team)
 }
 
 const openRename = () => {
@@ -492,6 +518,9 @@ onMounted(loadTeams)
 }
 .team-list-panel { padding: 10px; background: #f7f9fc; border-right: 1px solid #e2e7ef; }.team-list-item { display: flex; box-sizing: border-box; width: 100%; min-height: 64px; align-items: center; gap: 4px; margin-bottom: 6px; color: #35445b; background: transparent; border: 1px solid transparent; border-radius: 6px; }.team-list-item:hover { background: #fff; border-color: #dfe6f1; }.team-list-item.active { color: #2468e8; background: #fff; border-color: #9dbcf0; }.team-select-button { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 4px 10px 12px; color: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }.team-summary { min-width: 0; }.team-name-row { display: flex; min-width: 0; align-items: center; gap: 6px; }.team-list-item strong,.team-list-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.team-name-row strong { min-width: 0; }.team-list-item small { margin-top: 5px; color: #8a96a8; font-size: 11px; }.team-count { flex: 0 0 auto; color: #7b879a; font-size: 12px; }.order-actions { display: grid; flex: 0 0 auto; padding-right: 4px; }.order-actions :deep(.el-button) { width: 24px; height: 24px; margin: 0; }
 .team-detail-panel { padding: 22px; }.detail-heading { justify-content: space-between; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #e8edf4; }.detail-title-row { gap: 9px; }.detail-heading h3 { margin: 0; font-size: 20px; }.detail-heading p { margin: 6px 0 0; color: #8490a4; font-size: 13px; }
+.detail-heading-actions,.member-heading-actions { display: flex; align-items: center; gap: 8px; }
+.detail-heading-actions { flex-wrap: wrap; justify-content: flex-end; }
+.detail-heading-actions .el-button { margin: 0; }
 .invite-section { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; align-items: center; padding: 18px 0; border-bottom: 1px solid #edf0f5; }.invite-section strong,.invite-section span { display: block; }.invite-section span { margin-top: 5px; color: #8490a4; font-size: 12px; }.member-heading { justify-content: space-between; padding: 18px 0 10px; }.member-heading h4 { margin: 0; font-size: 16px; }.member-heading span { color: #8490a4; font-size: 12px; }.member-table { width: 100%; }.member-profile { gap: 10px; }.member-profile strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.team-actions { justify-content: flex-end; gap: 8px; padding-top: 18px; }.full-control { width: 100%; }
 @media(max-width:800px){
   .team-layout {

@@ -3,7 +3,9 @@ import type { ZhaogangCodingRole } from '@/types/zhaogang'
 import type {
   WorkbenchTeamDetail,
   WorkbenchTeamInvitationPreview,
-  WorkbenchTeamListItem
+  WorkbenchTeamListItem,
+  WorkbenchTeamManagementTokenStatus,
+  WorkbenchTeamMemberCandidates
 } from '@/types/zhaogangTeam'
 
 export const getWorkbenchTeams = () => zhaogangRequest<WorkbenchTeamListItem[]>('/workbench-teams')
@@ -67,4 +69,23 @@ export const updateWorkbenchTeamMemberMobile = (
   teamId: number, userId: number, versionNo: number, mobile: string
 ) => zhaogangRequest<WorkbenchTeamDetail>(`/workbench-teams/${teamId}/members/${userId}/mobile`, {
   method: 'PUT', body: JSON.stringify({ versionNo, mobile })
+})
+
+export const getWorkbenchTeamManagementTokenStatus = (teamId: number) =>
+  zhaogangRequest<WorkbenchTeamManagementTokenStatus>(`/workbench-teams/${teamId}/management-token`)
+
+export const updateWorkbenchTeamManagementToken = (teamId: number, versionNo: number, token: string) =>
+  zhaogangRequest<WorkbenchTeamDetail>(`/workbench-teams/${teamId}/management-token`, {
+    method: 'PUT', body: JSON.stringify({ versionNo, token })
+  })
+
+export const getWorkbenchTeamMemberCandidates = (teamId: number, matchTeamName: boolean) =>
+  zhaogangRequest<WorkbenchTeamMemberCandidates>(
+    `/workbench-teams/${teamId}/member-candidates?matchTeamName=${matchTeamName}`
+  )
+
+export const addWorkbenchTeamMembers = (
+  teamId: number, versionNo: number, projectId: number, matchTeamName: boolean, userIds: number[]
+) => zhaogangRequest<WorkbenchTeamDetail>(`/workbench-teams/${teamId}/members`, {
+  method: 'POST', body: JSON.stringify({ versionNo, projectId, matchTeamName, userIds })
 })
