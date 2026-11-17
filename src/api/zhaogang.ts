@@ -34,7 +34,7 @@ import type {
 } from '@/types/zhaogangReleaseImport'
 import { dispatchZhaogangPermissionPrompt, permissionPromptFrom } from '@/services/zhaogangPermissionPrompt'
 
-const API_ROOT = `${import.meta.env.VITE_BUILD_ENV === 'prod' ? '//api.itwray.com' : ''}/external-service/api/zhaogang`
+export const ZHAOGANG_API_ROOT = `${import.meta.env.VITE_BUILD_ENV === 'prod' ? '//api.itwray.com' : ''}/external-service/api/zhaogang`
 
 interface GeneralResponse<T> {
   code: number
@@ -59,7 +59,7 @@ export const zhaogangRequest = async <T>(path: string, init: RequestInit = {}): 
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json;charset=utf-8')
   }
-  const response = await fetch(`${API_ROOT}${path}`, {
+  const response = await fetch(`${ZHAOGANG_API_ROOT}${path}`, {
     ...init,
     headers,
     credentials: 'include'

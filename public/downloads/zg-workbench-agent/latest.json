@@ -1,12 +1,12 @@
 {
   "agentName": "zg-workbench-agent",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "protocolVersion": 2,
-  "releaseNotes": "工作台 Agent 2.0.2：修复本地开发票据兑换误报配置缺失，并透传后端兑换失败原因。",
+  "releaseNotes": "工作台 Agent 2.0.3：更新后自动安装 Skills CLI。",
   "platforms": {
-    "darwin-arm64": { "url": "zg-workbench-agent-darwin-arm64.bin", "downloadUrl": "zg-workbench-agent-darwin-arm64.zip", "sha256": "cba3530ff785bb08ea85a1ce05e3b3ede11a3e2f18a4aacddd5b1d03c3858d29" },
-    "darwin-amd64": { "url": "zg-workbench-agent-darwin-amd64.bin", "downloadUrl": "zg-workbench-agent-darwin-amd64.zip", "sha256": "e348b24ddea7434724c7fe18bbe34c3cf8eea4468817fc9ff3bdc51ab043b391" },
-    "windows-amd64": { "url": "zg-workbench-agent-windows-amd64.runtime.exe", "downloadUrl": "zg-workbench-agent-windows-amd64.exe", "installerUrl": "zg-workbench-agent-windows-amd64.exe", "sha256": "a2a882619230e6759ff849b6609fd22ae2b22ed4591140f8e8ed594f1fe9d1b6" },
-    "windows-arm64": { "url": "zg-workbench-agent-windows-arm64.runtime.exe", "downloadUrl": "zg-workbench-agent-windows-arm64.exe", "installerUrl": "zg-workbench-agent-windows-arm64.exe", "sha256": "6b4f43cc98febaa2f64362e97e4a54e1f6ef959a5a39aaf7c7f5c2e3513d2dcd" }
+    "darwin-arm64": { "url": "zg-workbench-agent-darwin-arm64.bin", "downloadUrl": "zg-workbench-agent-darwin-arm64.zip", "sha256": "f36b28abe2991b9bbcc7f669bd801bbb464595c0d374bd0c0c06c1a8118dbe85" },
+    "darwin-amd64": { "url": "zg-workbench-agent-darwin-amd64.bin", "downloadUrl": "zg-workbench-agent-darwin-amd64.zip", "sha256": "664b21a41ddd74587824c687ed02afa6d0e9680e74cbc5502d6dadd50da9bcda" },
+    "windows-amd64": { "url": "zg-workbench-agent-windows-amd64.runtime.exe", "downloadUrl": "zg-workbench-agent-windows-amd64.exe", "installerUrl": "zg-workbench-agent-windows-amd64.exe", "sha256": "f0f6e219516fee602b741250919fe882968d93fce5ee84b31032a590baedc935" },
+    "windows-arm64": { "url": "zg-workbench-agent-windows-arm64.runtime.exe", "downloadUrl": "zg-workbench-agent-windows-arm64.exe", "installerUrl": "zg-workbench-agent-windows-arm64.exe", "sha256": "e832cd943fc41241af86ed0569405032289db42112b2064eb0a68ba3964a2d1c" }
   }
 }

@@ -128,6 +128,10 @@
           <el-icon><Monitor /></el-icon>
           <span class="workspace-nav-label">K8s</span>
         </button>
+        <button :class="{ active: activeTab === 'skills' }" type="button" aria-label="Skills" :title="navCollapsed ? 'Skills' : undefined" @click="navigateTab('skills')">
+          <el-icon><Collection /></el-icon>
+          <span class="workspace-nav-label">Skills</span>
+        </button>
         <button :class="{ active: activeTab === 'settings' }" type="button" aria-label="设置" :title="navCollapsed ? '设置' : undefined" @click="navigateTab('settings')">
           <el-icon><Setting /></el-icon>
           <span class="workspace-nav-label">设置</span>
@@ -151,7 +155,7 @@
           @open="openTokenCreation"
           @dismiss="permissionPrompt = null"
         />
-        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'code' || activeTab === 'calendar' || activeTab === 'services' || route.name === '找钢 Agent 使用教程'">
+        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'code' || activeTab === 'calendar' || activeTab === 'services' || activeTab === 'skills' || route.name === '找钢 Agent 使用教程'">
           <router-view v-slot="{ Component }">
             <Suspense>
               <component :is="Component" @coding-role-updated="syncOwnCodingRole" />
@@ -547,7 +551,7 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Calendar, DataAnalysis, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Collection, Calendar, DataAnalysis, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 import ToolboxIcon from '@/assets/icons/toolbox.svg'
 import {
   bindZhaogangToken,
@@ -583,7 +587,7 @@ import ZhaogangPermissionPrompt from './components/ZhaogangPermissionPrompt.vue'
 import ZhaogangReleaseHistoryDrawer from './components/ZhaogangReleaseHistoryDrawer.vue'
 import ZhaogangAgentSettings from './settings/ZhaogangAgentSettings.vue'
 
-type TabKey = 'release' | 'team' | 'iteration' | 'code' | 'calendar' | 'worklog' | 'services' | 'settings'
+type TabKey = 'skills' | 'release' | 'team' | 'iteration' | 'code' | 'calendar' | 'worklog' | 'services' | 'settings'
 type ViewMode = 'table' | 'card'
 type BuildabilityFilter = 'buildable' | 'unbuildable' | 'all'
 type PlanWithBuild = ZhaogangBuildPlan
@@ -729,7 +733,7 @@ const showPermissionPrompt = (event: Event) => {
 
 const routeTab = (): TabKey => {
   const view = route.meta.zhaogangView
-  return view === 'team' || view === 'iteration' || view === 'code' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'settings'
+  return view === 'team' || view === 'iteration' || view === 'code' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'skills' || view === 'settings'
     ? view
     : 'release'
 }
@@ -752,7 +756,7 @@ const navigateTab = async (tab: TabKey) => {
         ? '/zhaogang/calendar'
       : tab === 'services'
         ? '/zhaogang/services'
-      : `/zhaogang/${tab === 'worklog' ? 'worklogs' : 'settings'}`
+      : `/zhaogang/${tab === 'worklog' ? 'worklogs' : tab}`
   if (route.path !== path) await router.push(path)
 }
 
@@ -1005,8 +1009,7 @@ const resetPlanK8sStatus = () => {
   detailK8sStatuses.value = null
 }
 
-const disconnect = async () => {
-  await clearZhaogangSession().catch(() => undefined)
+const resetSessionView = async () => {
   session.value = null
   releaseCheck.value = null
   releaseHistoryVisible.value = false
@@ -1022,6 +1025,14 @@ const disconnect = async () => {
   if (route.path !== '/zhaogang') await router.replace('/zhaogang')
 }
 
+const disconnect = async () => {
+  try {
+    await clearZhaogangSession()
+    await resetSessionView()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '会话操作失败')
+  }
+}
 const clearReplacementToken = () => {
   replacementToken.value = ''
   replaceTokenError.value = ''

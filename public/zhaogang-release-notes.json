@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-13-03",
+  "currentReleaseId": "zg-2026-11-17-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -663,6 +663,17 @@
         {
           "type": "IMPROVEMENT",
           "text": "工时报告汇总附成员名单，个人明细展示项目名称和事项层级，同一事项的多次登记合并展示。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-17-01",
+      "version": "1.14.1",
+      "publishedAt": "2026-11-17T10:17:04+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "Skills 页面支持列表与卡片切换、列宽调整并记忆，优化宽屏铺满和窄屏表格内滚动体验。"
         }
       ]
     }

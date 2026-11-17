@@ -45,6 +45,7 @@ export interface ZgWorkbenchAgentHealth extends Omit<ZgK8sAgentHealth, 'agentNam
   agentName: string
   protocolVersion?: number
   capabilities?: string[]
+  skillsCliPath?: string
 }
 
 export type ZgWorkbenchAgentState = {
@@ -67,7 +68,7 @@ export type ZgWorkbenchAgentUpdateStatus = {
   message?: string
 }
 
-const compareVersion = (left: string, right: string) => {
+export const compareZgWorkbenchAgentVersion = (left: string, right: string) => {
   const a = left.replace(/^v/i, '').split('.').map(Number)
   const b = right.replace(/^v/i, '').split('.').map(Number)
   for (let index = 0; index < 3; index += 1) if ((a[index] || 0) !== (b[index] || 0)) return (a[index] || 0) > (b[index] || 0) ? 1 : -1
@@ -138,7 +139,7 @@ export const zgWorkbenchAgentClient = (port = getZgWorkbenchAgentPort()) => {
   }
   return {
     port,
-    health: () => request<ZgWorkbenchAgentHealth>('/v1/health'),
+    health: (signal?: AbortSignal) => request<ZgWorkbenchAgentHealth>('/v1/health', { signal }),
     session: (environment: ZgK8sEnvironment) => request<ZgK8sAgentSession>(`/v1/session?environment=${environment}`),
     login: (environment: ZgK8sEnvironment, token: string) => request<ZgK8sAgentSession>('/v1/session/login', {
       method: 'POST',
@@ -208,7 +209,7 @@ export const listAllZgWorkbenchDeployments = async (
 export const checkZgWorkbenchAgent = async (): Promise<ZgWorkbenchAgentState> => {
   try {
     const health = await zgWorkbenchAgentClient().health()
-    const compatible = compareVersion(health.version || '0.0.0', '2.0.0') >= 0 && (health.protocolVersion || 0) >= 2
+    const compatible = compareZgWorkbenchAgentVersion(health.version || '0.0.0', '2.0.0') >= 0 && (health.protocolVersion || 0) >= 2
     return { installed: true, running: true, compatible, health, message: compatible ? undefined : '本机 Agent 版本过旧，请前往设置更新' }
   } catch {
     return { installed: false, running: false, compatible: false, message: '未检测到本机 Agent，请前往设置安装并启动' }

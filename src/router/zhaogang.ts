@@ -81,6 +81,12 @@ const zhaogangRoute: RouteRecordRaw = {
       meta: { public: true, title: 'Agent 使用教程', zhaogangView: 'settings' }
     },
     {
+      path: 'skills/:skillId?',
+      name: '找钢 Skills',
+      component: () => import('@/views/zhaogang/skills/ZhaogangSkillsView.vue'),
+      meta: { public: true, title: 'Skills', zhaogangView: 'skills' }
+    },
+    {
       path: 'settings',
       name: '找钢工作台设置',
       component: () => import('@/views/zhaogang/ZhaogangEmptyRoute.vue'),

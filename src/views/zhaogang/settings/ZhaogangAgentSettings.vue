@@ -21,16 +21,17 @@
         </div>
       </dl>
       <div class="settings-actions">
-        <el-button type="primary" :icon="Refresh" :loading="agentLoading" @click="refreshAgent">刷新状态</el-button>
+        <el-button :icon="Refresh" :loading="agentLoading" @click="refreshAgent">刷新状态</el-button>
         <el-button :icon="Promotion" @click="startAgent">启动</el-button>
         <el-button :icon="Reading" @click="openAgentGuide">安装与卸载教程</el-button>
         <el-button
+          :type="agentUpdateAvailable ? 'primary' : 'default'"
           :icon="Upload"
           :loading="agentUpdating"
           :disabled="!agentUpdateAvailable"
           @click="updateAgent"
         >
-          {{ updateInfo?.updateAvailable ? '更新到最新版' : '已是最新版' }}
+          {{ agentUpdateLabel }}
         </el-button>
         <el-button :icon="Setting" :disabled="!agentState?.compatible" @click="toggleAutostart">
           {{ agentState?.health?.autostartEnabled ? '关闭开机自启' : '开启开机自启' }}
@@ -39,6 +40,11 @@
       <p v-if="updateCheckError" class="settings-hint settings-hint--error">版本检查失败：{{ updateCheckError }}</p>
     </section>
 
+    <ZhaogangSkillsAuthorization
+      v-if="skillPairCode || (props.activeSection === 'agent-auth' && skillsDevicesVisible)"
+      :pair-code="skillPairCode"
+      @close="closeSkillsAuthorization"
+    />
     <section v-if="props.activeSection === 'agent-k8s'" id="agent-k8s" class="settings-section">
       <header class="settings-heading">
         <div>
@@ -141,6 +147,7 @@
           :loading="agentTokenDeleting"
           @click="deleteAgentToken"
         >删除令牌</el-button>
+        <el-button @click="skillsDevicesVisible = true">管理 Skills 授权设备</el-button>
       </div>
       <p class="settings-hint">Skill 请求地址：<code>https://api.itwray.com/external-service/api/zhaogang/agent-api</code></p>
 
@@ -297,6 +304,7 @@
 </template>
 
 <script setup lang="ts">
+import ZhaogangSkillsAuthorization from './ZhaogangSkillsAuthorization.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -318,6 +326,7 @@ import {
 } from '@/api/zhaogang'
 import {
   checkZgWorkbenchAgent,
+  compareZgWorkbenchAgentVersion,
   getZgWorkbenchAgentPort,
   saveZgWorkbenchAgentPort,
   startZgWorkbenchAgentProtocol,
@@ -348,6 +357,20 @@ const emit = defineEmits<{ 'summary-change': [summary: AgentSettingsSummary] }>(
 
 const route = useRoute()
 const router = useRouter()
+const skillsDevicesVisible = ref(false)
+const skillPairCode = computed(() => {
+  const code = route.query.skillPair
+  return props.activeSection === 'agent' && typeof code === 'string' && /^[0-9A-F]{10}$/.test(code)
+    ? code : undefined
+})
+const closeSkillsAuthorization = () => {
+  skillsDevicesVisible.value = false
+  if (skillPairCode.value) {
+    const query = { ...route.query }
+    delete query.skillPair
+    void router.replace({ query })
+  }
+}
 const environments: Array<{ value: ZgK8sEnvironment; label: string }> = [
   { value: 'test', label: '测试 TEST' },
   { value: 'uat', label: '预发 UAT' },
@@ -385,6 +408,11 @@ const aiClearing = ref(false)
 const configuredCount = computed(() => environments.filter(item => k8sConfigured.value[item.value]).length)
 const agentCapabilities = computed(() => agentState.value?.health?.capabilities?.join('、') || '未检测到')
 const agentUpdateAvailable = computed(() => canStartZgWorkbenchAgentUpdate(agentState.value, updateInfo.value))
+const agentUpdateLabel = computed(() => {
+  const latest = updateInfo.value?.latestVersion
+  if (!latest) return '更新版本'
+  return updateInfo.value?.updateAvailable ? `更新到 v${latest}` : '已是最新版'
+})
 const latestAgentVersionText = computed(() => {
   if (updateInfo.value?.latestVersion) return `v${updateInfo.value.latestVersion}`
   if (agentLoading.value) return '检测中'
@@ -614,6 +642,8 @@ const openAgentGuide = () => {
 }
 
 const updateAgent = async () => {
+  const target = updateInfo.value?.latestVersion
+  if (!target) return
   agentUpdating.value = true
   try {
     await client().update()
@@ -622,9 +652,15 @@ const updateAgent = async () => {
       await new Promise(resolve => window.setTimeout(resolve, 2000))
       const status = await client().updateStatus().catch(() => null)
       if (status?.state === 'FAILED') throw new Error(status.message || 'Agent 更新失败')
-      if (status?.state === 'IDLE') break
+      const health = await client().health().catch(() => null)
+      if (health?.version && compareZgWorkbenchAgentVersion(health.version, target) >= 0) {
+        await refreshAgent()
+        ElMessage.success(`Agent 已更新到 v${health.version}`)
+        return
+      }
     }
     await refreshAgent()
+    throw new Error(`尚未检测到 Agent v${target}，请刷新后检查更新状态`)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : 'Agent 更新失败')
   } finally {
