@@ -6,7 +6,7 @@
         :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
         :style="{ minWidth: `${chartWidth}px` }"
         role="img"
-        :aria-label="`${monthLabel}每日工时趋势`"
+        :aria-label="`${memberName ? `${memberName} · ` : ''}${monthLabel}每日工时趋势`"
       >
         <text class="axis-unit" :x="plotLeft" y="12">（小时）</text>
         <g v-for="tick in ticks" :key="tick.value">
@@ -14,7 +14,7 @@
           <text class="axis-label axis-label--y" :x="plotLeft - 9" :y="tick.y + 4">{{ tick.value }}</text>
         </g>
 
-        <g v-if="scope === 'SELF' && maxHours >= 8">
+        <g v-if="personalLabel && maxHours >= 8">
           <line class="reference-line" :x1="plotLeft" :x2="chartWidth - plotRight" :y1="yFor(8)" :y2="yFor(8)" />
           <text class="reference-label" :x="chartWidth - plotRight" :y="yFor(8) - 5">8h</text>
         </g>
@@ -36,7 +36,7 @@
             :width="slotWidth"
             :height="plotHeight"
           />
-          <template v-if="scope === 'SELF'">
+          <template v-if="personalLabel">
             <rect
               v-if="day.baseHours > 0"
               class="bar bar--self"
@@ -86,7 +86,7 @@
             :width="slotWidth"
             :height="plotHeight"
             :tabindex="hasTooltipData(day) ? 0 : -1"
-            :aria-label="hasTooltipData(day) ? `${day.date} · ${day.weekdayLabel}${scope === 'SELF' ? '我的工时' : '团队工时'}明细` : undefined"
+            :aria-label="hasTooltipData(day) ? `${day.date} · ${day.weekdayLabel} · ${personalLabel || '团队工时'}明细` : undefined"
             @mouseenter="showTooltip($event, day)"
             @mousemove="showTooltip($event, day)"
             @focus="showTooltip($event, day)"
@@ -98,9 +98,9 @@
 
     <div v-if="hoveredDay" class="trend-tooltip" :style="{ left: `${tooltipLeft}px` }">
       <strong>{{ hoveredDay.date }} · {{ hoveredDay.weekdayLabel }}</strong>
-      <div v-if="scope === 'SELF'" class="tooltip-member">
+      <div v-if="personalLabel" class="tooltip-member">
         <span class="member-color" :style="{ backgroundColor: hoveredDay.restDay ? '#e5a126' : '#3478e5' }" />
-        <span class="tooltip-name">我的工时</span>
+        <span class="tooltip-name">{{ personalLabel }}</span>
         <b>{{ formatHours(hoveredDay.hours) }}h</b>
       </div>
       <template v-else>
@@ -112,7 +112,7 @@
       </template>
     </div>
 
-    <div v-if="scope === 'WORKBENCH_TEAM' && teamMembers.length" class="member-legend" aria-label="团队成员颜色图例">
+    <div v-if="!personalLabel && teamMembers.length" class="member-legend" aria-label="团队成员颜色图例">
       <div v-for="member in teamMembers" :key="member.user.id" class="legend-item">
         <span class="member-color" :style="{ backgroundColor: member.color }" />
         <span :title="member.user.name">{{ member.user.name }}</span>
@@ -159,6 +159,7 @@ interface TeamMemberSeries {
 const props = withDefaults(defineProps<{
   month: string
   scope: ZhaogangWorklogScope
+  memberName?: string
   dailyTotals: ZhaogangWorklogDailyTotal[]
   memberDailyTotals?: ZhaogangWorklogMemberDailyTotal[]
 }>(), {
@@ -181,6 +182,7 @@ const chartShell = ref<HTMLElement | null>(null)
 const trendScroll = ref<HTMLElement | null>(null)
 const hoveredDay = ref<ChartDay | null>(null)
 const tooltipLeft = ref(12)
+const personalLabel = computed(() => props.memberName ?? (props.scope === 'SELF' ? '我的工时' : ''))
 const monthLabel = computed(() => {
   const [year, month] = props.month.split('-').map(Number)
   return `${year} 年 ${month} 月`
@@ -223,15 +225,15 @@ const days = computed<ChartDay[]>(() => {
   })
 })
 const rawMaxHours = computed(() => {
-  if (props.scope === 'WORKBENCH_TEAM') {
+  if (!personalLabel.value) {
     return Math.max(0, ...days.value.flatMap(day => day.members.map(member => member.hours)))
   }
   return Math.max(8, ...days.value.map(day => day.hours))
 })
 const maxHours = computed(() => Math.max(4, Math.ceil(rawMaxHours.value / 4) * 4))
-const minimumSlotWidth = computed(() => props.scope === 'WORKBENCH_TEAM'
-  ? Math.max(32, teamMembers.value.length * 12 + 10)
-  : 30)
+const minimumSlotWidth = computed(() => personalLabel.value
+  ? 30
+  : Math.max(32, teamMembers.value.length * 12 + 10))
 const chartWidth = computed(() => Math.max(920, days.value.length * minimumSlotWidth.value + plotLeft + plotRight))
 const slotWidth = computed(() => (chartWidth.value - plotLeft - plotRight) / Math.max(days.value.length, 1))
 const selfBarWidth = computed(() => Math.min(18, slotWidth.value * 0.62))
@@ -254,7 +256,7 @@ const teamBarX = (dayIndex: number, memberIndex: number) => slotX(dayIndex)
 const yFor = (hours: number) => plotTop + plotHeight - (hours / maxHours.value) * plotHeight
 const barHeight = (hours: number) => Math.max(1, (hours / maxHours.value) * plotHeight)
 const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-const hasTooltipData = (day: ChartDay) => props.scope === 'SELF'
+const hasTooltipData = (day: ChartDay) => personalLabel.value
   ? day.hours > 0
   : day.members.some(member => member.hours > 0)
 const showTooltip = (event: MouseEvent | FocusEvent, day: ChartDay) => {
@@ -277,6 +279,8 @@ const clearTooltip = () => {
   hoveredDay.value = null
 }
 
+watch([days, personalLabel], clearTooltip)
+
 const scrollToToday = async () => {
   await nextTick()
   const container = trendScroll.value
@@ -287,7 +291,7 @@ const scrollToToday = async () => {
 }
 
 watch(
-  () => [props.month, props.scope, chartWidth.value],
+  () => [props.month, personalLabel.value, chartWidth.value],
   () => { void scrollToToday() },
   { immediate: true }
 )

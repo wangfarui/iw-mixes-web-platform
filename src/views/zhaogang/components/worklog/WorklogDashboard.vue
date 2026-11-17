@@ -6,8 +6,8 @@
       <template #header>
         <div class="trend-header">
           <div class="trend-title">
-            <h3>月度工时统计</h3>
-            <p>{{ summary }}</p>
+            <h3>{{ trendMember ? `${trendMember.name} · 月度工时统计` : '月度工时统计' }}</h3>
+            <p v-if="summary">{{ summary }}</p>
           </div>
           <div class="scope-controls">
             <el-button
@@ -72,8 +72,17 @@
       </div>
 
       <el-alert v-if="statisticsError" class="view-error" type="error" :closable="false" show-icon :title="statisticsError" />
+      <el-alert
+        v-if="trendMember && memberStatisticsIssue"
+        class="view-error"
+        type="warning"
+        :closable="false"
+        show-icon
+        :title="`${trendMember.name}的月度工时未完整取得`"
+        :description="memberStatisticsIssue.reason"
+      />
       <WorklogCoverageNotice
-        v-if="statistics && scope === 'WORKBENCH_TEAM' && presentationMode === 'TREND'"
+        v-if="statistics && scope === 'WORKBENCH_TEAM' && presentationMode === 'TREND' && !trendMember"
         :coverage="statistics.coverage"
         :title="statisticsCoverageMessage"
       />
@@ -87,13 +96,14 @@
         :member-daily-totals="statistics.memberDailyTotals"
       />
       <WorklogTrendChart
-        v-else-if="statistics"
+        v-else-if="statistics && (!trendMember || hasMemberTrend)"
         :month="month"
         :scope="scope"
-        :daily-totals="statistics.dailyTotals"
-        :member-daily-totals="statistics.memberDailyTotals"
+        :member-name="trendMember?.name"
+        :daily-totals="trendDailyTotals"
+        :member-daily-totals="trendMember ? undefined : statistics.memberDailyTotals"
       />
-      <el-empty v-else description="暂无工时数据" :image-size="80" />
+      <el-empty v-else :description="trendMember ? '该成员的月度工时暂不可用' : '暂无工时数据'" :image-size="80" />
     </el-card>
 
     <el-card ref="entriesCard" class="week-card" shadow="never">
@@ -140,18 +150,28 @@
                 :value="member.id"
               />
             </el-select>
-            <span v-if="visibleEntries">{{ entryScopeLabel }} · {{ formatHours(visibleEntries.totalHours) }}h</span>
+            <span v-if="visibleEntries && !memberEntriesUnavailable">{{ entryScopeLabel }} · {{ formatHours(visibleEntries.totalHours) }}h</span>
           </div>
         </div>
       </template>
+      <el-alert
+        v-if="selectedEntryMember && memberEntriesIssue"
+        class="view-error"
+        type="warning"
+        :closable="false"
+        show-icon
+        :title="`${selectedEntryMember.name}的工时记录未完整取得`"
+        :description="memberEntriesIssue.reason"
+      />
       <WorklogCoverageNotice
-        v-if="entries?.coverage.partial"
+        v-if="entries?.coverage.partial && !selectedEntryMember"
         :coverage="entries.coverage"
         :title="entriesCoverageMessage"
       />
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
       <div v-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <el-skeleton v-else-if="!entries && !entriesError" :rows="6" animated />
+      <el-empty v-else-if="memberEntriesUnavailable" description="该成员的工时记录暂不可用" :image-size="80" />
       <WorklogWeekList v-else-if="visibleEntries" :scope="scope" :entries="visibleEntries" />
     </el-card>
 
@@ -222,23 +242,30 @@ const monthLabel = computed(() => {
 })
 const selectedTeam = computed(() => options.value?.teams.find(item => item.id === workbenchTeamId.value))
 const entryMembers = computed(() => selectedTeam.value?.members ?? [])
+const selectedEntryMember = computed(() => scope.value === 'WORKBENCH_TEAM'
+  ? entryMembers.value.find(member => member.id === entryMemberId.value)
+  : undefined)
+const trendMember = computed(() => presentationMode.value === 'TREND' ? selectedEntryMember.value : undefined)
+const memberStatistics = computed(() => statistics.value?.memberDailyTotals.find(item => item.user.id === trendMember.value?.id))
+const memberStatisticsIssue = computed(() => statistics.value?.coverage.memberIssues?.find(item => item.user.id === trendMember.value?.id))
+const trendDailyTotals = computed(() => (trendMember.value ? memberStatistics.value?.dailyTotals : statistics.value?.dailyTotals) ?? [])
+const monthTotal = computed(() => trendDailyTotals.value.reduce((sum, item) => sum + Number(item.hours || 0), 0))
+const hasMemberTrend = computed(() => !!memberStatistics.value && (!memberStatisticsIssue.value || monthTotal.value > 0))
 const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择工作台团队' : '还没有加入工作台团队')
-const monthTotal = computed(() => statistics.value?.dailyTotals.reduce((sum, item) => sum + Number(item.hours || 0), 0) || 0)
 const teamSelectWidth = computed(() => {
   const labels = (options.value?.teams || []).map(team => team.name)
   const longestLength = Math.max(0, ...labels.map(label => Array.from(label).length))
   return `${Math.min(280, Math.max(128, longestLength * 14 + 44))}px`
 })
 const emptyStatistics = { overtimeDays: 0, overtimeHours: 0, averageHours: 0 }
-const personalStatistics = computed(() => statistics.value?.summary || emptyStatistics)
-const teamStatistics = computed(() => statistics.value?.summary || emptyStatistics)
 const summary = computed(() => {
-  if (scope.value === 'WORKBENCH_TEAM') {
-    if (!workbenchTeamId.value) return teamSelectionHint.value
-    const count = statistics.value?.coverage.memberCount ?? selectedTeam.value?.memberCount ?? 0
-    return `总计工时 ${formatHours(monthTotal.value)}h · ${count} 人 · 加班天数 ${teamStatistics.value.overtimeDays}天 · 加班工时 ${formatHours(teamStatistics.value.overtimeHours)}h · 平均工时 ${formatAverageHours(teamStatistics.value.averageHours)}h`
-  }
-  return `总计工时 ${formatHours(monthTotal.value)}h · 加班天数 ${personalStatistics.value.overtimeDays}天 · 加班工时 ${formatHours(personalStatistics.value.overtimeHours)}h · 平均工时 ${formatAverageHours(personalStatistics.value.averageHours)}h`
+  if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return teamSelectionHint.value
+  if (trendMember.value && !hasMemberTrend.value) return ''
+
+  const metrics = (trendMember.value ? memberStatistics.value?.summary : statistics.value?.summary) ?? emptyStatistics
+  const count = statistics.value?.coverage.memberCount ?? selectedTeam.value?.memberCount ?? 0
+  const teamCount = scope.value === 'WORKBENCH_TEAM' && !trendMember.value ? ` · ${count} 人` : ''
+  return `总计工时 ${formatHours(monthTotal.value)}h${teamCount} · 加班天数 ${metrics.overtimeDays}天 · 加班工时 ${formatHours(metrics.overtimeHours)}h · 平均工时 ${formatAverageHours(metrics.averageHours)}h`
 })
 const statisticsCoverageMessage = computed(() => {
   const failed = statistics.value?.coverage.failedMemberCount || 0
@@ -252,9 +279,6 @@ const entriesCoverageMessage = computed(() => {
     ? `部分成员工时暂未取得，失败成员 ${failed} 人`
     : '部分成员工时未完整取得，登记明细可能不完整'
 })
-const selectedEntryMember = computed(() => scope.value === 'WORKBENCH_TEAM'
-  ? entryMembers.value.find(member => member.id === entryMemberId.value)
-  : undefined)
 const entryScopeLabel = computed(() => {
   if (scope.value === 'SELF') return '我的工时'
   return selectedEntryMember.value?.name || selectedTeam.value?.name || '团队工时'
@@ -267,6 +291,8 @@ const visibleEntries = computed(() => {
   const items = result.items.filter(item => item.user.id === member.id)
   return { ...result, items, totalHours: items.reduce((sum, item) => sum + Number(item.hours), 0) }
 })
+const memberEntriesIssue = computed(() => entries.value?.coverage.memberIssues?.find(item => item.user.id === selectedEntryMember.value?.id))
+const memberEntriesUnavailable = computed(() => !!memberEntriesIssue.value && !visibleEntries.value?.items.length)
 const syncTimeLabel = computed(() => {
   if (statisticsLoading.value || entriesLoading.value) return '同步中'
   if (!statistics.value?.syncedAt && !entries.value?.syncedAt) return '尚未同步'
