@@ -7,9 +7,13 @@
       </div>
       <el-button text :disabled="busy || webhookDialogVisible" @click="load">刷新</el-button>
     </div>
-    <p>工作台日历中的工作日，每天 17:00（北京时间）发送团队报告，再逐人发送参与统计成员的今日工时明细。</p>
+    <p>工作台日历中的工作日按设定时间发送团队报告及成员工时明细，休息日自动跳过。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-form v-if="config" label-position="top" @submit.prevent>
+      <el-form-item label="通知时间（北京时间）">
+        <el-time-picker v-model="sendTime" format="HH:mm" value-format="HH:mm" :clearable="false"
+          :disabled="busy || webhookDialogVisible" aria-label="通知时间（北京时间）" @change="savePreferences" />
+      </el-form-item>
       <el-form-item label="汇总提醒成员">
         <el-select v-model="summaryMemberId" clearable :value-on-clear="null" :disabled="busy || webhookDialogVisible"
           placeholder="选择接收汇总 @提醒的团队成员" aria-label="汇总提醒成员" style="width: 100%" @change="savePreferences">
@@ -73,6 +77,7 @@ const selectedMember = computed(() => props.members.find(member => member.userId
 const config = ref<WorklogNotificationStatus | null>(null)
 const recent = computed(() => (config.value?.recent ?? []).slice(0, 3))
 const enabled = ref(false)
+const sendTime = ref('17:00')
 const webhookDialogVisible = ref(false)
 const webhookDraft = ref('')
 const dialogError = ref('')
@@ -86,7 +91,12 @@ const busy = computed(() => loading.value || saving.value || testing.value || se
 const reportActive = computed(() => recent.value.some(item => item.kind !== 'TEST' && ['COLLECTING', 'READY'].includes(item.state)))
 let generation = 0
 let timer: ReturnType<typeof setTimeout> | undefined
-const apply = (value: WorklogNotificationStatus) => { config.value = value; enabled.value = value.enabled; summaryMemberId.value = value.summaryMemberId ?? null }
+const apply = (value: WorklogNotificationStatus) => {
+  config.value = value
+  enabled.value = value.enabled
+  sendTime.value = value.sendTime
+  summaryMemberId.value = value.summaryMemberId ?? null
+}
 const scheduleRefresh = () => {
   clearTimeout(timer)
   if (recent.value.some(item => ['COLLECTING', 'READY', 'TESTING'].includes(item.state))) {
@@ -119,7 +129,8 @@ const savePreferences = async () => {
   saving.value = true; error.value = ''
   try {
     const value = await saveWorklogNotification(props.teamId, {
-      enabled: enabled.value, revision: previous.revision, summaryMemberId: summaryMemberId.value
+      enabled: enabled.value, revision: previous.revision, summaryMemberId: summaryMemberId.value,
+      sendTime: sendTime.value
     })
     if (current === generation) { apply(value); scheduleRefresh(); ElMessage.success('通知配置已更新') }
   } catch (e) {

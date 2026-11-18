@@ -11,6 +11,7 @@ export interface WorklogNotificationStatus {
   enabled: boolean
   webhookConfigured: boolean
   summaryMemberId: number | null
+  sendTime: string
   revision: number
   latest: WorklogNotificationRecord | null
   recent: WorklogNotificationRecord[]
@@ -25,6 +26,7 @@ export interface WorklogNotificationCommand {
   enabled: boolean
   revision: number
   summaryMemberId: number | null
+  sendTime?: string
   webhook?: string
   clearWebhook?: boolean
 }
