@@ -181,6 +181,13 @@
         :coverage="entries.coverage"
         :title="entriesCoverageMessage"
       />
+      <el-alert
+        v-if="titlesIncomplete"
+        class="view-error"
+        type="info"
+        :closable="false"
+        title="部分事项详情暂未取得，可稍后刷新"
+      />
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
       <div v-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <el-skeleton v-else-if="!entries && !entriesError && !entryRangeTooLong" :rows="6" animated />
@@ -205,6 +212,7 @@ import { getZhaogangWorklogAbsences, getZhaogangWorklogEntries, getZhaogangWorkl
 import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogIssueCheck,
+  ZhaogangWorklogIssueCheckStatus,
   ZhaogangWorklogRankingMetric,
   ZhaogangWorklogScope,
   ZhaogangWorklogEntries,
@@ -236,6 +244,7 @@ const entries = ref<ZhaogangWorklogEntries | null>(null)
 const entriesKey = ref('')
 const entriesError = ref('')
 const entriesLoading = ref(false)
+const titlesIncomplete = ref(false)
 const entryMemberId = ref<number | null>(null)
 const absenceDialogVisible = ref(false)
 const absenceLoading = ref(false)
@@ -397,6 +406,7 @@ const loadEntries = async (refresh = entriesRefreshPending, observeIssueCheck = 
     if (sequence !== entriesRequestSequence) return
     ignoredEntriesCheckId = observeIssueCheck ? null : result.issueCheck?.checkId ?? null
     entries.value = result
+    titlesIncomplete.value = Boolean(result.issueCheck?.incomplete)
   } catch (error) {
     if (sequence !== entriesRequestSequence) return
     entriesError.value = error instanceof Error ? error.message : '工时登记加载失败，请稍后重试'
@@ -451,7 +461,8 @@ const loadAbsence = async (keepReport = false) => {
 const pollIssueCheck = (
   check: ZhaogangWorklogIssueCheck | null | undefined,
   onCleanup: (cleanup: () => void) => void,
-  onFinished: (deletionRevision: number) => void
+  onStatus: (status: ZhaogangWorklogIssueCheckStatus) => void,
+  onTimeout?: () => void
 ) => {
   const checkId = check?.checkId
   if (!checkId) return
@@ -470,16 +481,15 @@ const pollIssueCheck = (
     try {
       const status = await getZhaogangWorklogIssueCheck(checkId, currentScope, teamId, controller.signal)
       if (controller.signal.aborted) return
-      if (!status.pending) {
-        onFinished(status.deletionRevision)
-        return
-      }
+      onStatus(status)
+      if (!status.pending || controller.signal.aborted) return
     } catch {
       if (controller.signal.aborted) return
     }
-    if (attempts < 15) timer = setTimeout(poll, 2000)
+    if (attempts < 60) timer = setTimeout(poll, attempts < 5 ? 1000 : 2000)
+    else onTimeout?.()
   }
-  timer = setTimeout(poll, 1000)
+  timer = setTimeout(poll, 500)
 }
 
 const reloadChangedReports = (revision: number) => {
@@ -496,21 +506,38 @@ const reloadChangedReports = (revision: number) => {
 }
 
 watch(() => statisticsLoading.value ? null : statistics.value?.issueCheck, (check, _, onCleanup) => {
-  pollIssueCheck(check, onCleanup, reloadChangedReports)
+  pollIssueCheck(check, onCleanup, status => reloadChangedReports(status.deletionRevision))
 })
 
 watch(() => absenceDialogVisible.value && !absenceLoading.value ? absenceReport.value?.issueCheck : null,
   (check, _, onCleanup) => {
-    pollIssueCheck(check, onCleanup, reloadChangedReports)
+    pollIssueCheck(check, onCleanup, status => reloadChangedReports(status.deletionRevision))
   })
 
 watch(() => entriesLoading.value ? null : entries.value?.issueCheck, (check, _, onCleanup) => {
-  if (check?.checkId === ignoredEntriesCheckId) return
-  pollIssueCheck(check, onCleanup, revision => {
-    reloadChangedReports(revision)
-    // 同一删除版本也需要重读一次，补齐已加载明细的事项信息。
-    if (!entriesLoading.value) void loadEntries(false, false)
-  })
+  if (!check?.checkId || check.checkId === ignoredEntriesCheckId) return
+  let updatesApplied = 0
+  pollIssueCheck(check, onCleanup, status => {
+    const current = entries.value
+    if (entriesLoading.value || !current || current.issueCheck?.checkId !== check.checkId) return
+    for (const update of status.updates?.slice(updatesApplied) ?? []) {
+      const item = current.items[update.rowIndex]
+      if (!item) continue
+      item.issue = {
+        ...update.issue,
+        title: update.issue.title || item.workingDesc || `事项 #${update.issue.code}`
+      }
+      item.project = update.project
+      item.issueUrl = update.issueUrl
+    }
+    updatesApplied = status.updates?.length ?? 0
+    titlesIncomplete.value = Boolean(status.incomplete)
+    reloadChangedReports(status.deletionRevision)
+    // Older backends return only the check state during a rolling deployment.
+    if (!status.pending && status.updates === undefined && !entriesLoading.value) {
+      void loadEntries(false, false)
+    }
+  }, () => { titlesIncomplete.value = true })
 })
 
 const resetAbsence = () => {
@@ -543,6 +570,7 @@ const resetScopeResults = () => {
   entriesKey.value = ''
   entriesError.value = ''
   entriesLoading.value = false
+  titlesIncomplete.value = false
   entriesRefreshPending = false
   resetAbsence()
 }

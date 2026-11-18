@@ -223,11 +223,21 @@ export interface ZhaogangWorklogItem {
 export interface ZhaogangWorklogIssueCheck {
   deletionRevision: number
   checkId: string | null
+  incomplete?: boolean
+}
+
+export interface ZhaogangWorklogIssueUpdate {
+  rowIndex: number
+  issue: ZhaogangWorklogIssue
+  project: ZhaogangWorklogProject
+  issueUrl: string
 }
 
 export interface ZhaogangWorklogIssueCheckStatus {
   deletionRevision: number
   pending: boolean
+  updates?: ZhaogangWorklogIssueUpdate[]
+  incomplete?: boolean
 }
 
 export interface ZhaogangWorklogStatistics {
