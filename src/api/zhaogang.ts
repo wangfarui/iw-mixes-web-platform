@@ -66,7 +66,7 @@ export const zhaogangRequest = async <T>(path: string, init: RequestInit = {}): 
   })
   const payload = await response.json().catch(() => undefined) as GeneralResponse<T> | undefined
   if (!response.ok || payload?.code !== 200) {
-    const message = payload?.message || '找钢工作台服务暂不可用，请稍后重试'
+    const message = payload?.message || 'Dev Hub 服务暂不可用，请稍后重试'
     const prompt = permissionPromptFrom(payload?.data, message)
     if (prompt) dispatchZhaogangPermissionPrompt(prompt)
     throw new ZhaogangRequestError(message, response.status, payload?.code, prompt?.permissions || [])

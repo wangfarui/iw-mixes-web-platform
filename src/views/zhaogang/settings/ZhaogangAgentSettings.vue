@@ -49,7 +49,7 @@
       <header class="settings-heading">
         <div>
           <h3>K8s Dashboard Token</h3>
-          <p>Token 按当前工作台账号和环境保存。新增或更换前会先通过本机 Agent 验证。</p>
+          <p>Token 按当前 Dev Hub 账号和环境保存。新增或更换前会先通过本机 Agent 验证。</p>
         </div>
         <el-tag :type="configuredCount ? 'success' : 'info'" effect="light">已配置 {{ configuredCount }}/3</el-tag>
       </header>
@@ -98,7 +98,7 @@
       <header class="settings-heading">
         <div>
           <h3>Agent 授权</h3>
-          <p>供胖猫云 Skill 触发工作台构建。令牌永久有效，仅展示一次完整值，服务端只保存哈希。</p>
+          <p>供胖猫云 Skill 触发 Dev Hub 构建。令牌永久有效，仅展示一次完整值，服务端只保存哈希。</p>
         </div>
         <el-tag :type="agentTokenStatus?.configured ? 'success' : 'info'" effect="light">
           {{ agentTokenStatus?.configured ? '已授权' : '未授权' }}
@@ -234,7 +234,7 @@
                 <template #content>
                   <div class="execution-location-help">
                     <div><strong>AUTO</strong>：优先由服务器调用，仅网络不可达时尝试本机 Agent。</div>
-                    <div><strong>SERVER</strong>：始终由工作台服务器访问 AI 服务。</div>
+                    <div><strong>SERVER</strong>：始终由 Dev Hub 服务器访问 AI 服务。</div>
                     <div><strong>LOCAL_AGENT</strong>：通过本机 Agent 从当前电脑访问 AI，适合仅内网可达的服务。</div>
                   </div>
                 </template>
@@ -526,16 +526,16 @@ const skillPackageDownloadUrl = 'https://itwray.oss-cn-heyuan.aliyuncs.com/zg/pa
 
 const skillPackage = {
   available: Boolean(skillPackageDownloadUrl),
-  unavailableReason: '安装包下载地址正在配置，请联系工作台维护人。',
+  unavailableReason: '安装包下载地址正在配置，请联系 Dev Hub 维护人。',
   version: 'v1.0.0',
   fileName: 'pangmaoyun-workbench-build-v1.0.0.zip',
   checksum: '4f10aedaafd7ec3128b54fd82992fad53ddd120f5ce12369393d4f8ecaade67b',
   downloadUrl: skillPackageDownloadUrl
 }
 
-const skillInstallPrompt = `请将找钢工作台的胖猫云工作台构建 Skill 安装到我指定的目标工作区。
+const skillInstallPrompt = `请将 Dev Hub 提供的胖猫云工作台构建 Skill 安装到我指定的目标工作区。
 
-安装包地址：${skillPackage.downloadUrl || '【请先向工作台维护人获取下载地址】'}
+安装包地址：${skillPackage.downloadUrl || '【请先向 Dev Hub 维护人获取下载地址】'}
 安装包版本：${skillPackage.version}
 文件名：${skillPackage.fileName}
 SHA-256：${skillPackage.checksum}
@@ -548,7 +548,7 @@ SHA-256：${skillPackage.checksum}
 5. 安装到 <工作区>/.agents/skills/pangmaoyun-workbench-build/，不要修改工作区其它文件，不执行 Git 提交或推送。
 6. 安装后检查 SKILL.md 和 scripts/pmy-workbench-build（入口脚本必须可执行）。
 7. 在安装目录运行 Skill 的测试：python3 -m unittest discover -s tests -p 'test_*.py'。
-8. 不读取、打印或复制完整 Agent 令牌；不要自动绑定令牌，也不要自动触发构建。安装完成后提示我回到工作台 Agent 授权页生成令牌，再执行 auth set。
+8. 不读取、打印或复制完整 Agent 令牌；不要自动绑定令牌，也不要自动触发构建。安装完成后提示我回到 Dev Hub 的 Agent 授权页生成令牌，再执行 auth set。
 9. 最后报告：安装路径、版本、SHA-256 是否匹配、测试结果，以及是否需要绑定 Agent 令牌。`
 
 const copySkillInstallPrompt = async () => {

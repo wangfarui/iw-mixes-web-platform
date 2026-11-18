@@ -4,7 +4,7 @@
       <div>
         <p class="guide-kicker">zg-workbench-agent</p>
         <h2>Agent 使用教程</h2>
-        <p>安装本机 Agent 后，工作台可以从当前电脑访问 K8s Dashboard 和内网 AI。</p>
+        <p>安装本机 Agent 后，Dev Hub 可以从当前电脑访问 K8s Dashboard 和内网 AI。</p>
       </div>
       <el-button :icon="Back" @click="backToSettings">返回设置</el-button>
     </header>
@@ -18,7 +18,7 @@
               <el-button type="primary" :icon="Download" :loading="downloading" @click="downloadAgent('windows')">下载 Windows 安装程序</el-button>
             </div>
             <ol class="step-list">
-              <li><strong>下载安装程序</strong><span>工作台会根据当前 Windows 架构选择安装程序；从其它系统打开时默认下载 x64 版本。</span></li>
+              <li><strong>下载安装程序</strong><span>Dev Hub 会根据当前 Windows 架构选择安装程序；从其它系统打开时默认下载 x64 版本。</span></li>
               <li><strong>运行安装</strong><span>双击 <code>zg-workbench-agent-windows-*.exe</code>。程序安装到 <code>%LOCALAPPDATA%\zg-workbench-agent</code> 并自动启动。</span></li>
               <li><strong>处理安全提示</strong><span>如果 SmartScreen 显示未知发布者，选择“更多信息”后确认运行。</span></li>
               <li><strong>完成旧版迁移</strong><span>检测到 zg-k8s-agent 时会迁移配置、开机自启和协议；新 Agent 健康后再清理旧安装。</span></li>
@@ -31,7 +31,7 @@
             <ol class="step-list">
               <li><strong>打开已安装的应用</strong><span>在 Windows 设置中找到 zg-workbench-agent。</span></li>
               <li><strong>执行卸载</strong><span>选择卸载；也可以运行安装目录中的 <code>uninstall.exe</code>。</span></li>
-              <li><strong>确认状态</strong><span>回到工作台设置页刷新状态，确认 Agent 已停止。</span></li>
+              <li><strong>确认状态</strong><span>回到 Dev Hub 设置页刷新状态，确认 Agent 已停止。</span></li>
             </ol>
           </el-tab-pane>
         </el-tabs>
@@ -58,7 +58,7 @@
               <li><strong>进入解压目录</strong><span>确认目录中存在 <code>uninstall-macos.sh</code>。</span></li>
               <li><strong>执行卸载脚本</strong><pre>chmod +x uninstall-macos.sh
 ./uninstall-macos.sh</pre></li>
-              <li><strong>确认状态</strong><span>回到工作台设置页刷新状态，确认 Agent 已停止。</span></li>
+              <li><strong>确认状态</strong><span>回到 Dev Hub 设置页刷新状态，确认 Agent 已停止。</span></li>
             </ol>
           </el-tab-pane>
         </el-tabs>

@@ -17,7 +17,7 @@
           v-model="teamId"
           class="team-select"
           filterable
-          placeholder="选择工作台团队"
+          placeholder="选择 Dev Hub 团队"
           :loading="optionsLoading"
           @change="changeTeam"
         >
@@ -46,11 +46,11 @@
     </el-alert>
 
     <div v-if="!teams.length && !optionsLoading" class="code-placeholder">
-      <el-empty description="还没有加入工作台团队" :image-size="80" />
+      <el-empty description="还没有加入 Dev Hub 团队" :image-size="80" />
       <el-button type="primary" plain @click="openTeams">前往团队页</el-button>
     </div>
     <div v-else-if="!teamId" class="code-placeholder">
-      <el-empty description="请选择工作台团队" :image-size="80" />
+      <el-empty description="请选择 Dev Hub 团队" :image-size="80" />
     </div>
     <div v-else-if="!statistics && statisticsLoading" class="code-loading"><el-skeleton :rows="9" animated /></div>
     <template v-else-if="statistics">
@@ -229,7 +229,7 @@ const loadOptions = async () => {
       teamId.value = teams.value[0].id
     }
   } catch (error) {
-    optionsError.value = error instanceof Error ? error.message : '工作台团队加载失败'
+    optionsError.value = error instanceof Error ? error.message : 'Dev Hub 团队加载失败'
   } finally {
     optionsLoading.value = false
   }

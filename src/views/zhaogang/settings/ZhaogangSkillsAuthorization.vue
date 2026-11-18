@@ -8,7 +8,7 @@
   >
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" />
     <div v-if="pairCode" v-loading="loading">
-      <p v-if="candidate">允许 <strong>{{ candidate.label }}</strong> 使用当前工作台账号下载和发布 Skills。</p>
+      <p v-if="candidate">允许 <strong>{{ candidate.label }}</strong> 使用当前 Dev Hub 账号下载和发布 Skills。</p>
       <p v-else-if="loading">正在核对设备…</p>
     </div>
     <el-table v-else v-loading="loading" :data="devices" empty-text="暂无已授权设备">

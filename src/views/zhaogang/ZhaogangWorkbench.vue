@@ -2,10 +2,10 @@
   <main class="zhaogang-page">
     <header class="page-header">
       <div class="brand">
-        <span class="brand-mark">找钢</span>
+        <img class="brand-mark" :src="devHubBrand.icon" alt="" />
         <div>
-          <h1>找钢工作台</h1>
-          <p>研发协作与发布管理</p>
+          <h1>{{ devHubBrand.name }}</h1>
+          <p>{{ devHubBrand.subtitle }}</p>
         </div>
       </div>
       <div v-if="session" class="account-summary">
@@ -31,8 +31,8 @@
     <section v-else-if="!session" class="onboarding-shell">
       <div class="onboarding-copy">
         <el-tag type="primary" effect="plain">首次使用</el-tag>
-        <h2>连接你的 CODING 工作台</h2>
-        <p>令牌由你在 CODING 页面创建并完成密码验证；找钢工作台只在浏览器 Cookie 中保留加密后的绑定信息。</p>
+        <h2>绑定 CODING 账号</h2>
+        <p>请在 CODING 中完成密码验证并创建个人访问令牌，再回到 Dev Hub 绑定。浏览器 Cookie 中的绑定信息会加密保存。</p>
       </div>
 
       <ZhaogangPermissionPrompt
@@ -59,7 +59,7 @@
         <article class="step-card">
           <span>3</span>
           <h3>粘贴并检查</h3>
-          <p>工作台会验证令牌和可访问项目，不会要求输入 CODING 密码。</p>
+          <p>Dev Hub 会验证令牌和可访问项目。CODING 密码只需在 CODING 页面输入。</p>
         </article>
       </div>
 
@@ -350,7 +350,7 @@
                 </section>
 
                 <section class="settings-section">
-                  <header class="settings-heading"><div><h3>工作台偏好</h3><p>偏好保存在当前浏览器。</p></div></header>
+                  <header class="settings-heading"><div><h3>使用偏好</h3><p>偏好保存在当前浏览器。</p></div></header>
                   <el-form label-position="left" label-width="150px" class="preferences-form">
                     <el-form-item label="默认首页">
                       <el-radio-group v-model="preferences.defaultTab" @change="savePreferences">
@@ -549,6 +549,7 @@
 </template>
 
 <script setup lang="ts">
+import { devHubBrand } from '@/utils/devHubBrand'
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1370,7 +1371,7 @@ onBeforeUnmount(() => {
 .page-header { display: flex; box-sizing: border-box; height: 68px; min-height: 68px; align-items: center; justify-content: space-between; padding: 0 32px; background: #fff; border-bottom: 1px solid #e7ebf2; }
 .brand, .account-summary, .release-toolbar, .toolbar-left, .toolbar-right, .pagination-row, .drawer-heading, .build-row, .bind-actions { display: flex; align-items: center; }
 .route-loading-state { display: flex; min-height: 300px; align-items: center; justify-content: center; gap: 10px; color: #718097; font-size: 14px; }.route-loading-icon { color: #2878ed; animation: route-loading-spin 1s linear infinite; } @keyframes route-loading-spin { to { transform: rotate(360deg); } }
-.brand { gap: 12px; }.brand-mark { display: grid; width: 38px; height: 38px; place-items: center; color: #fff; background: linear-gradient(135deg, #276de9, #5e94f1); border-radius: 11px; font-size: 13px; font-weight: 700; }.brand h1 { margin: 0; font-size: 19px; }.brand p { margin: 3px 0 0; color: #8490a4; font-size: 12px; }.account-summary { gap: 9px; color: #526078; font-size: 14px; }.header-release-tag { position: relative; display: inline-flex; height: 28px; align-items: center; padding: 0 10px; color: #31527e; background: #f1f5fb; border: 1px solid #d8e3f2; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }.header-release-tag:hover { color: #2468e8; border-color: #9bbcf7; background: #edf3ff; }.header-release-tag:focus-visible { outline: 2px solid #7aa7f5; outline-offset: 2px; }.header-release-tag__dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background: #f04444; border: 2px solid #fff; border-radius: 50%; }
+.brand { gap: 12px; }.brand-mark { display: block; flex: none; width: 38px; height: 38px; }.brand h1 { margin: 0; font-size: 19px; }.brand p { margin: 3px 0 0; color: #8490a4; font-size: 12px; }.account-summary { gap: 9px; color: #526078; font-size: 14px; }.header-release-tag { position: relative; display: inline-flex; height: 28px; align-items: center; padding: 0 10px; color: #31527e; background: #f1f5fb; border: 1px solid #d8e3f2; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }.header-release-tag:hover { color: #2468e8; border-color: #9bbcf7; background: #edf3ff; }.header-release-tag:focus-visible { outline: 2px solid #7aa7f5; outline-offset: 2px; }.header-release-tag__dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background: #f04444; border: 2px solid #fff; border-radius: 50%; }
 .loading-shell, .onboarding-shell { width: min(1480px, calc(100% - 48px)); margin: 0 auto; }.loading-shell { padding: 80px 25%; }.onboarding-shell { padding: 74px 0; }.onboarding-copy { width: min(100%, 660px); margin: 0 auto 32px; text-align: center; }.onboarding-copy h2 { margin: 13px 0 10px; overflow-wrap: anywhere; font-size: 32px; }.onboarding-copy p { margin: 0; color: #748198; line-height: 1.7; }
 .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }.step-card { position: relative; min-height: 184px; padding: 22px; background: #fff; border: 1px solid #e5eaf2; border-radius: 14px; box-shadow: 0 8px 22px rgba(43, 67, 105, .04); }.step-card > span { display: grid; width: 27px; height: 27px; place-items: center; color: #2468e8; background: #eaf1ff; border-radius: 50%; font-size: 13px; font-weight: 700; }.step-card h3 { margin: 16px 0 7px; }.step-card p { color: #718097; font-size: 13px; line-height: 1.6; }.permission-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }.permission-list :deep(.el-tag) { height: auto; padding: 4px 7px; font-size: 11px; white-space: normal; }
 .bind-card { max-width: 780px; margin: 24px auto 0; border-color: #e5eaf2; }.bind-card-title strong, .bind-card-title small { display: block; }.bind-card-title small { margin-top: 5px; color: #8490a4; }.bind-actions { justify-content: space-between; gap: 12px; margin-top: 14px; }.bind-error { color: #dc4c4c; font-size: 13px; }

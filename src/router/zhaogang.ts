@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
+import { devHubBrand } from '@/utils/devHubBrand'
 
 const zhaogangRoute: RouteRecordRaw = {
   path: '/zhaogang',
@@ -6,7 +7,7 @@ const zhaogangRoute: RouteRecordRaw = {
   component: () => import('@/views/zhaogang/ZhaogangWorkbench.vue'),
   meta: {
     public: true,
-    title: '找钢工作台'
+    title: devHubBrand.tabTitle
   },
   children: [
     {
@@ -60,7 +61,7 @@ const zhaogangRoute: RouteRecordRaw = {
       path: 'calendar',
       name: '找钢日历',
       component: () => import('@/views/zhaogang/calendar/ZhaogangCalendarView.vue'),
-      meta: { public: true, title: '日历', zhaogangView: 'calendar', workbenchContentPadding: 'none' }
+      meta: { public: true, title: '工作日历', zhaogangView: 'calendar', workbenchContentPadding: 'none' }
     },
     {
       path: 'services',

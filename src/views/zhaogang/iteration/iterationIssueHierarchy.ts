@@ -37,7 +37,7 @@ export const childIssueAutoSyncAvailability = (
   }
   return codingBacked(parent)
     ? { enabled: true, reason: '' }
-    : { enabled: false, reason: '父事项尚未关联 CODING，子事项只保存到工作台' }
+    : { enabled: false, reason: '父事项尚未关联 CODING，子事项只保存在 Dev Hub' }
 }
 
 export const canOfferParentChange = (issue: Pick<TeamIterationIssue, 'issueType' | 'projectName'>) =>

@@ -37,7 +37,7 @@
               filterable
               clearable
               :loading="optionsLoading"
-              placeholder="选择工作台团队"
+              placeholder="选择 Dev Hub 团队"
               @change="changeTeam"
             >
               <el-option
@@ -282,7 +282,7 @@ const memberStatisticsIssue = computed(() => statistics.value?.coverage.memberIs
 const trendDailyTotals = computed(() => (trendMember.value ? memberStatistics.value?.dailyTotals : statistics.value?.dailyTotals) ?? [])
 const monthTotal = computed(() => trendDailyTotals.value.reduce((sum, item) => sum + Number(item.hours || 0), 0))
 const hasMemberTrend = computed(() => !!memberStatistics.value && (!memberStatisticsIssue.value || monthTotal.value > 0))
-const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择工作台团队' : '还没有加入工作台团队')
+const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择 Dev Hub 团队' : '还没有加入 Dev Hub 团队')
 const teamSelectWidth = computed(() => {
   const labels = (options.value?.teams || []).map(team => team.name)
   const longestLength = Math.max(0, ...labels.map(label => Array.from(label).length))
@@ -348,7 +348,7 @@ const loadOptions = async () => {
       workbenchTeamId.value = options.value.teams[0].id
     }
   } catch (error) {
-    optionsError.value = error instanceof Error ? error.message : '工作台团队加载失败，我的工时仍可使用'
+    optionsError.value = error instanceof Error ? error.message : 'Dev Hub 团队加载失败，我的工时仍可使用'
   } finally {
     optionsLoading.value = false
   }

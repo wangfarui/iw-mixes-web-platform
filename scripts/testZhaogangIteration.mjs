@@ -61,7 +61,7 @@ const localRequirement = {
 }
 assert.deepEqual(hierarchy.childIssueAutoSyncAvailability(localRequirement, 'USER_STORY'), {
   enabled: false,
-  reason: '父事项尚未关联 CODING，子事项只保存到工作台'
+  reason: '父事项尚未关联 CODING，子事项只保存在 Dev Hub'
 })
 const localStory = {
   id: 3, parentId: 1, issueType: 'USER_STORY', source: 'WORKBENCH', syncStatus: 'PENDING', children: []

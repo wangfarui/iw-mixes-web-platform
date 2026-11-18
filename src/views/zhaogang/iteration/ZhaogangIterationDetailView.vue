@@ -140,7 +140,7 @@
               <el-tag v-else-if="scope.row.syncStatus === 'SYNCING'" size="small" type="warning" effect="plain">同步中</el-tag>
               <el-tag v-else-if="scope.row.syncStatus === 'UNKNOWN'" size="small" type="warning" effect="plain">待核对</el-tag>
               <el-tag v-else-if="scope.row.syncStatus === 'FAILED'" size="small" type="danger" effect="plain">同步失败</el-tag>
-              <el-tag v-else size="small" type="info" effect="plain">工作台</el-tag>
+              <el-tag v-else size="small" type="info" effect="plain">本地事项</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="处理人" width="140">
@@ -243,15 +243,15 @@
       </template>
       <template v-else>
         <el-form label-position="top">
-          <el-form-item label="工作台团队" required><el-select v-model="selectedTeamIds" multiple filterable class="full-control" placeholder="选择一个或多个工作台团队"><el-option v-for="team in teamOptions" :key="team.teamId" :label="team.teamName" :value="team.teamId" /></el-select></el-form-item>
-          <template v-for="teamId in selectedTeamIds" :key="teamId"><el-form-item :label="`${teamById.get(teamId)?.teamName || '工作台团队'}成员`" required><el-select v-model="selectedByTeam[teamId]" multiple filterable class="full-control" placeholder="选择团队成员"><el-option v-for="member in teamById.get(teamId)?.members || []" :key="member.userId" :label="member.userName" :value="member.userId" :disabled="member.userId === detail?.creator.userId" /></el-select></el-form-item></template>
+          <el-form-item label="Dev Hub 团队" required><el-select v-model="selectedTeamIds" multiple filterable class="full-control" placeholder="选择一个或多个 Dev Hub 团队"><el-option v-for="team in teamOptions" :key="team.teamId" :label="team.teamName" :value="team.teamId" /></el-select></el-form-item>
+          <template v-for="teamId in selectedTeamIds" :key="teamId"><el-form-item :label="`${teamById.get(teamId)?.teamName || 'Dev Hub 团队'}成员`" required><el-select v-model="selectedByTeam[teamId]" multiple filterable class="full-control" placeholder="选择团队成员"><el-option v-for="member in teamById.get(teamId)?.members || []" :key="member.userId" :label="member.userName" :value="member.userId" :disabled="member.userId === detail?.creator.userId" /></el-select></el-form-item></template>
         </el-form>
         <el-table :data="memberDrafts" border class="member-editor-table">
           <el-table-column label="团队" min-width="150"><template #default="scope"><el-tag effect="plain">{{ scope.row.teamName }}</el-tag></template></el-table-column>
           <el-table-column label="成员" min-width="180"><template #default="scope">{{ scope.row.user.userName }}</template></el-table-column>
           <el-table-column label="角色（可选）" min-width="320"><template #default="scope"><el-select v-model="scope.row.roles" multiple clearable class="full-control" placeholder="可不选择角色"><el-option v-for="role in roleOptions" :key="role.value" :label="role.label" :value="role.value" /></el-select></template></el-table-column>
         </el-table>
-        <el-alert v-if="!teamOptions.length && !membersLoading" type="warning" :closable="false" show-icon title="请先创建或加入工作台团队" />
+        <el-alert v-if="!teamOptions.length && !membersLoading" type="warning" :closable="false" show-icon title="请先创建或加入 Dev Hub 团队" />
       </template>
       <template #footer>
         <el-button @click="memberDialogVisible = false">关闭</el-button>
@@ -285,7 +285,7 @@
     <el-dialog v-model="bindingVisible" title="维护 CODING 链接" width="min(560px, calc(100% - 28px))"
       :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving">
       <el-form label-position="top">
-        <el-form-item label="工作台事项"><el-input :model-value="bindingIssue?.title" disabled /></el-form-item>
+        <el-form-item label="本地事项"><el-input :model-value="bindingIssue?.title" disabled /></el-form-item>
         <el-form-item label="CODING 事项链接" required :error="bindingError">
           <el-input v-model="bindingUrl" maxlength="1000" placeholder="粘贴已有的同类型 CODING 事项链接" @input="bindingError = ''" />
         </el-form-item>
@@ -1061,7 +1061,7 @@ const syncIssue = async (issue: TeamIterationIssue) => {
 
 const syncCodingIssues = async () => {
   try {
-    await ElMessageBox.confirm('将以 CODING 最新数据覆盖当前迭代中已关联事项。人工补绑的事项保留工作台父子关系。', '同步 CODING 事项', { type: 'warning' })
+    await ElMessageBox.confirm('将以 CODING 最新数据覆盖当前迭代中已关联事项。人工补绑的事项保留在 Dev Hub 中的父子关系。', '同步 CODING 事项', { type: 'warning' })
     syncingCoding.value = true
     const result = await syncTeamIterationCodingIssues(id())
     await load()
@@ -1130,7 +1130,7 @@ const removeSelectedIssues = async () => {
   if (!issueIds.length) return
   try {
     await ElMessageBox.confirm(
-      `确认删除已勾选的 ${issueIds.length} 个事项？若包含父事项，其子事项也会一起从工作台删除；不会删除 CODING 事项。`,
+      `确认删除已勾选的 ${issueIds.length} 个事项？若包含父事项，其子事项也会一起从 Dev Hub 删除；不会删除 CODING 事项。`,
       '批量删除事项',
       { type: 'warning' }
     )
@@ -1147,7 +1147,7 @@ const removeSelectedIssues = async () => {
 
 const removeIssue = async (issue: TeamIterationIssue) => {
   try {
-    await ElMessageBox.confirm('移除后只删除工作台中的该事项及其子事项，不会删除 CODING 数据。', '移除事项', { type: 'warning' })
+    await ElMessageBox.confirm('移除后只删除 Dev Hub 中的该事项及其子事项，不会删除 CODING 数据。', '移除事项', { type: 'warning' })
     await removeTeamIterationIssue(id(), issue.id)
     await load()
   } catch (error) { if (error instanceof Error) ElMessage.error(error.message) }

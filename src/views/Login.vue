@@ -70,10 +70,10 @@
             </span>
             <el-icon class="public-entry-arrow"><ArrowRight /></el-icon>
           </button>
-          <button type="button" class="public-entry-card" aria-label="进入找钢工作台" @click="goToPublicPage('/zhaogang')">
-            <span class="public-entry-icon public-entry-icon--zhaogang"><el-icon><Briefcase /></el-icon></span>
+          <button type="button" class="public-entry-card" :aria-label="`进入 ${devHubBrand.name}`" @click="goToPublicPage('/zhaogang')">
+            <img class="public-entry-icon" :src="devHubBrand.icon" alt="" />
             <span class="public-entry-copy">
-              <strong>找钢工作台</strong>
+              <strong>{{ devHubBrand.name }}</strong>
               <small>发布、迭代与工时协作</small>
             </span>
             <el-icon class="public-entry-arrow"><ArrowRight /></el-icon>
@@ -126,7 +126,8 @@ import {
 } from "@/api/login.ts";
 import router from '@/router'
 import {ElMessage} from "element-plus";
-import {ArrowRight, Briefcase, Tools} from '@element-plus/icons-vue'
+import {ArrowRight, Tools} from '@element-plus/icons-vue'
+import {devHubBrand} from '@/utils/devHubBrand'
 
 import {useDictStore} from "@/stores/dict";
 import versionPollingService from '@/services/versionPollingService'
@@ -406,11 +407,6 @@ function forgetPassword() {
 .public-entry-icon--tools {
   color: #376fdd;
   background: #eaf1ff;
-}
-
-.public-entry-icon--zhaogang {
-  color: #a96713;
-  background: #fff2dc;
 }
 
 .public-entry-copy {

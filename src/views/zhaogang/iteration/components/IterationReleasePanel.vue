@@ -762,7 +762,7 @@ const canBuild = (releasePlan: TeamIterationReleasePlan) => {
 
 const buildCapabilityText = (releasePlan: TeamIterationReleasePlan) => canBuild(releasePlan)
   ? '尚无构建记录'
-  : '该计划不支持工作台快捷构建'
+  : '该计划不支持快捷构建'
 
 const buildStatus = (status?: string) => {
   if (!status) return '暂无记录'

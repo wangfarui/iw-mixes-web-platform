@@ -7,7 +7,7 @@
       </div>
       <el-button text :disabled="busy || webhookDialogVisible" @click="load">刷新</el-button>
     </div>
-    <p>工作台日历中的工作日按设定时间发送团队报告及成员工时明细，休息日自动跳过。</p>
+    <p>工作日历标记的工作日按设定时间发送团队报告及成员工时明细，休息日自动跳过。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-form v-if="config" label-position="top" @submit.prevent>
       <el-form-item label="通知时间（北京时间）">

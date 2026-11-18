@@ -13,6 +13,7 @@ import { refreshDictCache } from '@/api/login'
 import { reportToolUsage } from '@/services/toolUsageReporter'
 import authSession from '@/services/authSession'
 import {takePostLoginTarget} from '@/router/auth'
+import {devHubBrand} from '@/utils/devHubBrand'
 // @ts-ignore
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
@@ -60,11 +61,11 @@ router.afterEach((to, _from, failure) => {
     const isZhaogangRoute = to.path === '/zhaogang' || to.path.startsWith('/zhaogang/')
     const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
     if (favicon) {
-        favicon.href = isZhaogangRoute ? '/zhaogang-cat.svg' : '/wray.svg'
+        favicon.href = isZhaogangRoute ? devHubBrand.icon : '/wray.svg'
     }
 
     if (isZhaogangRoute) {
-        document.title = '找钢工作台'
+        document.title = devHubBrand.tabTitle
     } else {
         const pageTitle = typeof to.meta.title === 'string' ? to.meta.title.trim() : ''
         const titleSuffix = to.matched.some((route) => route.meta.toolRoot === true) ? '工具箱' : 'IW'

@@ -7,13 +7,13 @@
         <el-form-item label="开始日期"><el-date-picker v-model="form.startDate" value-format="YYYY-MM-DD" type="date" class="full-control" /></el-form-item>
         <el-form-item label="计划上线日期"><el-date-picker v-model="form.plannedReleaseDate" value-format="YYYY-MM-DD" type="date" class="full-control" /></el-form-item>
       </div>
-      <el-form-item label="工作台团队" required>
-        <el-select v-model="selectedTeamIds" multiple filterable class="full-control" placeholder="选择一个或多个工作台团队">
+      <el-form-item label="Dev Hub 团队" required>
+        <el-select v-model="selectedTeamIds" multiple filterable class="full-control" placeholder="选择一个或多个 Dev Hub 团队">
           <el-option v-for="team in teamOptions" :key="team.teamId" :label="team.teamName" :value="team.teamId" />
         </el-select>
       </el-form-item>
       <template v-for="teamId in selectedTeamIds" :key="teamId">
-        <el-form-item :label="`${teamById.get(teamId)?.teamName || '工作台团队'}成员`" required>
+        <el-form-item :label="`${teamById.get(teamId)?.teamName || 'Dev Hub 团队'}成员`" required>
           <el-select v-model="selectedByTeam[teamId]" multiple filterable class="full-control" placeholder="选择团队成员">
             <el-option v-for="member in teamById.get(teamId)?.members || []" :key="member.userId" :label="member.userName" :value="member.userId" />
           </el-select>
@@ -25,7 +25,7 @@
       <el-table-column label="成员" min-width="180"><template #default="scope"><div class="member-cell"><el-avatar :size="28" :src="scope.row.user.avatar">{{ scope.row.user.userName.slice(0, 1) }}</el-avatar><span>{{ scope.row.user.userName }}</span><el-tag v-if="scope.row.user.userId === session?.userId" size="small" effect="plain">创建人</el-tag></div></template></el-table-column>
       <el-table-column label="角色（可选）" min-width="300"><template #default="scope"><el-select v-model="draftRoles[scope.row.key]" multiple clearable class="full-control" placeholder="可不选择角色"><el-option v-for="role in roleOptions" :key="role.value" :label="role.label" :value="role.value" /></el-select></template></el-table-column>
     </el-table>
-    <el-alert v-if="!teamOptions.length && !membersLoading" class="role-alert" type="warning" :closable="false" show-icon title="请先创建或加入工作台团队" />
+    <el-alert v-if="!teamOptions.length && !membersLoading" class="role-alert" type="warning" :closable="false" show-icon title="请先创建或加入 Dev Hub 团队" />
     <template #footer><el-button @click="visible = false">取消</el-button><el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="submit">创建</el-button></template>
   </el-dialog>
 </template>
@@ -84,7 +84,7 @@ watch(visible, async value => {
       selectedTeamIds.value = [first.teamId]
       selectedByTeam[first.teamId] = session.value && first.members.some(member => member.userId === session.value?.userId) ? [session.value.userId] : []
     }
-  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '工作台团队成员加载失败') }
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : 'Dev Hub 团队成员加载失败') }
   finally { membersLoading.value = false }
 })
 watch(selectedTeamIds, ids => { Object.keys(selectedByTeam).forEach(key => { if (!ids.includes(Number(key))) delete selectedByTeam[Number(key)] }) })

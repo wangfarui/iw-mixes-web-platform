@@ -76,7 +76,7 @@
           >
         </div>
         <p class="muted-copy">
-          Token 保存到当前找钢工作台账号，Agent
+          Token 保存到当前 Dev Hub 账号，Agent
           重启后会自动恢复，不会保存到本机配置文件。
         </p></el-card
       >

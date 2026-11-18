@@ -2,7 +2,7 @@
   <section class="calendar-view">
     <header class="calendar-toolbar">
       <div class="calendar-title">
-        <h2>找钢日历</h2>
+        <h2>工作日历</h2>
         <el-tag :type="calendar?.canManage ? 'success' : 'info'" effect="plain">
           {{ calendar?.canManage ? '日历维护人' : '只读' }}
         </el-tag>
