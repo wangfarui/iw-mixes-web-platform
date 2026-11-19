@@ -383,6 +383,7 @@
               </div>
 
               <ZhaogangAgentSettings
+                :key="session?.userId"
                 :active-section="agentSettingsSection"
                 @summary-change="agentSettingsSummary = $event"
               />

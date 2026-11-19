@@ -1,7 +1,5 @@
-import {
-  getZhaogangK8sToken,
-  getZhaogangK8sTokenStatus
-} from '@/api/zhaogang'
+import { getZhaogangK8sTokenStatus } from '@/api/zhaogang'
+import { connectZhaogangK8sEnvironment } from './zhaogangK8sTokenState'
 import {
   checkZgWorkbenchAgent,
   getZgWorkbenchAgentPort,
@@ -156,20 +154,16 @@ export const queryReleaseK8sStatuses = async (
       })
       return result
     }
-    const healthByEnvironment = new Map<string, boolean>(Object.entries(health.environments || {}))
-
     await Promise.all([...grouped.entries()].map(async ([environment, environmentTargets]) => {
       try {
-        if (!healthByEnvironment.get(environment)) {
-          if (!tokenStatus.configured[environment]) {
-            environmentTargets.forEach(target => { result[target.id] = { state: 'TOKEN_MISSING', environment } })
-            return
-          }
-          const stored = await getZhaogangK8sToken(environment)
-          await client.login(environment, stored.token)
+        const connected = await connectZhaogangK8sEnvironment(client, environment, tokenStatus)
+        if (!connected) {
+          environmentTargets.forEach(target => { result[target.id] = { state: 'TOKEN_MISSING', environment } })
+          return
+        }
+        if (!health.environments?.[environment]) {
           const refreshed = await client.health()
           options.onHealth?.(refreshed)
-          if (!refreshed.environments?.[environment]) throw new Error('对应环境 Token 无法连接 Agent')
         }
         const namespace = await namespaceFor(client, environment)
         const deployments = await listAllZgWorkbenchDeployments(client, environment, namespace)

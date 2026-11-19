@@ -113,6 +113,14 @@ export const acknowledgeZhaogangRelease = (releaseId: string) => zhaogangRequest
 export interface ZhaogangK8sTokenStatus {
   environments: ZgK8sEnvironment[]
   configured: Record<ZgK8sEnvironment, boolean>
+  credentials?: Record<ZgK8sEnvironment, ZhaogangK8sTokenDisplay>
+}
+
+export interface ZhaogangK8sTokenDisplay {
+  source: 'PERSONAL' | 'DEFAULT' | 'NONE'
+  maskedToken: string | null
+  revision: string | null
+  defaultAvailable: boolean
 }
 
 export const getZhaogangK8sTokenStatus = () => zhaogangRequest<ZhaogangK8sTokenStatus>('/k8s-tokens')
@@ -121,7 +129,7 @@ export const saveZhaogangK8sToken = (environment: ZgK8sEnvironment, token: strin
   '/k8s-tokens', { method: 'POST', body: JSON.stringify({ environment, token }) }
 )
 
-export const getZhaogangK8sToken = (environment: ZgK8sEnvironment) => zhaogangRequest<ZhaogangTokenValue>(
+export const getZhaogangK8sToken = (environment: ZgK8sEnvironment) => zhaogangRequest<ZhaogangTokenValue & { revision?: string }>(
   `/k8s-tokens/${environment}`
 )
 

@@ -49,13 +49,14 @@
       <header class="settings-heading">
         <div>
           <h3>K8s Dashboard Token</h3>
-          <p>Token 按当前 Dev Hub 账号和环境保存。新增或更换前会先通过本机 Agent 验证。</p>
+          <p>各环境优先使用个人 Token，未配置时使用环境默认 Token。</p>
         </div>
         <el-tag :type="configuredCount ? 'success' : 'info'" effect="light">已配置 {{ configuredCount }}/3</el-tag>
       </header>
       <div class="k8s-token-list">
         <div class="k8s-token-row k8s-token-row--header" aria-hidden="true">
           <span>环境</span>
+          <span>Token</span>
           <span>配置状态</span>
           <span>操作</span>
         </div>
@@ -66,8 +67,9 @@
           :class="{ 'is-target': targetEnvironment === item.value }"
         >
           <strong>{{ item.label }}</strong>
+          <code class="k8s-token-mask">{{ k8sStatus?.credentials?.[item.value]?.maskedToken || '—' }}</code>
           <el-tag :type="k8sConfigured[item.value] ? 'success' : 'info'" size="small" effect="light">
-            {{ k8sConfigured[item.value] ? '已配置' : '未配置' }}
+            {{ k8sStatusLabel(item.value) }}
           </el-tag>
           <div class="k8s-token-actions">
             <el-button
@@ -82,9 +84,9 @@
               link
               type="primary"
               @click="openK8sDialog(item.value)"
-            >{{ k8sConfigured[item.value] ? '更换' : '配置' }}</el-button>
+            >{{ hasPersonalK8sToken(item.value) ? '更换' : '配置' }}</el-button>
             <el-button
-              v-if="k8sConfigured[item.value]"
+              v-if="hasPersonalK8sToken(item.value)"
               link
               type="danger"
               @click="deleteK8s(item.value)"
@@ -258,7 +260,7 @@
 
     <el-dialog
       v-model="k8sDialogVisible"
-      :title="`${k8sConfigured[k8sDialogEnvironment] ? '更换' : '配置'} K8s Dashboard Token`"
+      :title="`${hasPersonalK8sToken(k8sDialogEnvironment) ? '更换' : '配置'}个人 K8s Token`"
       width="min(500px, calc(100% - 32px))"
       :close-on-click-modal="false"
       @closed="resetK8sDialog"
@@ -297,7 +299,7 @@
           :loading="k8sSaving[k8sDialogEnvironment]"
           :disabled="!agentState?.compatible || !k8sTokens[k8sDialogEnvironment].trim()"
           @click="saveK8s(k8sDialogEnvironment)"
-        >{{ k8sConfigured[k8sDialogEnvironment] ? '验证并更换' : '验证并保存' }}</el-button>
+        >{{ hasPersonalK8sToken(k8sDialogEnvironment) ? '验证并更换' : '验证并保存' }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -317,13 +319,14 @@ import {
   deleteZhaogangK8sToken,
   getZhaogangAgentToken,
   getZhaogangAiConfig,
-  getZhaogangK8sToken,
   getZhaogangK8sTokenStatus,
   issueZhaogangAiTestTicket,
   saveZhaogangAiConfig,
   saveZhaogangK8sToken,
-  testZhaogangAiConfig
+  testZhaogangAiConfig,
+  type ZhaogangK8sTokenStatus
 } from '@/api/zhaogang'
+import { connectZhaogangK8sEnvironment, logoutZhaogangK8sEnvironment, validateZhaogangK8sDraft } from '@/services/zhaogangK8sTokenState'
 import {
   checkZgWorkbenchAgent,
   compareZgWorkbenchAgentVersion,
@@ -392,7 +395,16 @@ const agentTokenDeleting = ref(false)
 const copyingAgentToken = ref(false)
 const copyingSkillPrompt = ref(false)
 const updateCheckError = ref('')
-const k8sConfigured = ref(emptyEnvironmentFlags())
+const k8sStatus = ref<ZhaogangK8sTokenStatus | null>(null)
+const k8sConfigured = computed(() => k8sStatus.value?.configured ?? emptyEnvironmentFlags())
+const hasPersonalK8sToken = (environment: ZgK8sEnvironment) => {
+  const credential = k8sStatus.value?.credentials?.[environment]
+  return credential ? credential.source === 'PERSONAL' : k8sConfigured.value[environment]
+}
+const k8sStatusLabel = (environment: ZgK8sEnvironment) => {
+  if (k8sStatus.value?.credentials?.[environment]?.source === 'DEFAULT') return '使用默认'
+  return hasPersonalK8sToken(environment) ? '个人配置' : '未配置'
+}
 const k8sTokens = ref(emptyEnvironmentTokens())
 const k8sTesting = ref(emptyEnvironmentFlags())
 const k8sSaving = ref(emptyEnvironmentFlags())
@@ -585,8 +597,7 @@ const formatAgentTokenTime = (value: string) => {
 
 const loadK8sStatus = async () => {
   try {
-    const result = await getZhaogangK8sTokenStatus()
-    k8sConfigured.value = { ...emptyEnvironmentFlags(), ...result.configured }
+    k8sStatus.value = await getZhaogangK8sTokenStatus()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : 'K8s Token 状态加载失败')
   }
@@ -691,26 +702,30 @@ const resetK8sDialog = () => {
   k8sTokens.value[k8sDialogEnvironment.value] = ''
 }
 
-const tokenForValidation = async (environment: ZgK8sEnvironment) => {
-  const entered = k8sTokens.value[environment].trim()
-  if (entered) return entered
-  return (await getZhaogangK8sToken(environment)).token
-}
-
-const validateK8s = async (environment: ZgK8sEnvironment, token: string) => {
+const requireK8sAgent = async () => {
   const state = await checkZgWorkbenchAgent()
   agentState.value = state
   if (!state.compatible) throw new Error(state.message || '本机 Agent 未就绪')
-  await client().login(environment, token)
-  await client().namespaces(environment)
+  return client()
 }
 
 const testK8s = async (environment: ZgK8sEnvironment, requireEnteredToken = false) => {
+  if (k8sTesting.value[environment] || k8sSaving.value[environment]) return
   k8sTesting.value[environment] = true
   try {
-    if (requireEnteredToken && !k8sTokens.value[environment].trim()) return
-    const token = await tokenForValidation(environment)
-    await validateK8s(environment, token)
+    const k8sClient = await requireK8sAgent()
+    if (requireEnteredToken) {
+      const token = k8sTokens.value[environment].trim()
+      if (!token) return
+      await validateZhaogangK8sDraft(k8sClient, environment, token)
+    } else {
+      const status = await getZhaogangK8sTokenStatus()
+      k8sStatus.value = status
+      if (!await connectZhaogangK8sEnvironment(k8sClient, environment, status, true)) {
+        throw new Error('当前环境尚未配置 K8s Token')
+      }
+      await k8sClient.namespaces(environment)
+    }
     ElMessage.success(`${environmentLabel(environment)} 连接成功`)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : 'K8s 连接失败')
@@ -721,12 +736,11 @@ const testK8s = async (environment: ZgK8sEnvironment, requireEnteredToken = fals
 
 const saveK8s = async (environment: ZgK8sEnvironment) => {
   const token = k8sTokens.value[environment].trim()
-  if (!token) return
+  if (!token || k8sSaving.value[environment] || k8sTesting.value[environment]) return
   k8sSaving.value[environment] = true
   try {
-    await validateK8s(environment, token)
-    const result = await saveZhaogangK8sToken(environment, token)
-    k8sConfigured.value = { ...emptyEnvironmentFlags(), ...result.configured }
+    await validateZhaogangK8sDraft(await requireK8sAgent(), environment, token)
+    k8sStatus.value = await saveZhaogangK8sToken(environment, token)
     k8sTokens.value[environment] = ''
     k8sDialogVisible.value = false
     ElMessage.success('Token 已验证并保存')
@@ -738,17 +752,21 @@ const saveK8s = async (environment: ZgK8sEnvironment) => {
 }
 
 const deleteK8s = async (environment: ZgK8sEnvironment) => {
+  const hasDefault = k8sStatus.value?.credentials?.[environment]?.defaultAvailable
   try {
-    await ElMessageBox.confirm('删除后该环境的 K8s 页面将无法查询，确认继续？', '删除 K8s Token', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      hasDefault ? '删除个人 Token 后将使用该环境的默认 Token，确认继续？' : '删除后该环境将无法查询 K8s，确认继续？',
+      '删除个人 K8s Token', {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
     const result = await deleteZhaogangK8sToken(environment)
-    await client().logout(environment).catch(() => undefined)
-    k8sConfigured.value = { ...emptyEnvironmentFlags(), ...result.configured }
+    await logoutZhaogangK8sEnvironment(client(), environment).catch(() => undefined)
+    k8sStatus.value = result
     k8sTokens.value[environment] = ''
-    ElMessage.success('Token 已删除')
+    ElMessage.success(result.credentials?.[environment]?.source === 'DEFAULT' ? '个人 Token 已删除，现使用默认 Token' : '个人 Token 已删除')
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
     ElMessage.error(error instanceof Error ? error.message : 'Token 删除失败')
@@ -864,17 +882,21 @@ onMounted(async () => {
 .label-help-icon:hover, .label-help-icon:focus { color: #409eff; }
 .execution-location-help { max-width: 360px; line-height: 1.7; }
 .execution-location-help div + div { margin-top: 4px; }
-.k8s-token-list { overflow: hidden; margin-top: 16px; border: 1px solid #e4e9f1; border-radius: 6px; }
-.k8s-token-row { display: grid; min-height: 54px; grid-template-columns: minmax(130px, 1fr) minmax(110px, .8fr) minmax(220px, auto); align-items: center; gap: 16px; padding: 8px 14px; border-bottom: 1px solid #edf0f5; transition: background-color .2s; }
+.k8s-token-list { container-type: inline-size; overflow: hidden; margin-top: 16px; border: 1px solid #e4e9f1; border-radius: 6px; }
+.k8s-token-row { display: grid; min-height: 54px; grid-template-columns: minmax(86px, 1fr) minmax(76px, .8fr) minmax(64px, .8fr) minmax(180px, auto); align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #edf0f5; transition: background-color .2s; }
 .k8s-token-row:last-child { border-bottom: 0; }
 .k8s-token-row--header { min-height: 38px; color: #7d899c; background: #f7f9fc; font-size: 12px; }
 .k8s-token-row.is-target { border-color: #7aa7f5; background: #f5f8ff; }
 .k8s-token-row > strong { color: #344158; font-size: 14px; }
+.k8s-token-mask { color: #4f5e74; font-size: 13px; white-space: nowrap; }
 .k8s-token-row > .el-tag { justify-self: start; }
 .k8s-token-actions { display: flex; align-items: center; gap: 4px; }
 .k8s-token-actions { justify-content: flex-end; flex-wrap: wrap; }
-@media (max-width: 900px) {
-  .k8s-token-row { grid-template-columns: minmax(120px, 1fr) 100px minmax(200px, auto); }
+@container (max-width: 480px) {
+  .k8s-token-row { grid-template-columns: minmax(76px, 1fr) minmax(72px, auto) auto; gap: 8px; padding: 10px 12px; }
+  .k8s-token-row--header { display: none; }
+  .k8s-token-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .k8s-token-actions .el-button { margin-left: 0; }
 }
 @media (max-width: 640px) {
   .settings-section { padding: 16px; }
@@ -882,9 +904,5 @@ onMounted(async () => {
   .skill-package-heading { flex-direction: column; }
   .connection-details > div { align-items: flex-start; flex-direction: column; gap: 7px; }
   .connection-details dd { width: 100%; text-align: left; }
-  .k8s-token-row { grid-template-columns: minmax(92px, 1fr) auto; gap: 8px; padding: 10px 12px; }
-  .k8s-token-row--header { display: none; }
-  .k8s-token-actions { grid-column: 1 / -1; justify-content: flex-start; }
-  .k8s-token-actions .el-button { margin-left: 0; }
 }
 </style>

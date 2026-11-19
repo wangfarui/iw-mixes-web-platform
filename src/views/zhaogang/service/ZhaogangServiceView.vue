@@ -194,9 +194,9 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { Refresh, TopRight } from "@element-plus/icons-vue";
 import {
-  getZhaogangK8sToken,
   getZhaogangK8sTokenStatus,
   saveZhaogangK8sToken,
+  type ZhaogangK8sTokenStatus,
 } from "@/api/zhaogang";
 import {
   checkZgWorkbenchAgent,
@@ -205,7 +205,11 @@ import {
   zgWorkbenchAgentClient,
 } from "@/services/zgWorkbenchAgentClient";
 import { zhaogangK8sDashboardUrl } from "@/services/zhaogangReleaseK8s";
-import { mergeZhaogangK8sTokenConfigured } from "@/services/zhaogangK8sTokenState";
+import {
+  connectZhaogangK8sEnvironment,
+  mergeZhaogangK8sTokenConfigured,
+  validateZhaogangK8sDraft,
+} from "@/services/zhaogangK8sTokenState";
 import type {
   ZgK8sDeployment,
   ZgK8sEnvironment,
@@ -237,11 +241,7 @@ const writeRefreshIntervalPreference = (value: number) =>
 const portInput = ref(getZgWorkbenchAgentPort());
 const health = ref<ZgWorkbenchAgentHealth | null>(null);
 const environment = ref<ZgK8sEnvironment>("test");
-const tokenStatus = ref<Record<ZgK8sEnvironment, boolean>>({
-  test: false,
-  uat: false,
-  prd: false,
-});
+const tokenStatus = ref<ZhaogangK8sTokenStatus | null>(null);
 const tokenInput = ref("");
 const tokenSaving = ref(false);
 const namespace = ref("");
@@ -266,7 +266,9 @@ let environmentLoadSequence = 0;
 let deploymentLoadSequence = 0;
 const client = () =>
   zgWorkbenchAgentClient(saveZgWorkbenchAgentPort(Number(portInput.value)));
-const tokenConfigured = computed(() => tokenStatus.value[environment.value]);
+const tokenConfigured = computed(() => tokenStatus.value?.credentials
+  ? tokenStatus.value.configured[environment.value]
+  : mergeZhaogangK8sTokenConfigured(tokenStatus.value?.configured, health.value?.environments)[environment.value]);
 const agentReady = computed(() => Boolean(health.value && health.value.running && !agentError.value));
 const environmentAuthenticated = (target = environment.value) =>
   Boolean(health.value?.environments?.[target]);
@@ -336,11 +338,6 @@ const checkAgent = async () => {
       agentError.value = state.message || "本机 Agent 未就绪，请前往设置处理";
       return;
     }
-    const status = await getZhaogangK8sTokenStatus();
-    tokenStatus.value = mergeZhaogangK8sTokenConfigured(
-      status.configured,
-      health.value?.environments,
-    );
     await loadEnvironment();
   } catch (error) {
     health.value = null;
@@ -348,12 +345,13 @@ const checkAgent = async () => {
   }
 };
 const restoreEnvironmentSession = async (target: ZgK8sEnvironment) => {
-  if (environmentAuthenticated(target)) return true;
-  if (!tokenStatus.value[target]) return false;
-  const stored = await getZhaogangK8sToken(target);
-  await client().login(target, stored.token);
-  health.value = await client().health();
-  return true;
+  const status = await getZhaogangK8sTokenStatus();
+  tokenStatus.value = status;
+  const connected = await connectZhaogangK8sEnvironment(client(), target, status);
+  if (health.value && environmentAuthenticated(target) !== connected) {
+    health.value = { ...health.value, environments: { ...health.value.environments, [target]: connected } };
+  }
+  return connected;
 };
 const loadEnvironment = async () => {
   const sequence = ++environmentLoadSequence;
@@ -376,10 +374,6 @@ const loadEnvironment = async () => {
     const cached = readNamespaceCache();
     const namespaces = await client().namespaces(target);
     if (sequence !== environmentLoadSequence || target !== environment.value) return;
-    tokenStatus.value = mergeZhaogangK8sTokenConfigured(
-      tokenStatus.value,
-      health.value?.environments,
-    );
     namespace.value =
       cached[target] || namespaces[0]?.name || "application";
     if (!namespaces.some((item) => item.name === namespace.value))
@@ -401,7 +395,7 @@ const loadDeployments = async (
   silent = false,
 ) => {
   if (sequence !== undefined && sequence !== environmentLoadSequence) return;
-  if (!environmentAuthenticated(target) || !namespace.value || loading.value) return;
+  if (!namespace.value || loading.value) return;
   const requestSequence = ++deploymentLoadSequence;
   podDetails.value = {};
   podLoading.value = {};
@@ -410,6 +404,11 @@ const loadDeployments = async (
     errorMessage.value = "";
   }
   try {
+    if (sequence === undefined && !await restoreEnvironmentSession(target)) {
+      if (requestSequence === deploymentLoadSequence) deployments.value = [];
+      return;
+    }
+    if (requestSequence !== deploymentLoadSequence || target !== environment.value) return;
     const result = await client().deployments(target, namespace.value, page.value, pageSize.value);
     if (
       requestSequence !== deploymentLoadSequence ||
@@ -422,7 +421,7 @@ const loadDeployments = async (
     updatedAt.value = result.updatedAt;
     for (const deploymentName of expandedDeploymentNames.value) {
       if (deployments.value.some((item) => item.name === deploymentName))
-        void loadPodDetails(deploymentName);
+        void loadPodDetails(deploymentName, true);
     }
   } catch (error) {
     if (
@@ -437,12 +436,14 @@ const loadDeployments = async (
       loading.value = false;
   }
 };
-const loadPodDetails = async (deploymentName: string) => {
+const loadPodDetails = async (deploymentName: string, sessionReady = false) => {
   if (podDetails.value[deploymentName] || podLoading.value[deploymentName]) return;
   const target = environment.value;
   const targetNamespace = namespace.value;
   podLoading.value = { ...podLoading.value, [deploymentName]: true };
   try {
+    if (!sessionReady && !await restoreEnvironmentSession(target)) return;
+    if (target !== environment.value || targetNamespace !== namespace.value) return;
     const result = await client().pods(target, targetNamespace, deploymentName);
     if (target !== environment.value || targetNamespace !== namespace.value) return;
     podDetails.value = { ...podDetails.value, [deploymentName]: result.items || [] };
@@ -471,18 +472,18 @@ const handlePageSizeChange = (value: number) => {
   void loadDeployments();
 };
 const saveToken = async () => {
-  if (!tokenInput.value.trim()) return;
+  const token = tokenInput.value.trim();
+  const target = environment.value;
+  if (!token) return;
   tokenSaving.value = true;
   errorMessage.value = "";
   try {
-    await client().login(environment.value, tokenInput.value.trim());
-    health.value = await client().health();
-    const status = await saveZhaogangK8sToken(environment.value, tokenInput.value.trim());
-    tokenStatus.value = status.configured;
+    await validateZhaogangK8sDraft(client(), target, token);
+    tokenStatus.value = await saveZhaogangK8sToken(target, token);
     tokenInput.value = "";
     await loadEnvironment();
     ElMessage.success(
-      `${environmentLabel(environment.value)} Token 已保存并连接`,
+      `${environmentLabel(target)} Token 已保存`,
     );
   } catch (error) {
     errorMessage.value =
