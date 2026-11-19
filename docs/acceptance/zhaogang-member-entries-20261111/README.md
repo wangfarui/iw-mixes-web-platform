@@ -29,7 +29,7 @@ Web：
 - `test/java/com/itwray/iw/external/zhaogang/codestats/CodeStatsQueryServiceTest.java`、`CodeStatsEntriesModuleTest.java`：查询行为、缓存及权限边界回归。
 - `test/java/com/itwray/iw/external/zhaogang/ZhaogangCodeStatsControllerTest.java`：个人旧请求默认值、团队参数绑定及非法排序拒绝。
 
-同步更新联合工作区 `context/zhaogang-workbench-product-knowledge.md` 和 `context/zhaogang-workbench-technical-reference.md` 的产品及接口规则。
+同步更新联合工作区 `context/devhub-product-knowledge.md` 和 `context/devhub-technical-reference.md` 的产品及接口规则。
 
 ## 验证结果
 

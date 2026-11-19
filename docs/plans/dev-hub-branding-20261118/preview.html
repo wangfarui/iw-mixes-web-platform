@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dev Hub · CODING 助手</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f7fb; color: #182638; font: 14px system-ui, sans-serif; }
+    main { max-width: 760px; margin: auto; padding: 30px 24px; }
+    section + section { margin-top: 22px; }
+    .label { margin: 0 0 8px; color: #536277; font: 600 12px ui-monospace, monospace; }
+    .surface { overflow: hidden; background: white; border: 1px solid #e1e7f0; border-radius: 12px; }
+    .entries { padding: 16px; }
+    .divider { display: flex; align-items: center; gap: 12px; color: #586981; font-size: 12px; margin-bottom: 12px; }
+    .divider::before, .divider::after { content: ''; background: #e8ebf1; height: 1px; flex: 1; }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .card { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 11px; border: 1px solid #e6eaf1; border-radius: 10px; background: #fafbfe; color: inherit; text-decoration: none; }
+    a.card:hover { border-color: #9fbcf2; }
+    a:focus-visible, .app-header:focus-visible { outline: 2px solid #276de9; outline-offset: -2px; }
+    .card strong { display: block; font-size: 13px; }
+    .card small { display: block; color: #586981; margin-top: 3px; font-size: 11px; }
+    .arrow { margin-left: auto; color: #68798f; font-size: 18px; }
+    .tools { display: grid; flex-shrink: 0; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #eaf1ff; color: #376fdd; font-size: 18px; }
+    .browser { display: flex; align-items: center; padding: 8px 12px 0; background: #eaf0f8; border-bottom: 1px solid #e1e7f0; }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; font-size: 12px; background: white; border-radius: 8px 8px 0 0; }
+    .app-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 68px; padding: 0 24px; }
+    .brand, .account { display: flex; align-items: center; gap: 10px; }
+    h1 { margin: 0; font-size: 19px; line-height: 1.2; }
+    .subtitle { margin: 3px 0 0; font-size: 12px; color: #586981; }
+    .version { font-size: 12px; padding: 4px 9px; border: 1px solid #d8e3f2; border-radius: 99px; background: #f1f5fb; color: #31527e; }
+    .avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #eaf1ff; color: #31527e; }
+    .logo { position: relative; display: block; flex: 0 0 auto; width: 38px; height: 38px;  }
+    .logo--card { width: 34px; height: 34px; }
+    .logo--tab { width: 16px; height: 16px; }
+    @media (max-width: 520px) {
+      main { padding: 16px; }
+      .cards { grid-template-columns: 1fr; }
+      .app-header { padding: 0 12px; }
+      .account { gap: 6px; }
+      .account .name { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section aria-label="登录页快捷入口">
+      <p class="label">/login</p>
+      <div class="surface entries">
+        <div class="divider">无需登录，直接访问</div>
+        <div class="cards">
+          <div class="card">
+            <span class="tools" aria-hidden="true">⚙</span>
+            <span><strong>工具箱</strong><small>本地优先的实用工具</small></span>
+            <span class="arrow" aria-hidden="true">›</span>
+          </div>
+          <a class="card" href="#dev-hub" aria-label="进入 Dev Hub">
+            <img class="logo logo--card" src="../../../public/zhaogang-cat.svg" alt="">
+            <span><strong>Dev Hub</strong><small>发布、迭代与工时协作</small></span>
+            <span class="arrow" aria-hidden="true">›</span>
+          </a>
+        </div>
+      </div>
+    </section>
+    <section aria-label="Dev Hub 页头">
+      <p class="label">/zhaogang</p>
+      <div class="surface">
+        <div class="browser">
+          <div class="tab"><img class="logo logo--tab" src="../../../public/zhaogang-cat.svg" alt="">Dev Hub · CODING 助手</div>
+        </div>
+        <header class="app-header" id="dev-hub" tabindex="-1">
+          <div class="brand">
+            <img class="logo" src="../../../public/zhaogang-cat.svg" alt="">
+            <div><h1>Dev Hub</h1><p class="subtitle">CODING 助手 · 研发协作</p></div>
+          </div>
+          <div class="account" aria-label="账号和版本示意">
+            <span class="version">v1.x</span><span class="avatar">林</span><span class="name">林同学</span>
+          </div>
+        </header>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

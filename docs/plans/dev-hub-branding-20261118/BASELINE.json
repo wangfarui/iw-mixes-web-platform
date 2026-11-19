@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-18T02:52:13.411888+00:00",
+  "repos": {
+    "iw-mixes-web-platform": {
+      "head": "120cafd9811d5d6102fc3a9adcff7eca20c473ad",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "22864d75d1f92977fcfcb45477dff620070ee3043c1699ebe983e08ef39d9269",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-web-platform/AGENTS.md",
+      "sha256": "b7611beddd999c4c3e46389a1f0bd0ba80b1d9bd0f063a813a2b935b387324e5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/api/zhaogang.ts",
+      "sha256": "37cc7a16a17b5f3cf70efaf8b876b98d1e186077a7e397100395a79f8b27b351",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/main.ts",
+      "sha256": "3de891444eae677b2732452cdcaa1ce147554acc31bb2146ed4e91ea94c485ac",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/router/zhaogang.ts",
+      "sha256": "9a645e3033e2a29cc79ce3a4bd70874512a1be0a5c2b279e8187b0241e0ba364",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/Login.vue",
+      "sha256": "34d4f5fc97a13beaa5bd9ec00568cb1feb248cb74fe75e7c8f37324d0949d1aa",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/ZhaogangWorkbench.vue",
+      "sha256": "62da0f427d93a1b3560c1317813a015d252e7ccc5200c3de48496aedb29159b9",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/calendar/ZhaogangCalendarView.vue",
+      "sha256": "185c1626fa5a6c65f4ed4f39e9a2cb79195765e29934de822191bd4e5fd7a7de",
+      "tracked": true
+    }
+  ]
+}

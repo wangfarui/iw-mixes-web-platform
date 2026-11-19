@@ -18,12 +18,6 @@ export const planFavoriteKey = (projectId: number, planId: number): string => `$
 
 export const loadZhaogangFavorites = (userId: number): Set<string> => read(userId)
 
-export const clearZhaogangFavorites = (userId: number): Set<string> => {
-  const favorites = new Set<string>()
-  write(userId, favorites)
-  return favorites
-}
-
 export const toggleZhaogangFavorite = (userId: number, key: string): Set<string> => {
   const favorites = read(userId)
   if (favorites.has(key)) {

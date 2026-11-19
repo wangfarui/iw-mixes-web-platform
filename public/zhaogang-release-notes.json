@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-19-02",
+  "currentReleaseId": "zg-2026-11-19-03",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -726,6 +726,17 @@
         {
           "type": "FEATURE",
           "text": "K8s 支持按环境配置默认 Token，用户未配置个人 Token 时自动使用默认值，设置页展示当前生效的脱敏 Token。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-19-03",
+      "version": "2.0.3",
+      "publishedAt": "2026-11-19T15:20:01+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "「胖猫云工作台构建」统一在 Skills 页面下载和安装，Skill 详情与 Agent 授权页可互相跳转。"
         }
       ]
     }

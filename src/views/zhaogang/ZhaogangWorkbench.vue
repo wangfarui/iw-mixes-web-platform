@@ -387,14 +387,6 @@
                 :active-section="agentSettingsSection"
                 @summary-change="agentSettingsSummary = $event"
               />
-
-              <section v-if="settingsSection === 'local-data'" class="settings-section">
-                <header class="settings-heading"><div><h3>本地数据</h3><p>收藏保存在当前浏览器，不会同步到 CODING。</p></div></header>
-                <div class="local-data-row">
-                  <div><strong>{{ favorites.size }} 个收藏计划</strong><span>清理后不会影响 CODING 中的项目或构建计划。</span></div>
-                  <el-button :icon="Delete" :disabled="!favorites.size" @click="clearFavorites">清空收藏</el-button>
-                </div>
-              </section>
             </div>
           </div>
         </template>
@@ -553,8 +545,8 @@
 import { devHubBrand } from '@/utils/devHubBrand'
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, Calendar, DataAnalysis, Delete, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Collection, Calendar, DataAnalysis, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 import ToolboxIcon from '@/assets/icons/toolbox.svg'
 import ZhaogangMobileSettings from './settings/ZhaogangMobileSettings.vue'
 import {
@@ -569,7 +561,7 @@ import {
   triggerZhaogangBuild,
   updateZhaogangCodingRole
 } from '@/api/zhaogang'
-import { clearZhaogangFavorites, loadZhaogangFavorites, planFavoriteKey, toggleZhaogangFavorite } from '@/services/zhaogangFavorites'
+import { loadZhaogangFavorites, planFavoriteKey, toggleZhaogangFavorite } from '@/services/zhaogangFavorites'
 import {
   ZHAOGANG_PERMISSION_EVENT,
   type ZhaogangPermissionPromptDetail
@@ -596,8 +588,7 @@ type ViewMode = 'table' | 'card'
 type BuildabilityFilter = 'buildable' | 'unbuildable' | 'all'
 type PlanWithBuild = ZhaogangBuildPlan
 type ResizedPlanTableColumn = { columnKey?: string }
-type SettingsSection = 'general' | 'agent' | 'agent-k8s' | 'agent-auth' | 'ai' | 'local-data'
-type AgentSettingsSection = Exclude<SettingsSection, 'general' | 'local-data'> | null
+type SettingsSection = 'general' | 'agent' | 'agent-k8s' | 'agent-auth' | 'ai'
 type SettingsTagType = 'success' | 'warning' | 'info'
 type AgentSettingsSummary = {
   agent: string
@@ -686,29 +677,23 @@ const settingsNavigation: Array<{ key: SettingsSection; label: string }> = [
   { key: 'agent', label: '本机 Agent' },
   { key: 'agent-k8s', label: 'K8s Token' },
   { key: 'agent-auth', label: 'Agent 授权' },
-  { key: 'ai', label: 'AI Agent' },
-  { key: 'local-data', label: '本地数据' }
+  { key: 'ai', label: 'AI Agent' }
 ]
 
 const settingsSection = computed<SettingsSection>(() => {
   const section = typeof route.query.section === 'string' ? route.query.section : 'general'
   const normalized = section === 'agent-ai' ? 'ai' : section
-  return settingsNavigation.some(item => item.key === normalized) ? normalized as SettingsSection : 'general'
+  return settingsNavigation.find(item => item.key === normalized)?.key ?? 'general'
 })
 
-const agentSettingsSection = computed<AgentSettingsSection>(() =>
-  settingsSection.value === 'agent' || settingsSection.value === 'agent-k8s'
-    || settingsSection.value === 'agent-auth' || settingsSection.value === 'ai'
-    ? settingsSection.value
-    : null)
+const agentSettingsSection = computed(() => settingsSection.value === 'general' ? null : settingsSection.value)
 
 const settingsNavigationStatus = (section: SettingsSection) => {
-  if (section === 'general') return '已连接'
   if (section === 'agent') return agentSettingsSummary.value.agent
   if (section === 'agent-k8s') return agentSettingsSummary.value.k8s
   if (section === 'agent-auth') return agentSettingsSummary.value.agentAuth
   if (section === 'ai') return agentSettingsSummary.value.ai
-  return `${favorites.value.size} 项`
+  return '已连接'
 }
 
 const settingsNavigationTagType = (section: SettingsSection): SettingsTagType => {
@@ -716,7 +701,7 @@ const settingsNavigationTagType = (section: SettingsSection): SettingsTagType =>
   if (section === 'agent-k8s') return agentSettingsSummary.value.k8sType
   if (section === 'agent-auth') return agentSettingsSummary.value.agentAuthType
   if (section === 'ai') return agentSettingsSummary.value.aiType
-  return section === 'general' ? 'success' : 'info'
+  return 'success'
 }
 
 const changeSettingsSection = async (section: SettingsSection) => {
@@ -1063,21 +1048,6 @@ const replaceToken = async () => {
   }
 }
 
-const clearFavorites = async () => {
-  if (!session.value || !favorites.value.size) return
-  try {
-    await ElMessageBox.confirm('确定清空当前浏览器中的全部收藏计划吗？', '清空收藏', {
-      confirmButtonText: '清空',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    favorites.value = clearZhaogangFavorites(session.value.userId)
-    ElMessage.success('收藏已清空')
-  } catch {
-    // 用户取消时保持原状。
-  }
-}
-
 const loadCatalog = async () => {
   if (!session.value) return
   catalogLoading.value = true
@@ -1392,7 +1362,7 @@ onBeforeUnmount(() => {
 
 .release-toolbar { flex: 0 0 auto; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 11px; background: #fff; border: 1px solid #e5eaf2; border-bottom: 0; border-radius: 12px 12px 0 0; }.toolbar-left { gap: 6px; flex-wrap: wrap; }.toolbar-right { justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-left: auto; }.sync-time { color: #8490a4; font-size: 12px; white-space: nowrap; }.sync-time.is-syncing { color: #2468e8; }.service-search { width: 230px; }.project-filter { width: 150px; }.buildability-filter { width: 120px; }.partial-alert { flex: 0 0 auto; margin: 0; }.plan-list-viewport { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #fff; }.plan-table { width: 100%; height: 100%; border: 1px solid #e5eaf2; border-radius: 0; }.plan-list-empty { height: 100%; margin: 0; border: 1px solid #e5eaf2; }.plan-name { display: grid; gap: 4px; }.plan-name strong { color: #26344a; font-weight: 600; }.plan-name small { color: #8b96a7; }.favorite-button { padding: 0; color: #e5a126; font-size: 20px; }.pagination-row { box-sizing: border-box; flex: 0 0 auto; justify-content: space-between; min-height: 64px; padding: 12px 16px; color: #7b879a; background: #f8faff; border-top: 1px solid #e5eaf2; font-size: 13px; }
 .plan-cards { display: grid; box-sizing: border-box; height: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 12px; padding: 14px; overflow-y: auto; background: #fff; border: 1px solid #e5eaf2; border-radius: 0; }.plan-card { min-width: 0; padding: 16px; color: inherit; text-align: left; background: #fbfcff; border: 1px solid #e8edf5; border-radius: 10px; cursor: pointer; }.plan-card:hover { border-color: #9bbcf7; box-shadow: 0 8px 16px rgba(53, 96, 173, .09); }.plan-card > div { display: flex; justify-content: space-between; gap: 8px; }.plan-card > .build-status-cell { display: block; }.plan-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.card-star { color: #e5a126; font-size: 18px; }.plan-card small { display: block; margin: 7px 0 14px; color: #8b96a7; }.plan-card .build-status-cell small { margin: 4px 0 0; }.plan-card p { margin: 13px 0 0; color: #6e7c92; font-size: 12px; }
-.settings-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.settings-section { min-width: 0; padding: 20px; background: #fff; border: 1px solid #e4e9f1; border-radius: 8px; }.token-rotation-alert { margin-bottom: 16px; }.rotation-prompt-copy { margin: 0; color: #4f5e74; line-height: 1.7; }.settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #edf0f5; }.settings-heading h3 { margin: 0; font-size: 17px; }.settings-heading p { margin: 6px 0 0; color: #7d899c; font-size: 13px; line-height: 1.5; }.connection-profile { display: flex; align-items: center; gap: 12px; padding: 18px 0 14px; }.connection-profile strong, .connection-profile span { display: block; }.connection-profile span { margin-top: 4px; color: #8490a4; font-size: 13px; }.connection-details { margin: 0 0 18px; }.connection-details > div { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid #edf0f5; }.connection-details dt { color: #7c899c; font-size: 13px; }.connection-details dd { min-width: 0; margin: 0; color: #344158; font-weight: 600; text-align: right; }.connection-details code { display: inline-block; max-width: 100%; padding: 4px 7px; overflow: hidden; color: #31527e; background: #f1f5fb; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }.settings-actions { display: flex; gap: 9px; flex-wrap: wrap; }.preferences-form { padding-top: 18px; }.preferences-form :deep(.el-form-item) { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #edf0f5; }.preferences-form :deep(.el-form-item__label) { color: #4f5e74; }.local-data-section { grid-column: 1 / -1; }.local-data-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 17px; }.local-data-row strong, .local-data-row span { display: block; }.local-data-row span { margin-top: 5px; color: #8490a4; font-size: 13px; }
+.settings-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.settings-section { min-width: 0; padding: 20px; background: #fff; border: 1px solid #e4e9f1; border-radius: 8px; }.token-rotation-alert { margin-bottom: 16px; }.rotation-prompt-copy { margin: 0; color: #4f5e74; line-height: 1.7; }.settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #edf0f5; }.settings-heading h3 { margin: 0; font-size: 17px; }.settings-heading p { margin: 6px 0 0; color: #7d899c; font-size: 13px; line-height: 1.5; }.connection-profile { display: flex; align-items: center; gap: 12px; padding: 18px 0 14px; }.connection-profile strong, .connection-profile span { display: block; }.connection-profile span { margin-top: 4px; color: #8490a4; font-size: 13px; }.connection-details { margin: 0 0 18px; }.connection-details > div { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid #edf0f5; }.connection-details dt { color: #7c899c; font-size: 13px; }.connection-details dd { min-width: 0; margin: 0; color: #344158; font-weight: 600; text-align: right; }.connection-details code { display: inline-block; max-width: 100%; padding: 4px 7px; overflow: hidden; color: #31527e; background: #f1f5fb; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }.settings-actions { display: flex; gap: 9px; flex-wrap: wrap; }.preferences-form { padding-top: 18px; }.preferences-form :deep(.el-form-item) { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #edf0f5; }.preferences-form :deep(.el-form-item__label) { color: #4f5e74; }
 .connection-role { flex: 0 1 160px; }
 .settings-center { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
 .settings-nav { position: sticky; z-index: 3; top: -1px; display: flex; gap: 5px; padding: 7px; overflow-x: auto; background: #fff; border: 1px solid #e4e9f1; border-radius: 8px; scrollbar-width: thin; }
@@ -1404,8 +1374,8 @@ onBeforeUnmount(() => {
 .settings-content-panel { min-width: 0; }
 .drawer-heading { justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #e8edf4; }.drawer-heading > div:first-child { min-width: 0; }.drawer-heading h2 { max-width: 430px; margin: 0; overflow-wrap: anywhere; color: #233047; font-size: 20px; }.drawer-heading p { margin: 7px 0 0; color: #8290a5; font-size: 13px; }.drawer-heading-side { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 14px; }.drawer-heading-actions, .drawer-build-action { display: flex; align-items: center; }.drawer-heading-actions { gap: 4px; }.drawer-build-action { gap: 8px; }.drawer-icon-button { width: 36px; height: 36px; margin: 0; font-size: 20px; }.drawer-favorite-button { color: #8793a6; }.drawer-favorite-button.active { color: #e5a126; }.service-status-section { margin: 20px 0 24px; }.service-status-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }.service-status-heading h3 { margin: 0; }.service-status-table { overflow: hidden; border: 1px solid #e7ebf2; border-radius: 9px; }.service-status-row { display: grid; grid-template-columns: 90px 100px 190px minmax(180px, 1fr) 55px; gap: 12px; min-height: 52px; align-items: center; padding: 8px 13px; border-bottom: 1px solid #e8edf4; }.service-status-row:last-child { border-bottom: 0; }.service-status-row--header { min-height: 38px; color: #8490a4; background: #f8faff; font-size: 12px; }.service-status-row > span, .service-status-row > strong { min-width: 0; }.service-status-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.build-history { overflow: hidden; border: 1px solid #e7ebf2; border-radius: 9px; }.build-row { display: grid; grid-template-columns: 150px minmax(165px, 1fr) minmax(190px, 1.1fr); gap: 12px; align-items: center; padding: 13px; border-bottom: 1px solid #e8edf4; }.build-row > div { min-width: 0; }.build-row:last-child { border-bottom: 0; }.build-primary, .build-secondary, .build-status-cell small { display: block; }.build-primary, .build-secondary { overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }.build-primary { color: #233047; }.build-secondary { margin-top: 4px; color: #8a96a8; }.build-status-cell { min-width: 0; }.build-status-cell small { margin-top: 4px; color: #8a96a8; font-size: 12px; line-height: 1.4; white-space: normal; }.drawer-loading { padding: 10px; }.dialog-plan-name { margin: -8px 0 19px; color: #8390a4; font-size: 13px; }.dialog-control { width: 100%; }
 @media (min-width: 901px) { .workspace-shell--nav-collapsed { grid-template-columns: 64px minmax(0, 1fr); }.workspace-shell--nav-collapsed .workspace-nav { padding-right: 8px; padding-left: 8px; }.workspace-shell--nav-collapsed .workspace-nav-collapse { justify-content: center; padding-right: 0; padding-left: 0; }.workspace-shell--nav-collapsed .workspace-nav-label { display: none; }.workspace-shell--nav-collapsed .workspace-nav button:not(.workspace-nav-toggle) { justify-content: center; gap: 0; padding-right: 0; padding-left: 0; } }
-@media (max-width: 900px) { .steps-grid, .plan-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }.workspace-shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }.workspace-nav { flex-direction: row; gap: 7px; padding: 10px 14px; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid #e7ebf2; }.workspace-nav-collapse { display: none; }.workspace-nav button { width: auto; margin: 0; white-space: nowrap; }.workspace-nav .workspace-nav-tools { margin-left: auto; }.settings-layout { grid-template-columns: 1fr; }.local-data-section { grid-column: auto; } }
-@media (max-width: 640px) { .page-header { padding: 0 16px; }.account-summary > span:not(.el-tag), .account-summary :deep(.el-button) { display: none; }.loading-shell, .workspace-shell { width: 100%; }.onboarding-shell { width: calc(100% - 32px); padding: 38px 16px; }.steps-grid, .plan-cards { grid-template-columns: 1fr; }.workspace-content { padding: 17px 12px; }.content-heading { align-items: flex-start; }.content-heading h2 { font-size: 21px; }.release-toolbar { align-items: stretch; }.toolbar-left, .toolbar-right { width: 100%; }.toolbar-right { justify-content: flex-start; margin-left: 0; }.service-search { flex: 1; min-width: 160px; width: auto; }.project-filter, .buildability-filter { flex: 1; min-width: 120px; width: auto; }.pagination-row { align-items: flex-start; flex-direction: column; gap: 10px; }.build-row { grid-template-columns: 1fr; gap: 6px; }.service-status-heading { align-items: stretch; flex-direction: column; gap: 8px; }.service-status-row { grid-template-columns: 72px 84px minmax(120px, 1fr) 42px; gap: 8px; padding: 8px 9px; }.service-status-row > span:nth-child(4), .service-status-row--header > span:nth-child(4) { display: none; }.service-status-row > span:last-child { text-align: center; }.local-data-row { align-items: flex-start; flex-direction: column; gap: 7px; }.settings-section { padding: 16px; }.preferences-form :deep(.el-form-item) { display: block; }.preferences-form :deep(.el-form-item__label) { width: 100% !important; justify-content: flex-start; }.preferences-form :deep(.el-form-item__content) { margin-left: 0 !important; } }
+@media (max-width: 900px) { .steps-grid, .plan-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }.workspace-shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }.workspace-nav { flex-direction: row; gap: 7px; padding: 10px 14px; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid #e7ebf2; }.workspace-nav-collapse { display: none; }.workspace-nav button { width: auto; margin: 0; white-space: nowrap; }.workspace-nav .workspace-nav-tools { margin-left: auto; }.settings-layout { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .page-header { padding: 0 16px; }.account-summary > span:not(.el-tag), .account-summary :deep(.el-button) { display: none; }.loading-shell, .workspace-shell { width: 100%; }.onboarding-shell { width: calc(100% - 32px); padding: 38px 16px; }.steps-grid, .plan-cards { grid-template-columns: 1fr; }.workspace-content { padding: 17px 12px; }.content-heading { align-items: flex-start; }.content-heading h2 { font-size: 21px; }.release-toolbar { align-items: stretch; }.toolbar-left, .toolbar-right { width: 100%; }.toolbar-right { justify-content: flex-start; margin-left: 0; }.service-search { flex: 1; min-width: 160px; width: auto; }.project-filter, .buildability-filter { flex: 1; min-width: 120px; width: auto; }.pagination-row { align-items: flex-start; flex-direction: column; gap: 10px; }.build-row { grid-template-columns: 1fr; gap: 6px; }.service-status-heading { align-items: stretch; flex-direction: column; gap: 8px; }.service-status-row { grid-template-columns: 72px 84px minmax(120px, 1fr) 42px; gap: 8px; padding: 8px 9px; }.service-status-row > span:nth-child(4), .service-status-row--header > span:nth-child(4) { display: none; }.service-status-row > span:last-child { text-align: center; }.settings-section { padding: 16px; }.preferences-form :deep(.el-form-item) { display: block; }.preferences-form :deep(.el-form-item__label) { width: 100% !important; justify-content: flex-start; }.preferences-form :deep(.el-form-item__content) { margin-left: 0 !important; } }
 @media (max-width: 900px) {
   .settings-nav button { min-width: 136px; flex-basis: 136px; }
   .settings-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
