@@ -335,7 +335,7 @@
             </template>
             <template v-if="childForm.issueType === 'SUB_TASK'">
               <div class="sub-task-field-row">
-                <el-form-item label="预估工时（小时）" required><el-input-number v-model="childForm.estimatedHours" :min="0.1" :max="9999.9" :precision="1" :step="0.1" controls-position="right" class="hours-control" /></el-form-item>
+                <IterationHoursInput v-model="childForm.estimatedHours" label="预估工时（小时）" />
                 <el-form-item label="任务类型" required>
                   <el-input v-if="!childParent" v-model="childForm.taskType" maxlength="128" />
                   <el-select v-else v-model="childForm.taskType" filterable class="task-type-control"><el-option v-for="item in creationOptions.taskTypes" :key="item.value" :label="item.label" :value="item.value" /></el-select>
@@ -383,10 +383,10 @@
     <el-dialog v-model="worklogDialogVisible" title="登记工时" width="min(520px, calc(100% - 28px))">
       <el-form label-position="top">
         <el-form-item label="子工作项"><el-input :model-value="worklogIssue?.title" disabled /></el-form-item>
-        <el-form-item label="使用工时（小时）" required><el-input-number v-model="worklogForm.spendHours" :min="0.01" :max="9999.99" :precision="2" :step="0.5" controls-position="right" class="full-control" /></el-form-item>
+        <IterationHoursInput v-model="worklogForm.spendHours" label="使用工时（小时）" />
         <el-form-item label="登记时间" required><el-date-picker v-model="worklogForm.registeredAt" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DDTHH:mm" class="full-control" /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="worklogDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!worklogForm.spendHours || !worklogForm.registeredAt" @click="saveWorklog">登记</el-button></template>
+      <template #footer><el-button @click="worklogDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!worklogSubmitEnabled" @click="saveWorklog">登记</el-button></template>
     </el-dialog>
   </section>
 </template>
@@ -407,6 +407,7 @@ import type {
   TeamIterationParentIssueOption, TeamIterationReleasePlan, TeamIterationSelectionOption, TeamIterationStage, TeamIterationTeamOption, TeamIterationUser
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
+import IterationHoursInput from './components/IterationHoursInput.vue'
 import IterationIssueEditorDialog from './components/IterationIssueEditorDialog.vue'
 import IterationPrototypeLinkDialog from './components/IterationPrototypeLinkDialog.vue'
 import { prototypeLinkError } from './iterationPrototypeLink'
@@ -490,8 +491,9 @@ const selectedTeamIds = ref<number[]>([])
 const selectedByTeam = reactive<Record<number, number[]>>({})
 const draftRoles = reactive<Record<string, TeamIterationRole[]>>({})
 const editForm = reactive({ name: '', stage: 'NOT_STARTED' as TeamIterationStage, startDate: '', plannedReleaseDate: '' })
-const childForm = reactive({ issueType: 'SUB_TASK' as TeamIterationIssueType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
-const worklogForm = reactive({ spendHours: 1, registeredAt: '' })
+const childForm = reactive({ issueType: 'SUB_TASK' as TeamIterationIssueType, title: '', description: '', developmentTeam: '', definitionOfDone: '', estimatedHours: 1 as number | undefined, taskType: '', priority: defaultSubTaskPriority, onlineBug: false, bugPriority: '' })
+const worklogForm = reactive({ spendHours: 1 as number | undefined, registeredAt: '' })
+const worklogSubmitEnabled = computed(() => worklogForm.spendHours !== undefined && Boolean(worklogForm.registeredAt))
 const codingIssueUrlPlaceholder = '可粘贴多条链接，每条以 https:// 开始、detail 结尾\n例如：https://g-iijw5014.coding.net/p/.../issues/xxx/detail'
 const stageOptions: Array<{ value: TeamIterationStage, label: string }> = [
   { value: 'NOT_STARTED', label: '未开始' }, { value: 'DEVELOPING', label: '开发中' },
@@ -516,7 +518,7 @@ const childSubmitEnabled = computed(() => {
   if (childMode.value === 'LINK') return extractCodingIssueUrls(childCodingUrl.value).length > 0
   if (!childForm.title.trim()) return false
   if (childForm.issueType === 'USER_STORY') return Boolean(childForm.developmentTeam.trim() && childForm.definitionOfDone.trim())
-  if (childForm.issueType === 'SUB_TASK') return childForm.estimatedHours > 0 && Boolean(childForm.taskType.trim() && childForm.priority)
+  if (childForm.issueType === 'SUB_TASK') return childForm.estimatedHours !== undefined && Boolean(childForm.taskType.trim() && childForm.priority)
   if (childForm.issueType === 'DEFECT') return Boolean(childForm.bugPriority)
   return true
 })
@@ -1025,15 +1027,17 @@ const localMinute = () => {
 
 const openWorklogEditor = (issue: TeamIterationIssue) => {
   worklogIssue.value = issue
-  Object.assign(worklogForm, { spendHours: 1, registeredAt: localMinute() })
+  const remainingHours = (issue.estimatedHours ?? 0) - recordedWorklogHours(issue)
+  Object.assign(worklogForm, { spendHours: remainingHours > 0 ? remainingHours : 1, registeredAt: localMinute() })
   worklogDialogVisible.value = true
 }
 
 const saveWorklog = async () => {
-  if (!worklogIssue.value || !worklogForm.spendHours || !worklogForm.registeredAt) return
+  const { spendHours, registeredAt } = worklogForm
+  if (!worklogIssue.value || spendHours === undefined || !registeredAt || saving.value) return
   saving.value = true
   try {
-    await registerTeamIterationIssueWorklog(id(), worklogIssue.value.id, { ...worklogForm })
+    await registerTeamIterationIssueWorklog(id(), worklogIssue.value.id, { spendHours, registeredAt })
     worklogDialogVisible.value = false
     await load()
     ElMessage.success('工时已登记并同步 CODING')
@@ -1169,7 +1173,8 @@ const canBindCoding = (issue: TeamIterationIssue) => issue.source === 'WORKBENCH
 const canModifyCoding = codingBacked
 const canRegisterWorklog = (issue: TeamIterationIssue) => issue.issueType === 'SUB_TASK' && canModifyCoding(issue)
 const localWorklogTotal = (issue: TeamIterationIssue) => issue.worklogs.reduce((sum, item) => sum + Number(item.spendHours || 0), 0)
-const worklogTotal = (issue: TeamIterationIssue) => Number(issue.recordedHours ?? localWorklogTotal(issue)).toFixed(2).replace(/\.00$/, '')
+const recordedWorklogHours = (issue: TeamIterationIssue) => Number(issue.recordedHours ?? localWorklogTotal(issue))
+const worklogTotal = (issue: TeamIterationIssue) => recordedWorklogHours(issue).toFixed(2).replace(/\.00$/, '')
 const worklogCount = (issue: TeamIterationIssue) => Number(issue.recordedWorklogCount ?? issue.worklogs.length)
 const failedWorklogs = (issue: TeamIterationIssue) => issue.worklogs.filter(item => item.syncStatus === 'FAILED')
 const issueLevels = computed(() => {
@@ -1275,7 +1280,6 @@ watch(() => route.params.iterationId, () => {
 .child-sync-reason { color: #8994a5; font-size: 12px; line-height: 1.4; }
 .issue-type-select { width: 180px; }
 .sub-task-field-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 120px; gap: 16px; align-items: start; }
-.hours-control { width: 140px; }
 .task-type-control { width: 220px; }
 .story-field-row { display: grid; grid-template-columns: repeat(2,minmax(0,220px)); gap: 16px; }
 .story-field-row :deep(.el-select) { width: 100%; }
@@ -1290,6 +1294,6 @@ watch(() => route.params.iterationId, () => {
 .role-list { flex-wrap: wrap; }
 :global(.coding-association-result-dialog .el-message-box__message p) { overflow-wrap: anywhere; white-space: pre-wrap; }
 @media(max-width:1100px){.detail-header{flex-wrap:wrap}.header-actions{width:100%;justify-content:flex-end}}
-@media(max-width:640px){.detail-header{display:block}.detail-heading{gap:4px}.back-button{padding-right:4px;padding-left:0}.iteration-selector{width:100%;min-width:0}.iteration-selector :deep(.el-select__wrapper){font-size:20px}.detail-meta{gap:4px 12px}.header-actions{width:auto;justify-content:flex-start;margin-top:12px}.issue-section{min-height:120px}.form-grid,.story-field-row,.sub-task-field-row,.child-entry-row{grid-template-columns:1fr}.child-sync-field{min-width:0;justify-self:stretch}.hours-control,.task-type-control{width:100%}}
+@media(max-width:640px){.detail-header{display:block}.detail-heading{gap:4px}.back-button{padding-right:4px;padding-left:0}.iteration-selector{width:100%;min-width:0}.iteration-selector :deep(.el-select__wrapper){font-size:20px}.detail-meta{gap:4px 12px}.header-actions{width:auto;justify-content:flex-start;margin-top:12px}.issue-section{min-height:120px}.form-grid,.story-field-row,.sub-task-field-row,.child-entry-row{grid-template-columns:1fr}.child-sync-field{min-width:0;justify-self:stretch}.task-type-control{width:100%}}
 @media(max-width:640px){.section-header{display:block}.section-toolbar{align-items:stretch;flex-direction:column;margin-top:10px}.issue-status-filter{width:100%}.section-actions{flex-wrap:wrap}}
 </style>

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-18-01",
+  "currentReleaseId": "zg-2026-11-19-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -704,6 +704,17 @@
         {
           "type": "IMPROVEMENT",
           "text": "找钢工作台更名为 Dev Hub"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-19-01",
+      "version": "2.0.1",
+      "publishedAt": "2026-11-19T09:17:18+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "迭代登记工时默认填写剩余工时，小于等于 0 时填 1 小时，使用工时和新增事项预估工时统一按 0.5 小时输入。"
         }
       ]
     }
