@@ -1,9 +1,9 @@
 <template>
   <el-empty v-if="!entries.items.length" description="当前范围暂无工时登记" :image-size="80" />
-  <div v-else class="week-list">
+  <div v-else class="week-list" tabindex="0" aria-label="工时记录" @scroll.passive="onScroll">
     <a
-      v-for="item in entries.items"
-      :key="item.workLogId || `${item.project.name}-${item.issue.code}-${item.startAt}`"
+      v-for="[key, item] in rows"
+      :key="key"
       class="week-row"
       :class="{ 'week-row--team': scope === 'WORKBENCH_TEAM' }"
       :href="item.issueUrl"
@@ -26,17 +26,46 @@
       </div>
       <el-icon class="external-icon"><TopRight /></el-icon>
     </a>
+    <div v-if="hasMore" class="page-status">
+      <span v-if="moreError" role="status">{{ moreError }}</span>
+      <el-button link type="primary" :loading="loadingMore" @click="emit('load-more')">
+        {{ moreError ? '重试' : loadingMore ? '正在加载' : '加载更多' }}
+      </el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { TopRight } from '@element-plus/icons-vue'
-import type { ZhaogangWorklogEntries, ZhaogangWorklogScope } from '@/types/zhaogang'
+import type { ZhaogangWorklogEntries, ZhaogangWorklogItem, ZhaogangWorklogScope } from '@/types/zhaogang'
 
-defineProps<{
+const props = defineProps<{
   scope: ZhaogangWorklogScope
   entries: ZhaogangWorklogEntries
+  hasMore: boolean
+  loadingMore: boolean
+  moreError: string
 }>()
+
+const emit = defineEmits<{ 'load-more': [] }>()
+
+const rows = computed(() => {
+  const unique = new Map<number | string, ZhaogangWorklogItem>()
+  for (const item of props.entries.items) {
+    const key = item.workLogId > 0 ? item.workLogId : JSON.stringify([
+      item.project.name, item.issue.code, item.user.id, item.startAt, item.createdAt, item.hours
+    ])
+    if (!unique.has(key)) unique.set(key, item)
+  }
+  return [...unique]
+})
+
+const onScroll = (event: Event) => {
+  if (!props.hasMore || props.loadingMore || props.moreError) return
+  const list = event.currentTarget as HTMLElement
+  if (list.scrollHeight - list.clientHeight - list.scrollTop <= 2) emit('load-more')
+}
 
 const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 const formatTime = (value: string) => {
@@ -55,6 +84,7 @@ const formatTime = (value: string) => {
 
 <style scoped>
 .week-list { max-height: 430px; overflow-y: auto; border-top: 1px solid #edf0f5; }
+.page-status { display: flex; min-height: 36px; justify-content: center; align-items: center; gap: 8px; font-size: 13px; color: #64748b; }
 .week-row { display: grid; min-height: 70px; grid-template-columns: 104px 64px minmax(260px, 1fr) 24px; align-items: center; gap: 14px; padding: 12px 4px; color: inherit; border-bottom: 1px solid #edf0f5; text-decoration: none; }
 .week-row--team { grid-template-columns: 104px minmax(120px, auto) 64px minmax(260px, 1fr) 24px; }
 .week-row:hover { background: #f7faff; }

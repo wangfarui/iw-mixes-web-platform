@@ -261,6 +261,11 @@ export interface ZhaogangWorklogEntries {
   issueCheck?: ZhaogangWorklogIssueCheck | null
 }
 
+export interface ZhaogangWorklogEntriesPage {
+  entries: ZhaogangWorklogEntries
+  nextCursor?: string | null
+}
+
 export interface ZhaogangWorklogAbsenceDay {
   date: string
   hours: number

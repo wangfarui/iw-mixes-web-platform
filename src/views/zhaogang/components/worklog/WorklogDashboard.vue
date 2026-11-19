@@ -131,7 +131,6 @@
               end-placeholder="结束日期"
               :clearable="false"
               :disabled="entriesLoading"
-              @change="loadEntries()"
             />
             <el-select
               v-if="scope === 'WORKBENCH_TEAM'"
@@ -154,7 +153,7 @@
                 :value="member.id"
               />
             </el-select>
-            <span v-if="visibleEntries && !memberEntriesUnavailable">{{ entryScopeLabel }} · {{ formatHours(visibleEntries.totalHours) }}h</span>
+            <span v-if="entries && !memberEntriesUnavailable">{{ entryScopeLabel }} · {{ formatHours(entries.totalHours) }}h</span>
           </div>
         </div>
       </template>
@@ -192,7 +191,15 @@
       <div v-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <el-skeleton v-else-if="!entries && !entriesError && !entryRangeTooLong" :rows="6" animated />
       <el-empty v-else-if="memberEntriesUnavailable" description="该成员的工时记录暂不可用" :image-size="80" />
-      <WorklogWeekList v-else-if="visibleEntries" :scope="scope" :entries="visibleEntries" />
+      <WorklogWeekList
+        v-else-if="entries"
+        :scope="scope"
+        :entries="entries"
+        :has-more="Boolean(nextEntriesCursor) && !entryRangeTooLong"
+        :loading-more="entriesLoadingMore"
+        :more-error="entriesMoreError"
+        @load-more="loadMoreEntries"
+      />
     </el-card>
 
     <WorklogAbsenceDialog
@@ -206,9 +213,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowLeft, ArrowRight, Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
-import { getZhaogangWorklogAbsences, getZhaogangWorklogEntries, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
+import { getZhaogangWorklogAbsences, getZhaogangWorklogEntriesPage, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
 import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogIssueCheck,
@@ -240,11 +247,19 @@ const statisticsError = ref('')
 const statisticsLoading = ref(false)
 const entriesCard = ref<{ $el: HTMLElement } | null>(null)
 const dashboardLoading = ref(true)
-const entries = ref<ZhaogangWorklogEntries | null>(null)
+const entryPages = ref<ZhaogangWorklogEntries[]>([])
+const entries = computed(() => {
+  const latest = entryPages.value[entryPages.value.length - 1]
+  if (!latest) return null
+  return { ...latest, items: entryPages.value.flatMap(page => page.items) }
+})
+const nextEntriesCursor = ref<string>()
 const entriesKey = ref('')
 const entriesError = ref('')
 const entriesLoading = ref(false)
-const titlesIncomplete = ref(false)
+const entriesMoreError = ref('')
+const entriesLoadingMore = ref(false)
+const titlesIncomplete = computed(() => entryPages.value.some(page => page.issueCheck?.incomplete))
 const entryMemberId = ref<number | null>(null)
 const absenceDialogVisible = ref(false)
 const absenceLoading = ref(false)
@@ -272,8 +287,10 @@ const entryShortcut = computed(() => {
   return entryShortcuts.find(({ value }) => ranges[value][0] === from && ranges[value][1] === to)?.value
 })
 let statisticsRequestSequence = 0
-let entriesRequestSequence = 0
+let entriesRequest: AbortController | undefined
+const stopEntryChecks = new Set<() => void>()
 let entriesRefreshPending = false
+let entriesCardSeen = false
 let absenceRequestSequence = 0
 
 const monthLabel = computed(() => {
@@ -323,16 +340,8 @@ const entryScopeLabel = computed(() => {
   if (scope.value === 'SELF') return '我的工时'
   return selectedEntryMember.value?.name || selectedTeam.value?.name || '团队工时'
 })
-const visibleEntries = computed(() => {
-  const result = entries.value
-  const member = selectedEntryMember.value
-  if (!result || !member) return result
-
-  const items = result.items.filter(item => item.user.id === member.id)
-  return { ...result, items, totalHours: items.reduce((sum, item) => sum + Number(item.hours), 0) }
-})
 const memberEntriesIssue = computed(() => entries.value?.coverage.memberIssues?.find(item => item.user.id === selectedEntryMember.value?.id))
-const memberEntriesUnavailable = computed(() => !!memberEntriesIssue.value && !visibleEntries.value?.items.length)
+const memberEntriesUnavailable = computed(() => !!memberEntriesIssue.value && !entries.value?.items.length)
 const syncTimeLabel = computed(() => {
   if (statisticsLoading.value || entriesLoading.value) return '同步中'
   if (!statistics.value?.syncedAt && !entries.value?.syncedAt) return '尚未同步'
@@ -384,40 +393,82 @@ const loadStatistics = async (refresh = false) => {
 }
 
 const currentEntriesKey = () => {
-  return `${entryRange.value?.join(':') ?? ''}:${scope.value}:${workbenchTeamId.value || ''}`
+  return `${entryRange.value?.join(':') ?? ''}:${scope.value}:${workbenchTeamId.value || ''}:${selectedEntryMember.value?.id ?? ''}`
 }
 
-let ignoredEntriesCheckId: string | null = null
+const cancelEntryRequests = () => {
+  entriesRequest?.abort()
+  entriesRequest = undefined
+  entriesLoading.value = false
+  entriesLoadingMore.value = false
+  stopEntryChecks.forEach(stop => stop())
+  stopEntryChecks.clear()
+}
 
-const loadEntries = async (refresh = entriesRefreshPending, observeIssueCheck = true) => {
+const fetchEntriesPage = async (cursor?: string, refresh = false) => {
   if (!entryRange.value || entryRangeTooLong.value) return
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
   const [from, to] = entryRange.value
   if (!from || !to) return
   const key = currentEntriesKey()
-  if (entriesKey.value !== key) entries.value = null
-  entriesKey.value = key
-  entriesRefreshPending = false
-  const sequence = ++entriesRequestSequence
-  entriesLoading.value = true
-  entriesError.value = ''
+  const request = new AbortController()
+  entriesRequest = request
+  const loading = cursor ? entriesLoadingMore : entriesLoading
+  const errorMessage = cursor ? entriesMoreError : entriesError
+  loading.value = true
+  errorMessage.value = ''
   try {
-    const result = await getZhaogangWorklogEntries(from, to, scope.value, workbenchTeamId.value, refresh)
-    if (sequence !== entriesRequestSequence) return
-    ignoredEntriesCheckId = observeIssueCheck ? null : result.issueCheck?.checkId ?? null
-    entries.value = result
-    titlesIncomplete.value = Boolean(result.issueCheck?.incomplete)
+    const result = await getZhaogangWorklogEntriesPage({
+      from, to, scope: scope.value, workbenchTeamId: workbenchTeamId.value,
+      memberUserId: selectedEntryMember.value?.id, cursor, refresh
+    }, request.signal)
+    if (request.signal.aborted || key !== currentEntriesKey()) return
+    const previousRevision = entries.value?.issueCheck?.deletionRevision
+    if (cursor && previousRevision !== undefined && result.entries.issueCheck?.deletionRevision !== previousRevision) {
+      void loadEntries(false)
+      return
+    }
+    entryPages.value.push(result.entries)
+    nextEntriesCursor.value = result.nextCursor ?? undefined
+    watchEntryPage(entryPages.value[entryPages.value.length - 1])
   } catch (error) {
-    if (sequence !== entriesRequestSequence) return
-    entriesError.value = error instanceof Error ? error.message : '工时登记加载失败，请稍后重试'
+    if (request.signal.aborted || key !== currentEntriesKey()) return
+    errorMessage.value = error instanceof Error ? error.message : '工时登记加载失败，请稍后重试'
   } finally {
-    if (sequence === entriesRequestSequence) entriesLoading.value = false
+    if (entriesRequest === request) {
+      entriesRequest = undefined
+      loading.value = false
+    }
   }
 }
+
+const loadEntries = (refresh = entriesRefreshPending) => {
+  cancelEntryRequests()
+  if (!entryRange.value || entryRangeTooLong.value) return
+  if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
+  entryPages.value = []
+  nextEntriesCursor.value = undefined
+  entriesMoreError.value = ''
+  entriesKey.value = currentEntriesKey()
+  entriesRefreshPending = false
+  return fetchEntriesPage(undefined, refresh)
+}
+
+const loadMoreEntries = () => {
+  if (!nextEntriesCursor.value || entriesRequest || dashboardLoading.value || entriesKey.value !== currentEntriesKey()) return
+  void fetchEntriesPage(nextEntriesCursor.value)
+}
+
+watch(currentEntriesKey, key => {
+  if (entriesCardSeen && !dashboardLoading.value && !statisticsLoading.value && entriesKey.value !== key) {
+    void loadEntries()
+  }
+})
 
 watch([entriesCard, dashboardLoading, statisticsLoading], ([card, initializing, loading], _, onCleanup) => {
   if (!card || initializing || loading) return
   const loadIfNeeded = () => {
+    entriesCardSeen = true
     if (!entriesLoading.value && (entriesRefreshPending || entriesKey.value !== currentEntriesKey())) {
       void loadEntries()
     }
@@ -500,7 +551,8 @@ const reloadChangedReports = (revision: number) => {
       (absenceReport.value?.issueCheck?.deletionRevision ?? revision) < revision) {
     void loadAbsence(true)
   }
-  if (!entriesLoading.value && (entries.value?.issueCheck?.deletionRevision ?? revision) < revision) {
+  if (!dashboardLoading.value && !entryRangeTooLong.value &&
+      (entries.value?.issueCheck?.deletionRevision ?? revision) < revision) {
     void loadEntries(false)
   }
 }
@@ -514,14 +566,18 @@ watch(() => absenceDialogVisible.value && !absenceLoading.value ? absenceReport.
     pollIssueCheck(check, onCleanup, status => reloadChangedReports(status.deletionRevision))
   })
 
-watch(() => entriesLoading.value ? null : entries.value?.issueCheck, (check, _, onCleanup) => {
-  if (!check?.checkId || check.checkId === ignoredEntriesCheckId) return
+const watchEntryPage = (page: ZhaogangWorklogEntries) => {
+  const check = page.issueCheck
+  if (!check?.checkId) return
   let updatesApplied = 0
-  pollIssueCheck(check, onCleanup, status => {
-    const current = entries.value
-    if (entriesLoading.value || !current || current.issueCheck?.checkId !== check.checkId) return
+  let stop: () => void
+  const finish = () => { stopEntryChecks.delete(stop) }
+  pollIssueCheck(check, cleanup => {
+    stop = cleanup
+    stopEntryChecks.add(cleanup)
+  }, status => {
     for (const update of status.updates?.slice(updatesApplied) ?? []) {
-      const item = current.items[update.rowIndex]
+      const item = page.items[update.rowIndex]
       if (!item) continue
       item.issue = {
         ...update.issue,
@@ -531,14 +587,14 @@ watch(() => entriesLoading.value ? null : entries.value?.issueCheck, (check, _, 
       item.issueUrl = update.issueUrl
     }
     updatesApplied = status.updates?.length ?? 0
-    titlesIncomplete.value = Boolean(status.incomplete)
+    check.incomplete = Boolean(status.incomplete)
+    if (!status.pending) finish()
     reloadChangedReports(status.deletionRevision)
-    // Older backends return only the check state during a rolling deployment.
-    if (!status.pending && status.updates === undefined && !entriesLoading.value) {
-      void loadEntries(false, false)
-    }
-  }, () => { titlesIncomplete.value = true })
-})
+  }, () => {
+    check.incomplete = true
+    finish()
+  })
+}
 
 const resetAbsence = () => {
   absenceRequestSequence += 1
@@ -550,6 +606,7 @@ const resetAbsence = () => {
 
 const refreshDashboard = async () => {
   dashboardLoading.value = true
+  cancelEntryRequests()
   try {
     await loadOptions()
     entriesRefreshPending = true
@@ -561,17 +618,18 @@ const refreshDashboard = async () => {
 
 const resetScopeResults = () => {
   statisticsRequestSequence += 1
-  entriesRequestSequence += 1
+  cancelEntryRequests()
   statistics.value = null
   statisticsKey.value = ''
   statisticsError.value = ''
   statisticsLoading.value = false
-  entries.value = null
+  entryPages.value = []
+  nextEntriesCursor.value = undefined
   entriesKey.value = ''
   entriesError.value = ''
-  entriesLoading.value = false
-  titlesIncomplete.value = false
+  entriesMoreError.value = ''
   entriesRefreshPending = false
+  entriesCardSeen = false
   resetAbsence()
 }
 
@@ -607,7 +665,6 @@ const shiftMonth = (offset: number) => {
 const setEntryShortcut = (shortcut: EntryShortcut) => {
   if (entriesLoading.value) return
   entryRange.value = entryShortcutRanges()[shortcut]
-  void loadEntries()
 }
 
 const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
@@ -663,6 +720,7 @@ onMounted(async () => {
     dashboardLoading.value = false
   }
 })
+onBeforeUnmount(cancelEntryRequests)
 </script>
 
 <style scoped>

@@ -21,6 +21,7 @@ import type {
   ZhaogangWorklogStatistics,
   ZhaogangWorklogIssueCheckStatus,
   ZhaogangWorklogEntries,
+  ZhaogangWorklogEntriesPage,
   ZhaogangWorklogAbsence
 } from '@/types/zhaogang'
 import type { ZhaogangReleaseReceipt } from '@/types/zhaogangRelease'
@@ -275,6 +276,26 @@ export const getZhaogangWorklogEntries = (
   if (scope === 'WORKBENCH_TEAM' && workbenchTeamId) params.set('workbenchTeamId', String(workbenchTeamId))
   if (refresh) params.set('refresh', 'true')
   return zhaogangRequest<ZhaogangWorklogEntries>(`/worklogs/entries?${params.toString()}`)
+}
+
+export const getZhaogangWorklogEntriesPage = (query: {
+  from: string
+  to: string
+  scope: ZhaogangWorklogScope
+  workbenchTeamId: number | null
+  memberUserId?: number
+  cursor?: string
+  refresh?: boolean
+}, signal: AbortSignal) => {
+  const { from, to, scope, workbenchTeamId, memberUserId, cursor, refresh } = query
+  const params = new URLSearchParams({ from, to, scope })
+  if (scope === 'WORKBENCH_TEAM' && workbenchTeamId) {
+    params.set('workbenchTeamId', String(workbenchTeamId))
+    if (memberUserId) params.set('memberUserId', String(memberUserId))
+  }
+  if (cursor) params.set('cursor', cursor)
+  if (refresh) params.set('refresh', 'true')
+  return zhaogangRequest<ZhaogangWorklogEntriesPage>(`/worklogs/entries/page?${params}`, { signal })
 }
 
 export const getZhaogangWorklogIssueCheck = (
