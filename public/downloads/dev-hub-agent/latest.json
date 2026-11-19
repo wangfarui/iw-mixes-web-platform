@@ -1,0 +1,30 @@
+{
+  "agentName": "dev-hub-agent",
+  "version": "2.0.4",
+  "protocolVersion": 2,
+  "releaseNotes": "Dev Hub Agent 2.0.4：统一应用、安装目录、配置、自启和协议命名，并迁移旧安装。",
+  "platforms": {
+    "darwin-arm64": {
+      "url": "dev-hub-agent-darwin-arm64.bin",
+      "downloadUrl": "dev-hub-agent-darwin-arm64.zip",
+      "sha256": "287a7928159c7e0b2bbb43aaa5c4147a82f80fbfab209b2b79872a79ea8e17e7"
+    },
+    "darwin-amd64": {
+      "url": "dev-hub-agent-darwin-amd64.bin",
+      "downloadUrl": "dev-hub-agent-darwin-amd64.zip",
+      "sha256": "5c99649b4322efc9a7d93057ff0663554788b0df337449ba47f9eba28a312d6f"
+    },
+    "windows-amd64": {
+      "url": "dev-hub-agent-windows-amd64.runtime.exe",
+      "downloadUrl": "dev-hub-agent-windows-amd64.exe",
+      "sha256": "46a5498d4146fc2aaf345c1adaf6095566075e63a083eb1bdd056f6477cb15c5",
+      "installerUrl": "dev-hub-agent-windows-amd64.exe"
+    },
+    "windows-arm64": {
+      "url": "dev-hub-agent-windows-arm64.runtime.exe",
+      "downloadUrl": "dev-hub-agent-windows-arm64.exe",
+      "sha256": "3530694ebf9ff8cd3c16f946275f86300d21ce4597ea4b788a39ec8c2212f69f",
+      "installerUrl": "dev-hub-agent-windows-arm64.exe"
+    }
+  }
+}

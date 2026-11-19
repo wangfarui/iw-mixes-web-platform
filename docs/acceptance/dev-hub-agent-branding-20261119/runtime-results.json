@@ -1,0 +1,14 @@
+{
+  "agentName": "dev-hub-agent",
+  "version": "2.0.4",
+  "protocolVersion": 2,
+  "runtimeSHA256": "287a7928159c7e0b2bbb43aaa5c4147a82f80fbfab209b2b79872a79ea8e17e7",
+  "skillsCliInstalled": true,
+  "updateCheck": {
+    "currentVersion": "2.0.4",
+    "latestVersion": "2.0.4",
+    "releaseNotes": "Dev Hub Agent 2.0.4：统一应用、安装目录、配置、自启和协议命名，并迁移旧安装。",
+    "updateAvailable": false
+  },
+  "mode": "实际最终 macOS ZIP 的运行文件；临时目录、独立端口、显式配置；未修改用户安装、HOME 或自启状态"
+}

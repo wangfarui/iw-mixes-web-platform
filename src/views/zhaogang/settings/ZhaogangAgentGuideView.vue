@@ -2,7 +2,7 @@
   <section class="agent-guide-page">
     <header class="guide-header">
       <div>
-        <p class="guide-kicker">zg-workbench-agent</p>
+        <p class="guide-kicker">Dev Hub Agent</p>
         <h2>Agent 使用教程</h2>
         <p>安装本机 Agent 后，Dev Hub 可以从当前电脑访问 K8s Dashboard 和内网 AI。</p>
       </div>
@@ -19,9 +19,9 @@
             </div>
             <ol class="step-list">
               <li><strong>下载安装程序</strong><span>Dev Hub 会根据当前 Windows 架构选择安装程序；从其它系统打开时默认下载 x64 版本。</span></li>
-              <li><strong>运行安装</strong><span>双击 <code>zg-workbench-agent-windows-*.exe</code>。程序安装到 <code>%LOCALAPPDATA%\zg-workbench-agent</code> 并自动启动。</span></li>
+              <li><strong>运行安装</strong><span>双击 <code>dev-hub-agent-windows-*.exe</code>。程序安装到 <code>%LOCALAPPDATA%\dev-hub-agent</code> 并自动启动。</span></li>
               <li><strong>处理安全提示</strong><span>如果 SmartScreen 显示未知发布者，选择“更多信息”后确认运行。</span></li>
-              <li><strong>完成旧版迁移</strong><span>检测到 zg-k8s-agent 时会迁移配置、开机自启和协议；新 Agent 健康后再清理旧安装。</span></li>
+              <li><strong>完成旧版迁移</strong><span>检测到旧版 Agent 时会迁移配置、开机自启和协议；新 Agent 健康后再清理旧安装。</span></li>
               <li><strong>返回设置验证</strong><span>在设置页刷新 Agent 状态，然后配置 K8s Token 或 AI 连接。</span></li>
             </ol>
             <el-alert type="info" :closable="false" show-icon title="Agent 只监听 127.0.0.1，首次出现防火墙提示时仅需允许专用网络访问。" />
@@ -29,7 +29,7 @@
           <el-tab-pane label="卸载" name="uninstall">
             <div class="guide-title-row"><div><h3>Windows 卸载</h3><p>卸载会清理新旧协议、启动项和当前用户安装目录。</p></div></div>
             <ol class="step-list">
-              <li><strong>打开已安装的应用</strong><span>在 Windows 设置中找到 zg-workbench-agent。</span></li>
+              <li><strong>打开已安装的应用</strong><span>在 Windows 设置中找到 Dev Hub Agent。</span></li>
               <li><strong>执行卸载</strong><span>选择卸载；也可以运行安装目录中的 <code>uninstall.exe</code>。</span></li>
               <li><strong>确认状态</strong><span>回到 Dev Hub 设置页刷新状态，确认 Agent 已停止。</span></li>
             </ol>
@@ -45,10 +45,10 @@
               <el-button type="primary" :icon="Download" :loading="downloading" @click="downloadAgent('macos')">下载 macOS 安装包</el-button>
             </div>
             <ol class="step-list">
-              <li><strong>下载并解压 ZIP</strong><span>压缩包包含 Agent、安装脚本和卸载脚本。</span></li>
-              <li><strong>赋予执行权限</strong><span>在解压目录打开终端并执行：</span><pre>chmod +x install-macos.sh zg-workbench-agent</pre></li>
-              <li><strong>执行安装</strong><span>运行安装脚本，应用将安装到 <code>~/Applications/zg-workbench-agent.app</code>。</span><pre>./install-macos.sh</pre></li>
-              <li><strong>处理安全提示</strong><span>系统阻止运行时，在“隐私与安全性”中允许，或移除下载隔离标记：</span><pre>xattr -dr com.apple.quarantine ~/Applications/zg-workbench-agent.app</pre></li>
+              <li><strong>下载并解压 ZIP</strong><span>下载 dev-hub-agent-darwin-*.zip；压缩包包含 Agent、安装脚本和卸载脚本。</span></li>
+              <li><strong>赋予执行权限</strong><span>在解压目录打开终端并执行：</span><pre>chmod +x install-macos.sh dev-hub-agent</pre></li>
+              <li><strong>执行安装</strong><span>运行安装脚本，应用将安装到 <code>~/Applications/dev-hub-agent.app</code>。</span><pre>./install-macos.sh</pre></li>
+              <li><strong>处理安全提示</strong><span>系统阻止运行时，在“隐私与安全性”中允许，或移除下载隔离标记：</span><pre>xattr -dr com.apple.quarantine ~/Applications/dev-hub-agent.app</pre></li>
               <li><strong>完成旧版迁移</strong><span>安装脚本会迁移旧配置和开机自启状态，并兼容新旧 URL Scheme。</span></li>
             </ol>
           </el-tab-pane>

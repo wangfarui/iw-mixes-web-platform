@@ -4,7 +4,7 @@
       <header class="settings-heading">
         <div>
           <h3>本机 Agent</h3>
-          <p>统一管理 K8s、AI 视觉、自更新和开机自启能力。</p>
+          <p>Dev Hub Agent 统一管理 K8s、AI 视觉、自更新和开机自启能力。</p>
         </div>
         <el-tag :type="agentState?.compatible ? 'success' : 'warning'" effect="light">
           {{ agentState?.compatible ? '可用' : '需处理' }}

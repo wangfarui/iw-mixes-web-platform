@@ -1,12 +1,30 @@
 {
-  "agentName": "zg-workbench-agent",
-  "version": "2.0.3",
+  "agentName": "dev-hub-agent",
+  "version": "2.0.4",
   "protocolVersion": 2,
-  "releaseNotes": "升级到 zg-workbench-agent 2.0.3，自动安装 Skills CLI，并继续迁移旧安装。",
+  "releaseNotes": "Dev Hub Agent 2.0.4：统一应用、安装目录、配置、自启和协议命名，并迁移旧安装。",
   "platforms": {
-    "darwin-arm64": { "url": "../zg-workbench-agent/zg-workbench-agent-darwin-arm64.bin", "downloadUrl": "../zg-workbench-agent/zg-workbench-agent-darwin-arm64.zip", "sha256": "f36b28abe2991b9bbcc7f669bd801bbb464595c0d374bd0c0c06c1a8118dbe85" },
-    "darwin-amd64": { "url": "../zg-workbench-agent/zg-workbench-agent-darwin-amd64.bin", "downloadUrl": "../zg-workbench-agent/zg-workbench-agent-darwin-amd64.zip", "sha256": "664b21a41ddd74587824c687ed02afa6d0e9680e74cbc5502d6dadd50da9bcda" },
-    "windows-amd64": { "url": "../zg-workbench-agent/zg-workbench-agent-windows-amd64.runtime.exe", "downloadUrl": "../zg-workbench-agent/zg-workbench-agent-windows-amd64.exe", "sha256": "f0f6e219516fee602b741250919fe882968d93fce5ee84b31032a590baedc935" },
-    "windows-arm64": { "url": "../zg-workbench-agent/zg-workbench-agent-windows-arm64.runtime.exe", "downloadUrl": "../zg-workbench-agent/zg-workbench-agent-windows-arm64.exe", "sha256": "e832cd943fc41241af86ed0569405032289db42112b2064eb0a68ba3964a2d1c" }
+    "darwin-arm64": {
+      "url": "../dev-hub-agent/dev-hub-agent-darwin-arm64.bin",
+      "downloadUrl": "../dev-hub-agent/dev-hub-agent-darwin-arm64.zip",
+      "sha256": "287a7928159c7e0b2bbb43aaa5c4147a82f80fbfab209b2b79872a79ea8e17e7"
+    },
+    "darwin-amd64": {
+      "url": "../dev-hub-agent/dev-hub-agent-darwin-amd64.bin",
+      "downloadUrl": "../dev-hub-agent/dev-hub-agent-darwin-amd64.zip",
+      "sha256": "5c99649b4322efc9a7d93057ff0663554788b0df337449ba47f9eba28a312d6f"
+    },
+    "windows-amd64": {
+      "url": "../dev-hub-agent/dev-hub-agent-windows-amd64.runtime.exe",
+      "downloadUrl": "../dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "46a5498d4146fc2aaf345c1adaf6095566075e63a083eb1bdd056f6477cb15c5",
+      "installerUrl": "../dev-hub-agent/dev-hub-agent-windows-amd64.exe"
+    },
+    "windows-arm64": {
+      "url": "../dev-hub-agent/dev-hub-agent-windows-arm64.runtime.exe",
+      "downloadUrl": "../dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "3530694ebf9ff8cd3c16f946275f86300d21ce4597ea4b788a39ec8c2212f69f",
+      "installerUrl": "../dev-hub-agent/dev-hub-agent-windows-arm64.exe"
+    }
   }
 }

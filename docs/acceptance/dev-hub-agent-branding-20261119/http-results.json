@@ -1,0 +1,245 @@
+{
+  "version": "2.0.4",
+  "results": [
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "darwin-arm64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-arm64.bin",
+      "sha256": "287a7928159c7e0b2bbb43aaa5c4147a82f80fbfab209b2b79872a79ea8e17e7",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "darwin-arm64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-arm64.zip",
+      "sha256": "df5d19739322a7f7d11cbc57b4bad1440cc403d2e1dc3c7a7f8ec5c046fed54f",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "darwin-amd64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-amd64.bin",
+      "sha256": "5c99649b4322efc9a7d93057ff0663554788b0df337449ba47f9eba28a312d6f",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "darwin-amd64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-amd64.zip",
+      "sha256": "4a49b1b05a0c07781cbe95191680635acb0477d23f52b0b2af3bdfd5ad54f85b",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "windows-amd64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.runtime.exe",
+      "sha256": "46a5498d4146fc2aaf345c1adaf6095566075e63a083eb1bdd056f6477cb15c5",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "windows-amd64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "2314bc8625457c60fdce0ffb610cd519cb1e8743cc026a70c2cf84c1a49354d8",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "windows-amd64",
+      "field": "installerUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "2314bc8625457c60fdce0ffb610cd519cb1e8743cc026a70c2cf84c1a49354d8",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "windows-arm64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.runtime.exe",
+      "sha256": "3530694ebf9ff8cd3c16f946275f86300d21ce4597ea4b788a39ec8c2212f69f",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "windows-arm64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "48975625852d4c25af36453101a96b8fd77cf528674a3d3d020ae75e6b86398e",
+      "status": 200
+    },
+    {
+      "manifest": "dev-hub-agent",
+      "platform": "windows-arm64",
+      "field": "installerUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "48975625852d4c25af36453101a96b8fd77cf528674a3d3d020ae75e6b86398e",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "darwin-arm64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-arm64.bin",
+      "sha256": "287a7928159c7e0b2bbb43aaa5c4147a82f80fbfab209b2b79872a79ea8e17e7",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "darwin-arm64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-arm64.zip",
+      "sha256": "df5d19739322a7f7d11cbc57b4bad1440cc403d2e1dc3c7a7f8ec5c046fed54f",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "darwin-amd64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-amd64.bin",
+      "sha256": "5c99649b4322efc9a7d93057ff0663554788b0df337449ba47f9eba28a312d6f",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "darwin-amd64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-amd64.zip",
+      "sha256": "4a49b1b05a0c07781cbe95191680635acb0477d23f52b0b2af3bdfd5ad54f85b",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "windows-amd64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.runtime.exe",
+      "sha256": "46a5498d4146fc2aaf345c1adaf6095566075e63a083eb1bdd056f6477cb15c5",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "windows-amd64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "2314bc8625457c60fdce0ffb610cd519cb1e8743cc026a70c2cf84c1a49354d8",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "windows-amd64",
+      "field": "installerUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "2314bc8625457c60fdce0ffb610cd519cb1e8743cc026a70c2cf84c1a49354d8",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "windows-arm64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.runtime.exe",
+      "sha256": "3530694ebf9ff8cd3c16f946275f86300d21ce4597ea4b788a39ec8c2212f69f",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "windows-arm64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "48975625852d4c25af36453101a96b8fd77cf528674a3d3d020ae75e6b86398e",
+      "status": 200
+    },
+    {
+      "manifest": "zg-workbench-agent",
+      "platform": "windows-arm64",
+      "field": "installerUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "48975625852d4c25af36453101a96b8fd77cf528674a3d3d020ae75e6b86398e",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "darwin-arm64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-arm64.bin",
+      "sha256": "287a7928159c7e0b2bbb43aaa5c4147a82f80fbfab209b2b79872a79ea8e17e7",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "darwin-arm64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-arm64.zip",
+      "sha256": "df5d19739322a7f7d11cbc57b4bad1440cc403d2e1dc3c7a7f8ec5c046fed54f",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "darwin-amd64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-amd64.bin",
+      "sha256": "5c99649b4322efc9a7d93057ff0663554788b0df337449ba47f9eba28a312d6f",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "darwin-amd64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-darwin-amd64.zip",
+      "sha256": "4a49b1b05a0c07781cbe95191680635acb0477d23f52b0b2af3bdfd5ad54f85b",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "windows-amd64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.runtime.exe",
+      "sha256": "46a5498d4146fc2aaf345c1adaf6095566075e63a083eb1bdd056f6477cb15c5",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "windows-amd64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "2314bc8625457c60fdce0ffb610cd519cb1e8743cc026a70c2cf84c1a49354d8",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "windows-amd64",
+      "field": "installerUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-amd64.exe",
+      "sha256": "2314bc8625457c60fdce0ffb610cd519cb1e8743cc026a70c2cf84c1a49354d8",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "windows-arm64",
+      "field": "url",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.runtime.exe",
+      "sha256": "3530694ebf9ff8cd3c16f946275f86300d21ce4597ea4b788a39ec8c2212f69f",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "windows-arm64",
+      "field": "downloadUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "48975625852d4c25af36453101a96b8fd77cf528674a3d3d020ae75e6b86398e",
+      "status": 200
+    },
+    {
+      "manifest": "zg-k8s-agent",
+      "platform": "windows-arm64",
+      "field": "installerUrl",
+      "url": "/downloads/dev-hub-agent/dev-hub-agent-windows-arm64.exe",
+      "sha256": "48975625852d4c25af36453101a96b8fd77cf528674a3d3d020ae75e6b86398e",
+      "status": 200
+    }
+  ]
+}

@@ -26,10 +26,11 @@ export interface ZgWorkbenchAgentTask {
   retryable?: boolean
 }
 
-export const WORKBENCH_AGENT_PORT_KEY = 'zhaogang:zg-workbench-agent-port'
+export const WORKBENCH_AGENT_PORT_KEY = 'zhaogang:dev-hub-agent-port'
+const PREVIOUS_PORT_KEY = 'zhaogang:zg-workbench-agent-port'
 const LEGACY_PORT_KEY = 'zhaogang:zg-k8s-agent-port'
 const DEFAULT_PORT = 28731
-export const WORKBENCH_AGENT_DOWNLOAD_PATH = '/downloads/zg-workbench-agent/'
+export const WORKBENCH_AGENT_DOWNLOAD_PATH = '/downloads/dev-hub-agent/'
 const WORKBENCH_AGENT_DOWNLOAD_INDEX = `${WORKBENCH_AGENT_DOWNLOAD_PATH}index.html`
 const WORKBENCH_AGENT_MANIFEST = `${WORKBENCH_AGENT_DOWNLOAD_PATH}latest.json`
 
@@ -76,7 +77,7 @@ export const compareZgWorkbenchAgentVersion = (left: string, right: string) => {
 }
 
 export const getZgWorkbenchAgentPort = () => {
-  const value = Number(localStorage.getItem(WORKBENCH_AGENT_PORT_KEY) || localStorage.getItem(LEGACY_PORT_KEY))
+  const value = Number(localStorage.getItem(WORKBENCH_AGENT_PORT_KEY) || localStorage.getItem(PREVIOUS_PORT_KEY) || localStorage.getItem(LEGACY_PORT_KEY))
   return Number.isInteger(value) && value > 0 && value < 65536 ? value : DEFAULT_PORT
 }
 
@@ -218,7 +219,7 @@ export const checkZgWorkbenchAgent = async (): Promise<ZgWorkbenchAgentState> =>
 
 export const startZgWorkbenchAgentProtocol = () => {
   const link = document.createElement('a')
-  link.href = 'zg-workbench-agent://start'
+  link.href = 'dev-hub-agent://start'
   link.click()
   window.setTimeout(() => link.remove(), 1000)
 }
