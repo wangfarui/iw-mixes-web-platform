@@ -6,7 +6,7 @@
     <el-alert v-if="visibleLoadError" :title="visibleLoadError" type="error" :closable="false" show-icon />
     <template v-if="!skillId">
       <header class="skills-toolbar">
-        <el-input v-model="query" clearable aria-label="搜索 Skill" placeholder="搜索名称或简介" class="skill-search" @change="load" @keyup.enter="load" />
+        <el-input v-model="query" clearable aria-label="搜索 Skill" placeholder="搜索名称或简介" class="skill-search" @change="submitSearch" @keyup.enter="submitSearch" />
         <div class="actions">
           <el-radio-group v-model="viewPreferences.view" aria-label="Skill 展示方式" @change="saveViewPreferences">
             <el-radio-button value="list">列表</el-radio-button>
@@ -18,7 +18,7 @@
       <el-table v-if="viewPreferences.view === 'list'" class="skills-table" :data="skills" row-key="id" border allow-drag-last-column empty-text="暂无 Skill" @header-dragend="cacheColumnWidth">
         <el-table-column column-key="skill" label="Skill" :width="viewPreferences.widths.skill ?? 230" :min-width="skillColumnMinimumWidths.skill" resizable>
           <template #default="{ row }">
-            <router-link :to="`/zhaogang/skills/${row.id}`">{{ row.title }}</router-link>
+            <router-link :to="{ path: `/zhaogang/skills/${row.id}`, query: route.query }">{{ row.title }}</router-link>
             <small class="machine-name">{{ row.machineName }}</small>
           </template>
         </el-table-column>
@@ -28,7 +28,7 @@
         <el-table-column column-key="updatedAt" label="更新时间" :width="viewPreferences.widths.updatedAt ?? 172" :min-width="skillColumnMinimumWidths.updatedAt" resizable><template #default="{ row }">{{ date(row.updatedAt) }}</template></el-table-column>
       </el-table>
       <div v-else-if="skills.length" class="skill-cards">
-        <router-link v-for="skill in skills" :key="skill.id" :to="`/zhaogang/skills/${skill.id}`" class="skill-card">
+        <router-link v-for="skill in skills" :key="skill.id" :to="{ path: `/zhaogang/skills/${skill.id}`, query: route.query }" class="skill-card">
           <header class="skill-card-header">
             <div class="skill-card-name"><h3>{{ skill.title }}</h3><small class="machine-name">{{ skill.machineName }}</small></div>
             <el-tag size="small" type="info">{{ skill.currentVersion }}</el-tag>
@@ -41,7 +41,7 @@
     </template>
 
     <template v-else-if="detail">
-      <router-link to="/zhaogang/skills">返回 Skills</router-link>
+      <router-link :to="{ path: '/zhaogang/skills', query: route.query }">返回 Skills</router-link>
       <header class="skills-header">
         <div><h2>{{ detail.skill.title }}</h2><small class="machine-name">{{ detail.skill.machineName }}</small><p>{{ detail.skill.summary }}</p></div>
         <div class="actions">
@@ -49,6 +49,9 @@
           <el-button v-if="detail.skill.creator" type="danger" plain @click="openMutation('delete-skill')">删除 Skill</el-button>
         </div>
       </header>
+      <p v-if="detail.skill.machineName === PANGMAOYUN_WORKBENCH_BUILD_SKILL" class="skill-authorization-hint">
+        安装后，前往 <router-link to="/zhaogang/settings?section=agent-auth">设置 → Agent 授权</router-link> 配置构建令牌。
+      </p>
 
       <h3>版本</h3>
       <el-table :data="detail.versions" empty-text="暂无版本">
@@ -170,7 +173,7 @@ import { compareZgWorkbenchAgentVersion, getZgWorkbenchAgentPort, zgWorkbenchAge
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ZhaogangRequestError } from '@/api/zhaogang'
-import { compareSkill, deleteSkill, deleteSkillVersion, getSkill, listSkills, previewSkill, publishSkill, rollbackSkill, skillDownloadUrl } from '@/api/zhaogangSkills'
+import { PANGMAOYUN_WORKBENCH_BUILD_SKILL, compareSkill, deleteSkill, deleteSkillVersion, getSkill, listSkills, previewSkill, publishSkill, rollbackSkill, skillDownloadUrl } from '@/api/zhaogangSkills'
 import type { SkillDetail, SkillDifference, SkillEntry, SkillPreview, SkillPublish, SkillVersion } from '@/api/zhaogangSkills'
 import SkillDifferenceView from './SkillDifference.vue'
 import { MAX_SKILL_ZIP_BYTES, packSkillDirectory } from './packSkillDirectory'
@@ -194,6 +197,7 @@ function cacheColumnWidth(newWidth: number, _oldWidth: number, column: { columnK
   saveViewPreferences()
 }
 const skillId = computed(() => typeof route.params.skillId === 'string' ? route.params.skillId : '')
+const searchQuery = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
 const query = ref('')
 const skills = ref<SkillEntry[]>([])
 const detail = ref<SkillDetail>()
@@ -265,6 +269,16 @@ const message = (error: unknown) => error instanceof Error ? error.message : '�
 const actions: Record<string, string> = { CREATE: '创建', UPDATE: '更新', ROLLBACK: '手动回退', DELETE_VERSION: '删除版本', DELETE_SKILL: '删除 Skill' }
 const actionLabel = (action: string) => actions[action] || action
 
+function submitSearch() {
+  const q = query.value.trim()
+  query.value = q
+  if (q === searchQuery.value) {
+    if (loadError.value) void load()
+    return
+  }
+  void router.replace({ query: { ...route.query, q: q || undefined } })
+}
+
 async function load() {
   const request = ++loadRequest
   const id = skillId.value
@@ -275,7 +289,7 @@ async function load() {
       const result = await getSkill(id)
       if (request === loadRequest) detail.value = result
     } else {
-      const result = await listSkills(query.value)
+      const result = await listSkills(searchQuery.value)
       if (request === loadRequest) skills.value = result
     }
   } catch (error) {
@@ -284,7 +298,15 @@ async function load() {
     if (request === loadRequest) loading.value = false
   }
 }
-watch(skillId, () => { detail.value = undefined; uploadVisible.value = false; mutationVisible.value = false; void load() }, { immediate: true })
+watch([skillId, searchQuery], ([id, q], [previousId]) => {
+  if (!id) query.value = q
+  if (id !== previousId) {
+    detail.value = undefined
+    uploadVisible.value = false
+    mutationVisible.value = false
+  }
+  void load()
+}, { immediate: true })
 
 function openUpload() {
   uploadMode.value = 'web'
@@ -422,6 +444,7 @@ async function copyPrompt(kind: 'upload' | 'update' | 'install', version?: Skill
 .skills-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
 .skills-header h2, h3 { margin: 0; }
 .skills-header p { margin: 8px 0 0; color: #54647b; }
+.skill-authorization-hint { margin: 0; color: #54647b; }
 .machine-name { display: block; color: #64748b; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .actions .el-button + .el-button { margin-left: 0; }

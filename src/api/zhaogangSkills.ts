@@ -1,5 +1,7 @@
 import { ZHAOGANG_API_ROOT, zhaogangRequest } from './zhaogang'
 
+export const PANGMAOYUN_WORKBENCH_BUILD_SKILL = 'pangmaoyun-workbench-build'
+
 export interface SkillEntry {
   id: string
   machineName: string
