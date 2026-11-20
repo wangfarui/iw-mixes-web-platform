@@ -1,0 +1,14 @@
+PASS AC-01 personal defaults to this month; no month navigation; totals independent of paging
+PASS AC-02 team defaults to this week
+PASS UR-01 utilization is the default and percentages keep two decimal places
+PASS UR-02 all four ranking dimensions can be selected
+PASS UR-03 equal rounded percentages share first place
+PASS UR-04 percentages can exceed 100%; zero hours and zero workdays remain distinct
+PASS AC-03 ranking and absence share the range ending yesterday
+PASS AC-04 member filters chart and entries; ranking retains all team members
+PASS AC-05 historical shortcut and custom cross-month chart dates
+PASS AC-06 today/future-only ranges show no eligible ranking or absence data
+PASS AC-07 invalid ranges pause both chart/entries queries and label previous results
+PASS AC-08 mode switches reset defaults and late reports cannot replace the current scope
+PASS AC-09 report failures recover after refresh
+PASS AC-10 desktop/narrow layouts and no browser runtime errors

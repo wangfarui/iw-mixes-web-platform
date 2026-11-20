@@ -19,6 +19,7 @@ import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogScope,
   ZhaogangWorklogStatistics,
+  ZhaogangWorklogRangeReport,
   ZhaogangWorklogIssueCheckStatus,
   ZhaogangWorklogEntries,
   ZhaogangWorklogEntriesPage,
@@ -252,6 +253,16 @@ export const updateZhaogangCalendarLeave = (date: string, leave: boolean) => zha
   `/calendar/leaves/${encodeURIComponent(date)}?leave=${leave ? 'true' : 'false'}`,
   { method: 'PUT' }
 )
+
+export const getZhaogangWorklogReport = (
+  from: string, to: string, scope: ZhaogangWorklogScope,
+  workbenchTeamId?: number | null, refresh = false
+) => {
+  const params = new URLSearchParams({ from, to, scope })
+  if (scope === 'WORKBENCH_TEAM' && workbenchTeamId) params.set('workbenchTeamId', String(workbenchTeamId))
+  if (refresh) params.set('refresh', 'true')
+  return zhaogangRequest<ZhaogangWorklogRangeReport>(`/worklogs/report?${params}`)
+}
 
 export const getZhaogangWorklogStatistics = (
   month: string,

@@ -6,7 +6,7 @@
         :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
         :style="{ minWidth: `${chartWidth}px` }"
         role="img"
-        :aria-label="`${memberName ? `${memberName} · ` : ''}${monthLabel}每日工时趋势`"
+        :aria-label="`${memberName ? `${memberName} · ` : ''}${rangeLabel}每日工时趋势`"
       >
         <text class="axis-unit" :x="plotLeft" y="12">（小时）</text>
         <g v-for="tick in ticks" :key="tick.value">
@@ -139,7 +139,7 @@ interface MemberHours {
 
 interface ChartDay {
   date: string
-  day: number
+  day: string
   weekdayLabel: string
   restDay: boolean
   hours: number
@@ -157,7 +157,6 @@ interface TeamMemberSeries {
 }
 
 const props = withDefaults(defineProps<{
-  month: string
   scope: ZhaogangWorklogScope
   memberName?: string
   dailyTotals: ZhaogangWorklogDailyTotal[]
@@ -183,31 +182,27 @@ const trendScroll = ref<HTMLElement | null>(null)
 const hoveredDay = ref<ChartDay | null>(null)
 const tooltipLeft = ref(12)
 const personalLabel = computed(() => props.memberName ?? (props.scope === 'SELF' ? '我的工时' : ''))
-const monthLabel = computed(() => {
-  const [year, month] = props.month.split('-').map(Number)
-  return `${year} 年 ${month} 月`
-})
-const totalByDate = computed(() => new Map(props.dailyTotals.map(item => [item.date, item])))
+const rangeLabel = computed(() => props.dailyTotals.length
+  ? `${props.dailyTotals[0].date} 至 ${props.dailyTotals[props.dailyTotals.length - 1].date}` : '')
+const spansMonths = computed(() => new Set(props.dailyTotals.map(item => item.date.slice(0, 7))).size > 1)
 const teamMembers = computed<TeamMemberSeries[]>(() => props.memberDailyTotals.map((member, index) => ({
   user: member.user,
   color: memberColors[index % memberColors.length],
   totals: new Map(member.dailyTotals.map(item => [item.date, Number(item.hours || 0)]))
 })))
-const today = new Date()
-const todayText = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+const todayText = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date())
 const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 const days = computed<ChartDay[]>(() => {
-  const [year, month] = props.month.split('-').map(Number)
-  const count = new Date(year, month, 0).getDate()
-  return Array.from({ length: count }, (_, index) => {
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`
-    const total = totalByDate.value.get(date)
+  return props.dailyTotals.map(total => {
+    const date = total.date
     const hours = Number(total?.hours || 0)
     const weekday = new Date(`${date}T00:00:00`).getDay()
     const restDay = total?.dayType ? total.dayType === 'REST_DAY' : weekday === 0 || weekday === 6
     return {
       date,
-      day: index + 1,
+      day: spansMonths.value ? date.slice(5) : String(Number(date.slice(8))),
       weekdayLabel: weekdays[weekday],
       restDay,
       hours,
@@ -232,8 +227,8 @@ const rawMaxHours = computed(() => {
 })
 const maxHours = computed(() => Math.max(4, Math.ceil(rawMaxHours.value / 4) * 4))
 const minimumSlotWidth = computed(() => personalLabel.value
-  ? 30
-  : Math.max(32, teamMembers.value.length * 12 + 10))
+  ? (spansMonths.value ? 46 : 30)
+  : Math.max(spansMonths.value ? 46 : 32, teamMembers.value.length * 12 + 10))
 const chartWidth = computed(() => Math.max(920, days.value.length * minimumSlotWidth.value + plotLeft + plotRight))
 const slotWidth = computed(() => (chartWidth.value - plotLeft - plotRight) / Math.max(days.value.length, 1))
 const selfBarWidth = computed(() => Math.min(18, slotWidth.value * 0.62))
@@ -291,7 +286,7 @@ const scrollToToday = async () => {
 }
 
 watch(
-  () => [props.month, personalLabel.value, chartWidth.value],
+  () => [rangeLabel.value, personalLabel.value, chartWidth.value],
   () => { void scrollToToday() },
   { immediate: true }
 )

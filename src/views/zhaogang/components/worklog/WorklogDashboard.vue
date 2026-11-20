@@ -6,7 +6,7 @@
       <template #header>
         <div class="trend-header">
           <div class="trend-title">
-            <h3>{{ trendMember ? `${trendMember.name} · 月度工时统计` : '月度工时统计' }}</h3>
+            <h3>{{ trendMember ? `${trendMember.name} · 工时统计` : '工时统计' }}</h3>
             <p v-if="summary">{{ summary }}</p>
           </div>
           <div class="scope-controls">
@@ -27,7 +27,7 @@
               :aria-pressed="presentationMode === 'RANKING'"
               @click="togglePresentation"
             >
-              {{ presentationMode === 'RANKING' ? '月度趋势' : '谁是卷王' }}
+              {{ presentationMode === 'RANKING' ? '工时趋势' : '谁是卷王' }}
             </el-button>
             <el-select
               v-if="scope === 'WORKBENCH_TEAM'"
@@ -65,11 +65,15 @@
         </div>
       </template>
 
-      <div class="month-controls">
-        <el-tooltip content="上一月"><el-button circle :icon="ArrowLeft" aria-label="上一月" :disabled="statisticsLoading" @click="shiftMonth(-1)" /></el-tooltip>
-        <strong>{{ monthLabel }}</strong>
-        <el-tooltip content="下一月"><el-button circle :icon="ArrowRight" aria-label="下一月" :disabled="statisticsLoading" @click="shiftMonth(1)" /></el-tooltip>
-      </div>
+      <el-alert
+        v-if="entryRangeTooLong"
+        class="view-error"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="工时统计范围不能超过一个月（31 天）"
+        :description="report ? `当前显示上次查询结果（${reportRangeLabel}）` : undefined"
+      />
 
       <el-alert v-if="statisticsError" class="view-error" type="error" :closable="false" show-icon :title="statisticsError" />
       <el-alert
@@ -78,7 +82,7 @@
         type="warning"
         :closable="false"
         show-icon
-        :title="`${trendMember.name}的月度工时未完整取得`"
+        :title="`${trendMember.name}的工时未完整取得`"
         :description="memberStatisticsIssue.reason"
       />
       <WorklogCoverageNotice
@@ -90,14 +94,14 @@
       <div v-else-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <WorklogRanking
         v-else-if="statistics && scope === 'WORKBENCH_TEAM' && presentationMode === 'RANKING'"
-        :month="month"
+        :from="report!.from"
+        :to-exclusive="report!.rankingToExclusive"
         v-model:metric="rankingMetric"
         :coverage="statistics.coverage"
-        :member-daily-totals="statistics.memberDailyTotals"
+        :member-daily-totals="report!.ranking.memberDailyTotals"
       />
       <WorklogTrendChart
         v-else-if="statistics && (!trendMember || hasMemberTrend)"
-        :month="month"
         :scope="scope"
         :member-name="trendMember?.name"
         :daily-totals="trendDailyTotals"
@@ -206,7 +210,7 @@
       v-model="absenceDialogVisible"
       :loading="absenceLoading"
       :error="absenceError"
-      :month="month"
+      :selected-range="reportRangeLabel"
       :report="absenceReport"
     />
   </section>
@@ -214,8 +218,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ArrowLeft, ArrowRight, Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
-import { getZhaogangWorklogAbsences, getZhaogangWorklogEntriesPage, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogStatistics } from '@/api/zhaogang'
+import { Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
+import { getZhaogangWorklogEntriesPage, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogReport } from '@/api/zhaogang'
 import type {
   ZhaogangWorklogOptions,
   ZhaogangWorklogIssueCheck,
@@ -223,8 +227,7 @@ import type {
   ZhaogangWorklogRankingMetric,
   ZhaogangWorklogScope,
   ZhaogangWorklogEntries,
-  ZhaogangWorklogStatistics,
-  ZhaogangWorklogAbsence
+  ZhaogangWorklogRangeReport
 } from '@/types/zhaogang'
 import WorklogTrendChart from './WorklogTrendChart.vue'
 import WorklogRanking from './WorklogRanking.vue'
@@ -232,16 +235,15 @@ import WorklogWeekList from './WorklogWeekList.vue'
 import WorklogAbsenceDialog from './WorklogAbsenceDialog.vue'
 import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 
-const current = new Date()
-const month = ref(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`)
 const scope = ref<ZhaogangWorklogScope>('SELF')
 const presentationMode = ref<'TREND' | 'RANKING'>('TREND')
-const rankingMetric = ref<ZhaogangWorklogRankingMetric>('OVERTIME_HOURS')
+const rankingMetric = ref<ZhaogangWorklogRankingMetric>('UTILIZATION_RATE')
 const workbenchTeamId = ref<number | null>(null)
 const options = ref<ZhaogangWorklogOptions | null>(null)
 const optionsLoading = ref(false)
 const optionsError = ref('')
-const statistics = ref<ZhaogangWorklogStatistics | null>(null)
+const report = ref<ZhaogangWorklogRangeReport | null>(null)
+const statistics = computed(() => report.value?.statistics ?? null)
 const statisticsKey = ref('')
 const statisticsError = ref('')
 const statisticsLoading = ref(false)
@@ -262,9 +264,9 @@ const entriesLoadingMore = ref(false)
 const titlesIncomplete = computed(() => entryPages.value.some(page => page.issueCheck?.incomplete))
 const entryMemberId = ref<number | null>(null)
 const absenceDialogVisible = ref(false)
-const absenceLoading = ref(false)
-const absenceError = ref('')
-const absenceReport = ref<ZhaogangWorklogAbsence | null>(null)
+const absenceLoading = computed(() => statisticsLoading.value)
+const absenceError = computed(() => statisticsError.value)
+const absenceReport = computed(() => report.value?.absences ?? null)
 const entryShortcuts = [
   { value: 'week', label: '本周' },
   { value: 'lastWeek', label: '上周' },
@@ -273,7 +275,7 @@ const entryShortcuts = [
 ] as const
 type EntryShortcut = (typeof entryShortcuts)[number]['value']
 type EntryRange = [string, string]
-const entryRange = ref<EntryRange | null>(entryShortcutRanges().week)
+const entryRange = ref<EntryRange | null>(entryShortcutRanges().month)
 const entryRangeTooLong = computed(() => {
   if (!entryRange.value) return false
   const [from, to] = entryRange.value
@@ -291,12 +293,10 @@ let entriesRequest: AbortController | undefined
 const stopEntryChecks = new Set<() => void>()
 let entriesRefreshPending = false
 let entriesCardSeen = false
-let absenceRequestSequence = 0
 
-const monthLabel = computed(() => {
-  const [year, value] = month.value.split('-').map(Number)
-  return `${year} 年 ${value} 月`
-})
+const reportRangeLabel = computed(() => report.value
+  ? `${report.value.from} 至 ${addDays(report.value.toExclusive, -1)}`
+  : entryRange.value?.join(' 至 ') || '请选择日期范围')
 const selectedTeam = computed(() => options.value?.teams.find(item => item.id === workbenchTeamId.value))
 const entryMembers = computed(() => selectedTeam.value?.members ?? [])
 const selectedEntryMember = computed(() => scope.value === 'WORKBENCH_TEAM'
@@ -306,8 +306,8 @@ const trendMember = computed(() => presentationMode.value === 'TREND' ? selected
 const memberStatistics = computed(() => statistics.value?.memberDailyTotals.find(item => item.user.id === trendMember.value?.id))
 const memberStatisticsIssue = computed(() => statistics.value?.coverage.memberIssues?.find(item => item.user.id === trendMember.value?.id))
 const trendDailyTotals = computed(() => (trendMember.value ? memberStatistics.value?.dailyTotals : statistics.value?.dailyTotals) ?? [])
-const monthTotal = computed(() => trendDailyTotals.value.reduce((sum, item) => sum + Number(item.hours || 0), 0))
-const hasMemberTrend = computed(() => !!memberStatistics.value && (!memberStatisticsIssue.value || monthTotal.value > 0))
+const rangeTotal = computed(() => trendDailyTotals.value.reduce((sum, item) => sum + Number(item.hours || 0), 0))
+const hasMemberTrend = computed(() => !!memberStatistics.value && (!memberStatisticsIssue.value || rangeTotal.value > 0))
 const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择 Dev Hub 团队' : '还没有加入 Dev Hub 团队')
 const teamSelectWidth = computed(() => {
   const labels = (options.value?.teams || []).map(team => team.name)
@@ -322,13 +322,13 @@ const summary = computed(() => {
   const metrics = (trendMember.value ? memberStatistics.value?.summary : statistics.value?.summary) ?? emptyStatistics
   const count = statistics.value?.coverage.memberCount ?? selectedTeam.value?.memberCount ?? 0
   const teamCount = scope.value === 'WORKBENCH_TEAM' && !trendMember.value ? ` · ${count} 人` : ''
-  return `总计工时 ${formatHours(monthTotal.value)}h${teamCount} · 加班天数 ${metrics.overtimeDays}天 · 加班工时 ${formatHours(metrics.overtimeHours)}h · 平均工时 ${formatAverageHours(metrics.averageHours)}h`
+  return `总计工时 ${formatHours(rangeTotal.value)}h${teamCount} · 加班天数 ${metrics.overtimeDays}天 · 加班工时 ${formatHours(metrics.overtimeHours)}h · 平均工时 ${formatAverageHours(metrics.averageHours)}h`
 })
 const statisticsCoverageMessage = computed(() => {
   const failed = statistics.value?.coverage.failedMemberCount || 0
   return failed > 0
-    ? `部分成员工时暂未取得，失败成员 ${failed} 人，月度统计可能不完整`
-    : '部分成员工时未完整取得，月度统计可能不完整'
+    ? `部分成员工时暂未取得，失败成员 ${failed} 人，工时统计可能不完整`
+    : '部分成员工时未完整取得，工时统计可能不完整'
 })
 const entriesCoverageMessage = computed(() => {
   const failed = entries.value?.coverage.failedMemberCount || 0
@@ -373,24 +373,41 @@ const loadOptions = async () => {
 }
 
 const loadStatistics = async (refresh = false) => {
-  if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
-  const key = `${month.value}:${scope.value}:${workbenchTeamId.value || ''}`
-  if (statisticsKey.value !== key) statistics.value = null
   const sequence = ++statisticsRequestSequence
+  if (!entryRange.value || entryRangeTooLong.value || (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value)) {
+    statisticsLoading.value = false
+    return
+  }
+  const key = currentReportKey()
+  if (statisticsKey.value !== key) report.value = null
   statisticsLoading.value = true
   statisticsError.value = ''
   try {
-    const result = await getZhaogangWorklogStatistics(month.value, scope.value, workbenchTeamId.value, refresh)
-    if (sequence !== statisticsRequestSequence) return
-    statistics.value = result
+    const [from, to] = entryRange.value
+    const result = await getZhaogangWorklogReport(from, to, scope.value, workbenchTeamId.value, refresh)
+    if (sequence !== statisticsRequestSequence || key !== currentReportKey()) return
+    report.value = result
     statisticsKey.value = key
   } catch (error) {
     if (sequence !== statisticsRequestSequence) return
-    statisticsError.value = error instanceof Error ? error.message : '月度工时统计加载失败，请稍后重试'
+    statisticsError.value = error instanceof Error ? error.message : '工时统计加载失败，请稍后重试'
   } finally {
     if (sequence === statisticsRequestSequence) statisticsLoading.value = false
   }
 }
+
+const currentReportKey = () => `${entryRange.value?.join(':') ?? ''}:${scope.value}:${workbenchTeamId.value || ''}`
+
+watch(currentReportKey, () => {
+  cancelEntryRequests()
+  resetAbsence()
+  if (!entryRangeTooLong.value) {
+    entryPages.value = []
+    nextEntriesCursor.value = undefined
+    entriesKey.value = ''
+  }
+  if (!dashboardLoading.value) void loadStatistics()
+})
 
 const currentEntriesKey = () => {
   return `${entryRange.value?.join(':') ?? ''}:${scope.value}:${workbenchTeamId.value || ''}:${selectedEntryMember.value?.id ?? ''}`
@@ -487,26 +504,8 @@ watch([entriesCard, dashboardLoading, statisticsLoading], ([card, initializing, 
 }, { flush: 'post' })
 
 const openAbsenceDialog = () => {
-  if ((scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) || absenceLoading.value) return
+  if ((scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) || statisticsLoading.value) return
   absenceDialogVisible.value = true
-  void loadAbsence()
-}
-
-const loadAbsence = async (keepReport = false) => {
-  absenceLoading.value = true
-  absenceError.value = ''
-  if (!keepReport) absenceReport.value = null
-  const sequence = ++absenceRequestSequence
-  try {
-    const result = await getZhaogangWorklogAbsences(month.value, scope.value, workbenchTeamId.value)
-    if (sequence !== absenceRequestSequence) return
-    absenceReport.value = result
-  } catch (error) {
-    if (sequence !== absenceRequestSequence) return
-    absenceError.value = error instanceof Error ? error.message : '缺勤统计加载失败，请稍后重试'
-  } finally {
-    if (sequence === absenceRequestSequence) absenceLoading.value = false
-  }
 }
 
 const pollIssueCheck = (
@@ -547,10 +546,6 @@ const reloadChangedReports = (revision: number) => {
   if (!statisticsLoading.value && (statistics.value?.issueCheck?.deletionRevision ?? revision) < revision) {
     void loadStatistics()
   }
-  if (absenceDialogVisible.value && !absenceLoading.value &&
-      (absenceReport.value?.issueCheck?.deletionRevision ?? revision) < revision) {
-    void loadAbsence(true)
-  }
   if (!dashboardLoading.value && !entryRangeTooLong.value &&
       (entries.value?.issueCheck?.deletionRevision ?? revision) < revision) {
     void loadEntries(false)
@@ -560,11 +555,6 @@ const reloadChangedReports = (revision: number) => {
 watch(() => statisticsLoading.value ? null : statistics.value?.issueCheck, (check, _, onCleanup) => {
   pollIssueCheck(check, onCleanup, status => reloadChangedReports(status.deletionRevision))
 })
-
-watch(() => absenceDialogVisible.value && !absenceLoading.value ? absenceReport.value?.issueCheck : null,
-  (check, _, onCleanup) => {
-    pollIssueCheck(check, onCleanup, status => reloadChangedReports(status.deletionRevision))
-  })
 
 const watchEntryPage = (page: ZhaogangWorklogEntries) => {
   const check = page.issueCheck
@@ -597,11 +587,7 @@ const watchEntryPage = (page: ZhaogangWorklogEntries) => {
 }
 
 const resetAbsence = () => {
-  absenceRequestSequence += 1
   absenceDialogVisible.value = false
-  absenceLoading.value = false
-  absenceError.value = ''
-  absenceReport.value = null
 }
 
 const refreshDashboard = async () => {
@@ -619,7 +605,7 @@ const refreshDashboard = async () => {
 const resetScopeResults = () => {
   statisticsRequestSequence += 1
   cancelEntryRequests()
-  statistics.value = null
+  report.value = null
   statisticsKey.value = ''
   statisticsError.value = ''
   statisticsLoading.value = false
@@ -634,6 +620,7 @@ const resetScopeResults = () => {
 }
 
 const changeScope = (value: string | number | boolean | undefined) => {
+  entryRange.value = entryShortcutRanges()[value === 'WORKBENCH_TEAM' ? 'week' : 'month']
   if (value === 'WORKBENCH_TEAM') {
     workbenchTeamId.value = options.value?.teams[0]?.id || null
   } else {
@@ -641,7 +628,6 @@ const changeScope = (value: string | number | boolean | undefined) => {
     workbenchTeamId.value = null
   }
   resetScopeResults()
-  void loadStatistics()
 }
 
 const togglePresentation = () => {
@@ -650,16 +636,6 @@ const togglePresentation = () => {
 
 const changeTeam = () => {
   resetScopeResults()
-  void loadStatistics()
-}
-
-const shiftMonth = (offset: number) => {
-  if (statisticsLoading.value) return
-  resetAbsence()
-  const [year, value] = month.value.split('-').map(Number)
-  const next = new Date(year, value - 1 + offset, 1)
-  month.value = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
-  void loadStatistics()
 }
 
 const setEntryShortcut = (shortcut: EntryShortcut) => {
@@ -725,7 +701,7 @@ onBeforeUnmount(cancelEntryRequests)
 
 <style scoped>
 .worklog-dashboard { display: grid; gap: 14px; }
-.trend-header, .scope-controls, .month-controls, .week-header { display: flex; align-items: center; }
+.trend-header, .scope-controls, .week-header { display: flex; align-items: center; }
 .trend-card, .week-card { border-color: #e4e9f1; border-radius: 8px; }
 .trend-header { justify-content: space-between; gap: 18px; }
 .trend-title h3, .week-header h3 { margin: 0; color: #26344a; font-size: 17px; }
@@ -733,8 +709,6 @@ onBeforeUnmount(cancelEntryRequests)
 .scope-controls { justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .sync-time { color: #7b879a; font-size: 12px; white-space: nowrap; }
 .team-select { flex: 0 0 auto; }
-.month-controls { justify-content: center; gap: 14px; margin-bottom: 12px; }
-.month-controls strong { min-width: 120px; color: #35445b; text-align: center; }
 .selection-placeholder { display: grid; min-height: 260px; place-items: center; color: #8a96a9; }
 .view-error { margin-bottom: 12px; }
 .week-header { justify-content: space-between; gap: 16px; }

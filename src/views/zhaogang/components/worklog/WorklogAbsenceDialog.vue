@@ -11,11 +11,11 @@
     <el-alert v-else-if="error" type="error" :closable="false" show-icon :title="error" />
     <template v-else-if="report">
       <div class="absence-meta">
-        <span>统计月份：{{ monthLabel }}</span>
+        <span>所选范围：{{ selectedRange }}</span>
         <span>统计范围：{{ rangeLabel }}</span>
       </div>
       <WorklogCoverageNotice :coverage="report.coverage" :title="coverageWarning" />
-      <el-empty v-if="!report.members.length" description="所选范围内没有缺勤记录" :image-size="90" />
+      <el-empty v-if="!report.members.length" :description="report.from >= report.toExclusive ? '所选范围内暂无可统计日期，仅统计截至昨天的工时' : '所选范围内没有缺勤记录'" :image-size="90" />
       <el-table v-else :data="report.members" size="small" stripe>
         <el-table-column label="成员" min-width="150">
           <template #default="{ row }">
@@ -54,16 +54,12 @@ const props = defineProps<{
   modelValue: boolean
   loading: boolean
   error: string
-  month: string
+  selectedRange: string
   report: ZhaogangWorklogAbsence | null
 }>()
 
-const monthLabel = computed(() => {
-  const [year, month] = props.month.split('-').map(Number)
-  return `${year} 年 ${month} 月`
-})
 const rangeLabel = computed(() => {
-  if (!props.report?.from || !props.report.toExclusive || props.report.from >= props.report.toExclusive) return '无工作日范围'
+  if (!props.report?.from || !props.report.toExclusive || props.report.from >= props.report.toExclusive) return '暂无可统计日期（排除当天及未来日期）'
   const [year, month, day] = props.report.toExclusive.split('-').map(Number)
   const date = new Date(Date.UTC(year, month - 1, day - 1))
   return `${props.report.from} 至 ${date.toISOString().slice(0, 10)}`

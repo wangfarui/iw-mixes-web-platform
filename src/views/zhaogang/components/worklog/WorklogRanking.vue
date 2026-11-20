@@ -1,31 +1,37 @@
 <template>
-  <section class="worklog-ranking" aria-label="团队月度卷王排行榜">
+  <section class="worklog-ranking" aria-label="团队卷王排行榜">
     <WorklogCoverageNotice :coverage="coverage" :title="coverageMessage" />
 
     <div class="ranking-intro">
       <div class="ranking-heading">
-        <strong>团队月度卷王榜</strong>
-        <span>按{{ metricLabel }}排序 · 统计 {{ memberDailyTotals.length }} 人</span>
+        <strong>团队卷王榜</strong>
+        <span class="ranking-statistics">
+          按{{ metricLabel }}排序 · 统计 {{ memberDailyTotals.length }} 人
+          <el-tooltip content="按所选日期范围统计，排除当天及未来日期" placement="top">
+            <el-icon class="ranking-help" tabindex="0" role="img" aria-label="统计范围说明"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </span>
       </div>
       <div class="ranking-controls">
         <el-radio-group v-model="selectedMetric" size="small" aria-label="排行榜统计维度">
+          <el-radio-button value="UTILIZATION_RATE">工时利用率</el-radio-button>
           <el-radio-button value="TOTAL_HOURS">总工时</el-radio-button>
           <el-radio-button value="OVERTIME_HOURS">加班工时</el-radio-button>
           <el-radio-button value="OVERTIME_DAYS">加班天数</el-radio-button>
         </el-radio-group>
-        <span class="ranking-month">{{ monthLabel }}</span>
+        <span class="ranking-range">{{ rangeLabel }}</span>
       </div>
     </div>
 
     <el-empty v-if="!hasRankingResult" :description="emptyDescription" :image-size="92" />
     <template v-else>
-      <div class="champion-card">
+      <div v-if="champions.length" class="champion-card">
         <div class="champion-crown" aria-hidden="true"><el-icon><Trophy /></el-icon></div>
         <div class="champion-copy">
-          <span>{{ champions.length > 1 ? `本月并列${championTitle}` : `本月${championTitle}` }}</span>
+          <span>{{ champions.length > 1 ? `所选范围内并列${championTitle}` : `所选范围内${championTitle}` }}</span>
           <strong :title="championNames">{{ championNames }}</strong>
           <small v-if="champions.length === 1">{{ championDetails }}</small>
-          <small v-else>{{ metricLabel }}相同，共享本月第一</small>
+          <small v-else>{{ metricLabel }}相同，共享第一</small>
         </div>
         <div class="champion-hours">
           <strong>{{ formatMetricValue(champions[0]) }}</strong>
@@ -35,18 +41,19 @@
 
       <ol v-if="remainingStandings.length" class="ranking-list">
         <li v-for="member in remainingStandings" :key="member.user.id" class="ranking-row">
-          <span class="rank-number" :class="`rank-number--${Math.min(member.rank, 4)}`">{{ rankLabel(member.rank) }}</span>
+          <span class="rank-number" :class="`rank-number--${Math.min(member.rank ?? 4, 4)}`">{{ rankLabel(member.rank) }}</span>
           <el-avatar :size="34" :src="member.user.avatar">{{ member.user.name?.slice(0, 1) }}</el-avatar>
           <div class="member-summary">
             <div class="member-line">
               <strong :title="member.user.name">{{ member.user.name }}</strong>
-              <span>{{ metricLabel }} {{ formatMetricValue(member) }}{{ metricUnit }}</span>
+              <span>{{ metricLabel }} {{ formatMetricValue(member) }}{{ metricSuffix(member) }}</span>
             </div>
             <div class="progress-track" aria-hidden="true">
               <span :style="{ width: `${progressWidth(member)}%` }" />
             </div>
           </div>
           <div class="member-metrics">
+            <span v-if="metric === 'UTILIZATION_RATE' && member.rank === null">无工作日，不参与排名</span>
             <span v-for="item in secondaryMetrics(member)" :key="item.label">{{ item.label }} {{ item.value }}</span>
           </div>
         </li>
@@ -57,7 +64,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Trophy } from '@element-plus/icons-vue'
+import { QuestionFilled, Trophy } from '@element-plus/icons-vue'
 import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 import type {
   ZhaogangWorklogCoverage,
@@ -68,14 +75,16 @@ import type {
 
 interface WorklogStanding {
   user: ZhaogangWorklogUser
-  rank: number
+  rank: number | null
   totalHours: number
   overtimeHours: number
   overtimeDays: number
+  utilizationRate: number | null
 }
 
 const props = defineProps<{
-  month: string
+  from: string
+  toExclusive: string
   metric: ZhaogangWorklogRankingMetric
   coverage: ZhaogangWorklogCoverage
   memberDailyTotals: ZhaogangWorklogMemberDailyTotal[]
@@ -89,9 +98,11 @@ const selectedMetric = computed({
   set: value => emit('update:metric', value)
 })
 
-const monthLabel = computed(() => {
-  const [year, month] = props.month.split('-').map(Number)
-  return `${year} 年 ${month} 月`
+const rangeLabel = computed(() => {
+  if (props.from >= props.toExclusive) return '暂无可统计日期'
+  const lastDate = new Date(props.toExclusive)
+  lastDate.setUTCDate(lastDate.getUTCDate() - 1)
+  return `${props.from} 至 ${lastDate.toISOString().slice(0, 10)}`
 })
 const memberStatistics = computed<Omit<WorklogStanding, 'rank'>[]>(() => props.memberDailyTotals.map(member => {
   const totalHours = member.dailyTotals.reduce((sum, item) => sum + Number(item.hours || 0), 0)
@@ -100,7 +111,8 @@ const memberStatistics = computed<Omit<WorklogStanding, 'rank'>[]>(() => props.m
     rank: 0,
     totalHours,
     overtimeHours: Number(member.summary?.overtimeHours || 0),
-    overtimeDays: Number(member.summary?.overtimeDays || 0)
+    overtimeDays: Number(member.summary?.overtimeDays || 0),
+    utilizationRate: member.summary?.utilizationRate ?? null
   }
 }))
 const standings = computed<WorklogStanding[]>(() => {
@@ -111,32 +123,41 @@ const standings = computed<WorklogStanding[]>(() => {
   let previousRank = 0
   return sorted.map((member, index) => {
     const value = metricValue(member)
+    if (props.metric === 'UTILIZATION_RATE' && member.utilizationRate === null) return { ...member, rank: null }
     const rank = previousValue !== null && sameValue(value, previousValue) ? previousRank : index + 1
     previousValue = value
     previousRank = rank
     return { ...member, rank }
   })
 })
-const hasRankingResult = computed(() => standings.value.some(member => metricValue(member) > 0))
+const hasRankingResult = computed(() => props.from < props.toExclusive && (props.metric === 'UTILIZATION_RATE'
+  ? standings.value.length > 0
+  : standings.value.some(member => metricValue(member) > 0)))
 const champions = computed(() => standings.value.filter(member => member.rank === 1 && metricValue(member) > 0))
-const remainingStandings = computed(() => standings.value.filter(member => member.rank > 1))
+const remainingStandings = computed(() => standings.value.filter(member => !champions.value.length || member.rank !== 1))
 const championNames = computed(() => champions.value.map(member => member.user.name).join('、'))
 const maximumMetricValue = computed(() => standings.value[0] ? metricValue(standings.value[0]) : 0)
 const metricLabel = computed(() => ({
+  UTILIZATION_RATE: '工时利用率',
   TOTAL_HOURS: '总工时',
   OVERTIME_HOURS: '加班工时',
   OVERTIME_DAYS: '加班天数'
 }[props.metric]))
-const metricUnit = computed(() => props.metric === 'OVERTIME_DAYS' ? '天' : 'h')
+const metricUnit = computed(() => props.metric === 'UTILIZATION_RATE' ? '%' : props.metric === 'OVERTIME_DAYS' ? '天' : 'h')
+const metricSuffix = (member: WorklogStanding) => props.metric === 'UTILIZATION_RATE' && member.utilizationRate === null ? '' : metricUnit.value
 const championTitle = computed(() => ({
+  UTILIZATION_RATE: '工时利用率第一',
   TOTAL_HOURS: '总工时卷王',
   OVERTIME_HOURS: '加班王',
   OVERTIME_DAYS: '加班天数王'
 }[props.metric]))
-const emptyDescription = computed(() => ({
-  TOTAL_HOURS: '本月暂无工时，暂未产生总工时卷王',
-  OVERTIME_HOURS: '本月暂无加班工时，暂未产生加班王',
-  OVERTIME_DAYS: '本月暂无加班天数，暂未产生加班天数王'
+const emptyDescription = computed(() => props.from >= props.toExclusive
+  ? '所选范围内暂无可统计日期，仅统计截至昨天的工时'
+  : ({
+  UTILIZATION_RATE: '所选范围内暂无成员工时利用率数据',
+  TOTAL_HOURS: '所选范围内暂无工时，暂未产生总工时卷王',
+  OVERTIME_HOURS: '所选范围内暂无加班工时，暂未产生加班王',
+  OVERTIME_DAYS: '所选范围内暂无加班天数，暂未产生加班天数王'
 }[props.metric]))
 const championDetails = computed(() => {
   const champion = champions.value[0]
@@ -148,16 +169,20 @@ const coverageMessage = computed(() => props.coverage.failedMemberCount > 0
   : '榜单数据暂不完整：部分成员工时未完整取得，排名可能发生变化')
 
 const metricValue = (member: Omit<WorklogStanding, 'rank'> | WorklogStanding) => ({
+  UTILIZATION_RATE: member.utilizationRate ?? -1,
   TOTAL_HOURS: member.totalHours,
   OVERTIME_HOURS: member.overtimeHours,
   OVERTIME_DAYS: member.overtimeDays
 }[props.metric])
 const sameValue = (left: number, right: number) => Math.abs(left - right) < 0.000001
 const formatHours = (hours: number) => Number(hours || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+const formatUtilization = (value: number | null) => value === null ? '—' : value.toFixed(2)
 const formatMetricValue = (member?: WorklogStanding) => member
-  ? (props.metric === 'OVERTIME_DAYS' ? String(member.overtimeDays) : formatHours(metricValue(member)))
+  ? (props.metric === 'UTILIZATION_RATE' ? formatUtilization(member.utilizationRate)
+    : props.metric === 'OVERTIME_DAYS' ? String(member.overtimeDays) : formatHours(metricValue(member)))
   : '0'
 const secondaryMetrics = (member: WorklogStanding) => [
+  props.metric === 'UTILIZATION_RATE' ? null : { label: '工时利用率', value: `${formatUtilization(member.utilizationRate)}${member.utilizationRate === null ? '' : '%'}` },
   props.metric === 'TOTAL_HOURS' ? null : { label: '总工时', value: `${formatHours(member.totalHours)}h` },
   props.metric === 'OVERTIME_HOURS' ? null : { label: '加班工时', value: `${formatHours(member.overtimeHours)}h` },
   props.metric === 'OVERTIME_DAYS' ? null : { label: '加班天数', value: `${member.overtimeDays}天` }
@@ -166,7 +191,7 @@ const progressWidth = (member: WorklogStanding) => {
   const value = metricValue(member)
   return value > 0 && maximumMetricValue.value ? Math.max(2, value / maximumMetricValue.value * 100) : 0
 }
-const rankLabel = (rank: number) => rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : String(rank)
+const rankLabel = (rank: number | null) => rank === null ? '—' : rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : String(rank)
 </script>
 
 <style scoped>
@@ -176,7 +201,9 @@ const rankLabel = (rank: number) => rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 
 .ranking-intro strong { font-size: 16px; }
 .ranking-intro span { color: #7b879a; font-size: 12px; }
 .ranking-controls { display: flex; align-items: center; gap: 12px; }
-.ranking-month { flex: 0 0 auto; }
+.ranking-range { flex: 0 0 auto; }
+.ranking-statistics { display: inline-flex; align-items: center; gap: 4px; }
+.ranking-help { flex-shrink: 0; font-size: 14px; cursor: help; }
 .champion-card {
   display: grid;
   position: relative;

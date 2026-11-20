@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-19-03",
+  "currentReleaseId": "zg-2026-11-20-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -737,6 +737,21 @@
         {
           "type": "IMPROVEMENT",
           "text": "「胖猫云工作台构建」统一在 Skills 页面下载和安装，Skill 详情与 Agent 授权页可互相跳转。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-20-01",
+      "version": "2.1.0",
+      "publishedAt": "2026-11-20T15:05:45+08:00",
+      "items": [
+        {
+          "type": "IMPROVEMENT",
+          "text": "工时图表、汇总、排行榜和缺勤统一跟随所选日期，个人默认本月、团队默认本周，排行榜与缺勤统计截至昨天。"
+        },
+        {
+          "type": "FEATURE",
+          "text": "「谁是卷王」新增工时利用率并作为默认排行，按扣除请假后的工作日计算，支持两位百分比和并列排名。"
         }
       ]
     }

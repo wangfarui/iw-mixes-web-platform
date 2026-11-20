@@ -116,7 +116,7 @@ export interface ZhaogangBranch {
 }
 
 export type ZhaogangWorklogScope = 'SELF' | 'WORKBENCH_TEAM'
-export type ZhaogangWorklogRankingMetric = 'TOTAL_HOURS' | 'OVERTIME_HOURS' | 'OVERTIME_DAYS'
+export type ZhaogangWorklogRankingMetric = 'UTILIZATION_RATE' | 'TOTAL_HOURS' | 'OVERTIME_HOURS' | 'OVERTIME_DAYS'
 
 export interface ZhaogangCodingPermissionError {
   type: 'CODING_PERMISSION_DENIED'
@@ -181,6 +181,8 @@ export interface ZhaogangWorklogSummary {
   overtimeDays: number
   overtimeHours: number
   averageHours: number
+  workdayCount: number
+  utilizationRate: number | null
 }
 
 export interface ZhaogangWorklogUser {
@@ -249,6 +251,15 @@ export interface ZhaogangWorklogStatistics {
   dailyTotals: ZhaogangWorklogDailyTotal[]
   memberDailyTotals: ZhaogangWorklogMemberDailyTotal[]
   issueCheck?: ZhaogangWorklogIssueCheck | null
+}
+
+export interface ZhaogangWorklogRangeReport {
+  from: string
+  toExclusive: string
+  rankingToExclusive: string
+  statistics: ZhaogangWorklogStatistics
+  ranking: ZhaogangWorklogStatistics
+  absences: ZhaogangWorklogAbsence
 }
 
 export interface ZhaogangWorklogEntries {
