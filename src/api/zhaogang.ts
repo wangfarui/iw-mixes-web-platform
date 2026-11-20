@@ -235,6 +235,15 @@ export const triggerZhaogangBuild = (projectId: number, planId: number, dto: Zha
 
 export const getZhaogangWorklogOptions = () => zhaogangRequest<ZhaogangWorklogOptions>('/worklog-options')
 
+export const getZhaogangWorklogSync = (scope: import('@/types/zhaogang').ZhaogangWorklogScope,
+  workbenchTeamId?: number | null, trigger = false, signal?: AbortSignal) => {
+  const params = new URLSearchParams({ scope })
+  if (scope === 'WORKBENCH_TEAM' && workbenchTeamId) params.set('workbenchTeamId', String(workbenchTeamId))
+  return zhaogangRequest<import('@/types/zhaogang').ZhaogangWorklogSyncStatus>(`/worklogs/sync?${params}`, {
+    method: trigger ? 'POST' : 'GET', signal
+  })
+}
+
 export const getZhaogangCalendarMonth = (month: string) => zhaogangRequest<ZhaogangCalendarMonth>(
   `/calendar?month=${encodeURIComponent(month)}`
 )

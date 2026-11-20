@@ -52,7 +52,7 @@
               <el-button
                 circle
                 :icon="Refresh"
-                :loading="statisticsLoading || entriesLoading || optionsLoading"
+                :loading="syncBusy || statisticsLoading || entriesLoading || optionsLoading"
                 aria-label="刷新当前工时数据"
                 @click="refreshDashboard"
               />
@@ -86,7 +86,7 @@
         :description="memberStatisticsIssue.reason"
       />
       <WorklogCoverageNotice
-        v-if="statistics && scope === 'WORKBENCH_TEAM' && presentationMode === 'TREND' && !trendMember"
+        v-if="statistics && presentationMode === 'TREND' && !trendMember"
         :coverage="statistics.coverage"
         :title="statisticsCoverageMessage"
       />
@@ -101,13 +101,13 @@
         :member-daily-totals="report!.ranking.memberDailyTotals"
       />
       <WorklogTrendChart
-        v-else-if="statistics && (!trendMember || hasMemberTrend)"
+        v-else-if="statistics && !statisticsUnavailable && (!trendMember || hasMemberTrend)"
         :scope="scope"
         :member-name="trendMember?.name"
         :daily-totals="trendDailyTotals"
         :member-daily-totals="trendMember ? undefined : statistics.memberDailyTotals"
       />
-      <el-empty v-else :description="trendMember ? '该成员的月度工时暂不可用' : '暂无工时数据'" :image-size="80" />
+      <el-empty v-else :description="statisticsUnavailable ? '工时尚未同步完成或暂不可用' : trendMember ? '该成员的月度工时暂不可用' : '暂无工时数据'" :image-size="80" />
     </el-card>
 
     <el-card ref="entriesCard" class="week-card" shadow="never">
@@ -157,7 +157,7 @@
                 :value="member.id"
               />
             </el-select>
-            <span v-if="entries && !memberEntriesUnavailable">{{ entryScopeLabel }} · {{ formatHours(entries.totalHours) }}h</span>
+            <span v-if="entries && !entriesUnavailable && !memberEntriesUnavailable">{{ entryScopeLabel }} · {{ formatHours(entries.totalHours) }}h</span>
           </div>
         </div>
       </template>
@@ -194,7 +194,7 @@
       <el-alert v-if="entriesError" class="view-error" type="error" :closable="false" show-icon :title="entriesError" />
       <div v-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <el-skeleton v-else-if="!entries && !entriesError && !entryRangeTooLong" :rows="6" animated />
-      <el-empty v-else-if="memberEntriesUnavailable" description="该成员的工时记录暂不可用" :image-size="80" />
+      <el-empty v-else-if="entriesUnavailable || memberEntriesUnavailable" description="工时记录尚未同步完成或暂不可用" :image-size="80" />
       <WorklogWeekList
         v-else-if="entries"
         :scope="scope"
@@ -219,9 +219,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Refresh, TrendCharts, TrophyBase, WarningFilled } from '@element-plus/icons-vue'
-import { getZhaogangWorklogEntriesPage, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogReport } from '@/api/zhaogang'
+import { getZhaogangWorklogSync, getZhaogangWorklogEntriesPage, getZhaogangWorklogIssueCheck, getZhaogangWorklogOptions, getZhaogangWorklogReport } from '@/api/zhaogang'
 import type {
   ZhaogangWorklogOptions,
+  ZhaogangWorklogSyncStatus,
   ZhaogangWorklogIssueCheck,
   ZhaogangWorklogIssueCheckStatus,
   ZhaogangWorklogRankingMetric,
@@ -235,6 +236,8 @@ import WorklogWeekList from './WorklogWeekList.vue'
 import WorklogAbsenceDialog from './WorklogAbsenceDialog.vue'
 import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 
+const syncState = ref<ZhaogangWorklogSyncStatus | null>(null)
+const syncBusy = ref(false)
 const scope = ref<ZhaogangWorklogScope>('SELF')
 const presentationMode = ref<'TREND' | 'RANKING'>('TREND')
 const rankingMetric = ref<ZhaogangWorklogRankingMetric>('UTILIZATION_RATE')
@@ -307,6 +310,8 @@ const memberStatistics = computed(() => statistics.value?.memberDailyTotals.find
 const memberStatisticsIssue = computed(() => statistics.value?.coverage.memberIssues?.find(item => item.user.id === trendMember.value?.id))
 const trendDailyTotals = computed(() => (trendMember.value ? memberStatistics.value?.dailyTotals : statistics.value?.dailyTotals) ?? [])
 const rangeTotal = computed(() => trendDailyTotals.value.reduce((sum, item) => sum + Number(item.hours || 0), 0))
+const statisticsUnavailable = computed(() => !!statistics.value?.coverage.memberCount && statistics.value.coverage.failedMemberCount >= statistics.value.coverage.memberCount)
+const entriesUnavailable = computed(() => !!entries.value?.coverage.memberCount && entries.value.coverage.failedMemberCount >= entries.value.coverage.memberCount)
 const hasMemberTrend = computed(() => !!memberStatistics.value && (!memberStatisticsIssue.value || rangeTotal.value > 0))
 const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择 Dev Hub 团队' : '还没有加入 Dev Hub 团队')
 const teamSelectWidth = computed(() => {
@@ -317,6 +322,7 @@ const teamSelectWidth = computed(() => {
 const emptyStatistics = { overtimeDays: 0, overtimeHours: 0, averageHours: 0 }
 const summary = computed(() => {
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return teamSelectionHint.value
+  if (statisticsUnavailable.value) return syncBusy.value ? '工时正在同步' : '工时数据暂不可用'
   if (trendMember.value && !hasMemberTrend.value) return ''
 
   const metrics = (trendMember.value ? memberStatistics.value?.summary : statistics.value?.summary) ?? emptyStatistics
@@ -343,10 +349,58 @@ const entryScopeLabel = computed(() => {
 const memberEntriesIssue = computed(() => entries.value?.coverage.memberIssues?.find(item => item.user.id === selectedEntryMember.value?.id))
 const memberEntriesUnavailable = computed(() => !!memberEntriesIssue.value && !entries.value?.items.length)
 const syncTimeLabel = computed(() => {
-  if (statisticsLoading.value || entriesLoading.value) return '同步中'
-  if (!statistics.value?.syncedAt && !entries.value?.syncedAt) return '尚未同步'
-  const syncedAt = statistics.value?.syncedAt || entries.value?.syncedAt || ''
-  return `同步时间：${formatSyncTime(syncedAt)}`
+  const syncedAt = syncState.value?.syncedAt || ''
+  if (syncedAt) return `同步时间：${formatSyncTime(syncedAt)}`
+  return syncBusy.value ? '同步中' : '尚未同步'
+})
+
+let syncTimer: ReturnType<typeof setTimeout> | undefined
+let syncRequest: AbortController | undefined
+let syncGeneration = 0
+const syncScopeKey = () => `${scope.value}:${scope.value === 'WORKBENCH_TEAM' ? workbenchTeamId.value || '' : ''}`
+const stopSyncPolling = () => {
+  syncGeneration += 1
+  if (syncTimer) clearTimeout(syncTimer)
+  syncTimer = undefined
+  syncRequest?.abort()
+  syncRequest = undefined
+}
+const pollSync = async (trigger = false) => {
+  if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
+  stopSyncPolling()
+  const generation = syncGeneration
+  const key = syncScopeKey()
+  const request = new AbortController()
+  syncRequest = request
+  if (trigger) syncBusy.value = true
+  try {
+    const result = await getZhaogangWorklogSync(scope.value, workbenchTeamId.value, trigger, request.signal)
+    if (generation !== syncGeneration || key !== syncScopeKey()) return
+    const previous = syncState.value
+    syncState.value = result
+    syncBusy.value = result.running
+    const dataChanged = previous && (previous.dataVersion !== result.dataVersion || previous.syncedAt !== result.syncedAt)
+    if (dataChanged || (!result.running && (previous?.running || trigger))) {
+      await loadStatistics()
+      if (generation !== syncGeneration || key !== syncScopeKey()) return
+      if (entriesCardSeen) await loadEntries(false)
+    }
+  } catch (error) {
+    if (request.signal.aborted || generation !== syncGeneration) return
+    syncBusy.value = false
+    statisticsError.value = error instanceof Error ? error.message : '工时同步状态暂未获取，请稍后重试'
+  } finally {
+    if (generation === syncGeneration) {
+      syncRequest = undefined
+      syncTimer = setTimeout(() => { void pollSync() }, syncBusy.value ? 2000 : 15000)
+    }
+  }
+}
+watch(syncScopeKey, () => {
+  stopSyncPolling()
+  syncState.value = null
+  syncBusy.value = false
+  if (!dashboardLoading.value) void pollSync()
 })
 
 watch([workbenchTeamId, entryMembers], ([teamId], [previousTeamId]) => {
@@ -450,6 +504,10 @@ const fetchEntriesPage = async (cursor?: string, refresh = false) => {
     watchEntryPage(entryPages.value[entryPages.value.length - 1])
   } catch (error) {
     if (request.signal.aborted || key !== currentEntriesKey()) return
+    if (cursor && error instanceof Error && error.message.includes('工时数据已更新')) {
+      void loadEntries(false)
+      return
+    }
     errorMessage.value = error instanceof Error ? error.message : '工时登记加载失败，请稍后重试'
   } finally {
     if (entriesRequest === request) {
@@ -591,15 +649,9 @@ const resetAbsence = () => {
 }
 
 const refreshDashboard = async () => {
-  dashboardLoading.value = true
-  cancelEntryRequests()
-  try {
-    await loadOptions()
-    entriesRefreshPending = true
-    await loadStatistics(true)
-  } finally {
-    dashboardLoading.value = false
-  }
+  if (syncBusy.value) return
+  await loadOptions()
+  await pollSync(true)
 }
 
 const resetScopeResults = () => {
@@ -691,12 +743,13 @@ const formatSyncTime = (value: string) => {
 onMounted(async () => {
   try {
     await loadOptions()
+    await pollSync()
     await loadStatistics()
   } finally {
     dashboardLoading.value = false
   }
 })
-onBeforeUnmount(cancelEntryRequests)
+onBeforeUnmount(() => { stopSyncPolling(); cancelEntryRequests() })
 </script>
 
 <style scoped>

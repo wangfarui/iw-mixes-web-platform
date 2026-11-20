@@ -153,6 +153,20 @@ export interface ZhaogangWorklogOptions {
   teams: ZhaogangWorklogTeamOption[]
 }
 
+export interface ZhaogangWorklogSyncStatus {
+  running: boolean
+  syncedAt: string
+  dataVersion: string
+  partial: boolean
+  members: Array<{
+    user: ZhaogangWorklogUser
+    source: 'PERSONAL' | 'TEAM_MANAGED' | 'NONE'
+    state: 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED' | 'MISSING'
+    syncedAt: string
+    message: string
+  }>
+}
+
 export interface ZhaogangWorklogCoverage {
   scope: ZhaogangWorklogScope
   workbenchTeamId: number | null

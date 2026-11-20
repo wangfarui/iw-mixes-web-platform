@@ -79,7 +79,7 @@
                   <el-avatar :size="34" :src="scope.row.avatar">{{ scope.row.userName.slice(0, 1) }}</el-avatar>
                   <strong>{{ scope.row.userName }}</strong>
                   <el-tag v-if="detail.permissions.canManageStatistics && scope.row.managedStatistics"
-                    size="small" effect="plain" type="info">管理令牌统计</el-tag>
+                    size="small" effect="plain" type="info">手动添加</el-tag>
                 </div>
               </template>
             </el-table-column>
