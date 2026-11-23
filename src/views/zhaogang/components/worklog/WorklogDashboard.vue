@@ -77,6 +77,15 @@
 
       <el-alert v-if="statisticsError" class="view-error" type="error" :closable="false" show-icon :title="statisticsError" />
       <el-alert
+        v-if="syncError"
+        class="view-error"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="工时同步状态暂未获取，将自动重试"
+        :description="syncError"
+      />
+      <el-alert
         v-if="trendMember && memberStatisticsIssue"
         class="view-error"
         type="warning"
@@ -238,6 +247,7 @@ import WorklogCoverageNotice from './WorklogCoverageNotice.vue'
 
 const syncState = ref<ZhaogangWorklogSyncStatus | null>(null)
 const syncBusy = ref(false)
+const syncError = ref('')
 const scope = ref<ZhaogangWorklogScope>('SELF')
 const presentationMode = ref<'TREND' | 'RANKING'>('TREND')
 const rankingMetric = ref<ZhaogangWorklogRankingMetric>('UTILIZATION_RATE')
@@ -379,6 +389,7 @@ const pollSync = async (trigger = false) => {
     const previous = syncState.value
     syncState.value = result
     syncBusy.value = result.running
+    syncError.value = ''
     const dataChanged = previous && (previous.dataVersion !== result.dataVersion || previous.syncedAt !== result.syncedAt)
     if (dataChanged || (!result.running && (previous?.running || trigger))) {
       await loadStatistics()
@@ -388,7 +399,7 @@ const pollSync = async (trigger = false) => {
   } catch (error) {
     if (request.signal.aborted || generation !== syncGeneration) return
     syncBusy.value = false
-    statisticsError.value = error instanceof Error ? error.message : '工时同步状态暂未获取，请稍后重试'
+    syncError.value = error instanceof Error ? error.message : '请稍后重试'
   } finally {
     if (generation === syncGeneration) {
       syncRequest = undefined
@@ -400,6 +411,7 @@ watch(syncScopeKey, () => {
   stopSyncPolling()
   syncState.value = null
   syncBusy.value = false
+  syncError.value = ''
   if (!dashboardLoading.value) void pollSync()
 })
 
