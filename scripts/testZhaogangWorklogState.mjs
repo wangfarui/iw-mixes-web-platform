@@ -43,7 +43,7 @@ const originalSetTimeout = globalThis.setTimeout
 const originalClearTimeout = globalThis.clearTimeout
 const timers = new Map()
 let timerId = 0
-globalThis.setTimeout = fn => { const id = ++timerId; timers.set(id, fn); return id }
+globalThis.setTimeout = (fn, delay) => { const id = ++timerId; timers.set(id, { fn, delay }); return id }
 globalThis.clearTimeout = id => timers.delete(id)
 const instances = []
 const mount = async () => {
@@ -73,7 +73,7 @@ try {
   globalThis.worklogTestApi.getZhaogangWorklogSync = async () => status
   const poll = [...timers.values()].at(-1)
   timers.clear()
-  await poll()
+  await poll.fn()
   await flush()
   assert.equal(state.syncError, '', '轮询恢复后自动清除同步错误，无需改日期')
 
@@ -92,6 +92,116 @@ try {
   await flush()
   assert.equal(state.syncError, '', '切换团队后忽略旧请求错误')
   console.log('worklog dashboard: sync/report error isolation, recovery and stale requests passed')
+  instances.forEach(app => app.unmount())
+  instances.length = 0
+  timers.clear()
+  let currentStatus = { ...status }
+  let reads = 0
+  const page = (id, revision = 0) => ({
+    from: report.from, toExclusive: report.toExclusive, totalHours: 4,
+    coverage: { memberCount: 1, failedMemberCount: 0 },
+    issueCheck: { deletionRevision: revision }, items: [{ workLogId: id, hours: 2 }]
+  })
+  let readEntries = async ({ cursor }) => ({ entries: page(cursor ? 2 : 1), nextCursor: cursor ? undefined : 'second' })
+  globalThis.worklogTestApi = {
+    getZhaogangWorklogOptions: async () => ({ teams: [] }),
+    getZhaogangWorklogSync: async () => currentStatus,
+    getZhaogangWorklogReport: async () => { reads++; return report },
+    getZhaogangWorklogEntriesPage: (...args) => readEntries(...args)
+  }
+  const dashboard = await mount()
+  dashboard.entriesCard = { $el: {} }
+  await flush()
+  dashboard.loadMoreEntries()
+  await flush()
+  assert.equal(dashboard.entries.items.length, 2)
+  const pendingEntries = deferred()
+  const pendingSecondPage = deferred()
+  readEntries = ({ cursor }) => cursor
+    ? pendingSecondPage.promise : pendingEntries.promise
+  const refreshing = dashboard.loadEntries(false)
+  await flush()
+  assert.equal(dashboard.entries?.items.length, 2, '后台刷新期间保留已展示明细，不能切为骨架屏')
+  pendingEntries.resolve({ entries: page(10), nextCursor: 'new-second' })
+  await flush()
+  assert.deepEqual(dashboard.entries.items.map(item => item.workLogId), [1, 2], '后续分页尚未返回时不能混入新版本第一页')
+  pendingSecondPage.resolve({ entries: page(20) })
+  await refreshing
+  await flush()
+  assert.deepEqual(dashboard.entries.items.map(item => item.workLogId), [10, 20], '从新游标重读全部已展示分页后一次替换')
+  readEntries = async () => { throw new Error('明细暂时不可用') }
+  await dashboard.loadEntries(false)
+  assert.deepEqual(dashboard.entries.items.map(item => item.workLogId), [10, 20], '刷新失败保留原结果')
+  assert.equal(dashboard.entriesError, '明细暂时不可用')
+  readEntries = async ({ cursor }) => ({ entries: page(cursor ? 99 : 10, cursor ? 2 : 1), nextCursor: cursor ? undefined : 'changed-revision' })
+  await dashboard.loadEntries(false)
+  assert.deepEqual(dashboard.entries.items.map(item => item.workLogId), [10, 20], '刷新跨页发生版本变化时保留旧快照，不能发布混合结果')
+  assert.match(dashboard.entriesError, /工时数据已更新/)
+
+  const fireReload = async () => {
+    const timer = [...timers.entries()].find(([, timer]) => timer.delay <= 3000)
+    assert.ok(timer, '应存在待执行的合并刷新任务')
+    timers.delete(timer[0])
+    await timer[1].fn()
+    await flush()
+  }
+  readEntries = async ({ cursor }) => ({ entries: page(cursor ? 20 : 10), nextCursor: cursor ? undefined : 'second' })
+  const before = reads
+  currentStatus = { ...status, running: true, dataVersion: 'two' }
+  await dashboard.pollSync()
+  await flush()
+  currentStatus = { ...currentStatus, dataVersion: 'three' }
+  await dashboard.pollSync()
+  await flush()
+  assert.equal(reads, before, '连续版本通知应先合并，不逐次重读报表')
+  await fireReload()
+  assert.equal(reads, before + 1)
+  assert.deepEqual(dashboard.entries.items.map(item => item.workLogId), [10, 20])
+  currentStatus = { ...currentStatus, running: false }
+  await dashboard.pollSync()
+  await fireReload()
+  assert.equal(reads, before + 2, '同步结束后刷新最终结果')
+  await dashboard.pollSync()
+  await flush()
+  assert.equal(reads, before + 2, '状态不变不触发额外刷新')
+
+  const pendingReport = deferred()
+  globalThis.worklogTestApi.getZhaogangWorklogReport = () => { reads++; return pendingReport.promise }
+  currentStatus = { ...currentStatus, running: true, dataVersion: 'four' }
+  await dashboard.pollSync()
+  const activeTimer = [...timers.entries()].find(([, timer]) => timer.delay === 3000)
+  timers.delete(activeTimer[0])
+  const activeReload = activeTimer[1].fn()
+  await flush()
+  currentStatus = { ...currentStatus, dataVersion: 'five' }
+  await dashboard.pollSync()
+  currentStatus = { ...currentStatus, running: false, dataVersion: 'six' }
+  await dashboard.pollSync()
+  assert.equal(reads, before + 3, '前一轮未完成时不能并发启动另一轮刷新')
+  pendingReport.resolve(report)
+  await activeReload
+  globalThis.worklogTestApi.getZhaogangWorklogReport = async () => { reads++; return report }
+  await fireReload()
+  assert.equal(reads, before + 4, '刷新中的多次通知只补跑一轮最终刷新')
+
+  const staleEntries = deferred()
+  readEntries = ({ from }) => from === '2026-11-01'
+    ? Promise.resolve({ entries: page(30) }) : staleEntries.promise
+  const staleRefresh = dashboard.loadEntries(false)
+  dashboard.entryRange = ['2026-11-01', '2026-11-02']
+  await flush()
+  staleEntries.resolve({ entries: page(99) })
+  await staleRefresh
+  await flush()
+  assert.ok(!dashboard.entries || !dashboard.entries.items.some(item => item.workLogId === 99), '切换范围后不能写入旧刷新结果')
+  currentStatus = { ...currentStatus, running: true, dataVersion: 'seven' }
+  await dashboard.pollSync()
+  assert.ok([...timers.values()].some(timer => timer.delay === 3000))
+  instances.forEach(app => app.unmount())
+  instances.length = 0
+  assert.equal(timers.size, 0, '卸载时必须取消轮询和待执行刷新')
+  console.log('worklog dashboard: retained pages, atomic refresh, failure recovery, coalescing and scope cancellation passed')
+
 } finally {
   instances.forEach(app => app.unmount())
   globalThis.setTimeout = originalSetTimeout

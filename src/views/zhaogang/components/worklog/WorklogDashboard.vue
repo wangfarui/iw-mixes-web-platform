@@ -367,7 +367,41 @@ const syncTimeLabel = computed(() => {
 let syncTimer: ReturnType<typeof setTimeout> | undefined
 let syncRequest: AbortController | undefined
 let syncGeneration = 0
+let dashboardReloadTimer: ReturnType<typeof setTimeout> | undefined
+let dashboardReloadRunning = false
+let dashboardReloadPending = false
+let dashboardReloadDelay = 0
+let dashboardReloadGeneration = 0
 const syncScopeKey = () => `${scope.value}:${scope.value === 'WORKBENCH_TEAM' ? workbenchTeamId.value || '' : ''}`
+const cancelDashboardReload = () => {
+  dashboardReloadGeneration += 1
+  if (dashboardReloadTimer !== undefined) clearTimeout(dashboardReloadTimer)
+  dashboardReloadTimer = undefined
+  dashboardReloadPending = false
+}
+const scheduleDashboardReload = (running: boolean) => {
+  dashboardReloadPending = true
+  dashboardReloadDelay = running ? 3000 : 0
+  if (dashboardReloadRunning) return
+  // Keep the first deadline while syncing so a long history backfill still updates.
+  if (dashboardReloadTimer !== undefined) {
+    if (running) return
+    clearTimeout(dashboardReloadTimer)
+  }
+  dashboardReloadTimer = setTimeout(async () => {
+    dashboardReloadTimer = undefined
+    dashboardReloadPending = false
+    dashboardReloadRunning = true
+    const generation = dashboardReloadGeneration
+    try {
+      await loadStatistics()
+      if (generation === dashboardReloadGeneration && entriesCardSeen) await loadEntries(false)
+    } finally {
+      dashboardReloadRunning = false
+      if (dashboardReloadPending) scheduleDashboardReload(dashboardReloadDelay > 0)
+    }
+  }, dashboardReloadDelay)
+}
 const stopSyncPolling = () => {
   syncGeneration += 1
   if (syncTimer) clearTimeout(syncTimer)
@@ -392,9 +426,7 @@ const pollSync = async (trigger = false) => {
     syncError.value = ''
     const dataChanged = previous && (previous.dataVersion !== result.dataVersion || previous.syncedAt !== result.syncedAt)
     if (dataChanged || (!result.running && (previous?.running || trigger))) {
-      await loadStatistics()
-      if (generation !== syncGeneration || key !== syncScopeKey()) return
-      if (entriesCardSeen) await loadEntries(false)
+      scheduleDashboardReload(result.running)
     }
   } catch (error) {
     if (request.signal.aborted || generation !== syncGeneration) return
@@ -408,6 +440,7 @@ const pollSync = async (trigger = false) => {
   }
 }
 watch(syncScopeKey, () => {
+  cancelDashboardReload()
   stopSyncPolling()
   syncState.value = null
   syncBusy.value = false
@@ -465,6 +498,7 @@ const loadStatistics = async (refresh = false) => {
 const currentReportKey = () => `${entryRange.value?.join(':') ?? ''}:${scope.value}:${workbenchTeamId.value || ''}`
 
 watch(currentReportKey, () => {
+  cancelDashboardReload()
   cancelEntryRequests()
   resetAbsence()
   if (!entryRangeTooLong.value) {
@@ -488,7 +522,7 @@ const cancelEntryRequests = () => {
   stopEntryChecks.clear()
 }
 
-const fetchEntriesPage = async (cursor?: string, refresh = false) => {
+const fetchEntriesPage = async (cursor?: string, refresh = false, pageCount = 1) => {
   if (!entryRange.value || entryRangeTooLong.value) return
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
   const [from, to] = entryRange.value
@@ -501,19 +535,28 @@ const fetchEntriesPage = async (cursor?: string, refresh = false) => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const result = await getZhaogangWorklogEntriesPage({
-      from, to, scope: scope.value, workbenchTeamId: workbenchTeamId.value,
-      memberUserId: selectedEntryMember.value?.id, cursor, refresh
-    }, request.signal)
-    if (request.signal.aborted || key !== currentEntriesKey()) return
-    const previousRevision = entries.value?.issueCheck?.deletionRevision
-    if (cursor && previousRevision !== undefined && result.entries.issueCheck?.deletionRevision !== previousRevision) {
-      void loadEntries(false)
-      return
+    const pages: ZhaogangWorklogEntries[] = []
+    let nextCursor = cursor
+    for (let index = 0; index < pageCount; index += 1) {
+      const result = await getZhaogangWorklogEntriesPage({
+        from, to, scope: scope.value, workbenchTeamId: workbenchTeamId.value,
+        memberUserId: selectedEntryMember.value?.id, cursor: nextCursor, refresh
+      }, request.signal)
+      if (request.signal.aborted || key !== currentEntriesKey()) return
+      const previousRevision = (pages[0] ?? entries.value)?.issueCheck?.deletionRevision
+      if (nextCursor && previousRevision !== undefined && result.entries.issueCheck?.deletionRevision !== previousRevision) {
+        if (cursor) void loadEntries(false)
+        else entriesError.value = '工时数据已更新，请稍后刷新'
+        return
+      }
+      pages.push(result.entries)
+      nextCursor = result.nextCursor ?? undefined
+      if (!nextCursor) break
     }
-    entryPages.value.push(result.entries)
-    nextEntriesCursor.value = result.nextCursor ?? undefined
-    watchEntryPage(entryPages.value[entryPages.value.length - 1])
+    if (cursor) entryPages.value.push(...pages)
+    else entryPages.value = pages
+    nextEntriesCursor.value = nextCursor
+    pages.forEach(watchEntryPage)
   } catch (error) {
     if (request.signal.aborted || key !== currentEntriesKey()) return
     if (cursor && error instanceof Error && error.message.includes('工时数据已更新')) {
@@ -533,12 +576,16 @@ const loadEntries = (refresh = entriesRefreshPending) => {
   cancelEntryRequests()
   if (!entryRange.value || entryRangeTooLong.value) return
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return
-  entryPages.value = []
-  nextEntriesCursor.value = undefined
+  const retainPages = entriesKey.value === currentEntriesKey()
+  const pageCount = retainPages ? Math.max(1, entryPages.value.length) : 1
+  if (!retainPages) {
+    entryPages.value = []
+    nextEntriesCursor.value = undefined
+  }
   entriesMoreError.value = ''
   entriesKey.value = currentEntriesKey()
   entriesRefreshPending = false
-  return fetchEntriesPage(undefined, refresh)
+  return fetchEntriesPage(undefined, refresh, pageCount)
 }
 
 const loadMoreEntries = () => {
@@ -761,7 +808,7 @@ onMounted(async () => {
     dashboardLoading.value = false
   }
 })
-onBeforeUnmount(() => { stopSyncPolling(); cancelEntryRequests() })
+onBeforeUnmount(() => { cancelDashboardReload(); stopSyncPolling(); cancelEntryRequests(); statisticsRequestSequence += 1 })
 </script>
 
 <style scoped>
