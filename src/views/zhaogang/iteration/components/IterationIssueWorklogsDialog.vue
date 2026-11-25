@@ -4,7 +4,7 @@
     @update:model-value="(value: boolean) => !deletingId && emit('update:modelValue', value)">
     <div style="max-height: calc(84vh - 145px); overflow: auto">
       <p class="issue-title">{{ issue?.title }}</p>
-      <div class="summary">共 {{ entries.length }} 条本地记录 · {{ total }} h <el-button link type="primary" :disabled="loading || !!deletingId" @click="reload">刷新</el-button></div>
+      <div class="summary">共 {{ entries.length }} 条本地记录 · {{ total }} h <el-button link type="primary" :loading="loading" :disabled="!!deletingId" @click="refreshWorklogs">{{ loading ? '刷新中' : '刷新' }}</el-button></div>
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="feedback" />
       <el-table v-loading="loading" :data="entries" max-height="380" empty-text="暂无已保存的工时记录">
         <el-table-column label="登记时间" min-width="150"><template #default="{ row }">{{ dateLabel(row.registeredAt) }}</template></el-table-column>
@@ -44,17 +44,26 @@ const total = computed(() => entries.value.reduce((sum, row) => sum + row.spendH
 const dateLabel = (value: string) => value?.replace('T', ' ').slice(0, 16) || '—'
 const statusLabel = (status: string) => ({ SYNCED: '已同步', FAILED: '同步失败', PENDING: '待同步', SYNCING: '同步中', UNKNOWN: '待核对', NOT_REQUIRED: '本地记录' }[status] || status)
 const statusHint = (row: TeamIterationIssueWorklog) => row.syncStatus === 'SYNCING' ? '正在同步，请稍后再试' : row.canDelete === false ? '该记录暂不可删除，请刷新或同步 CODING 事项后重试' : ''
-const reload = async () => {
+const reload = async (): Promise<boolean> => {
   const issueId = props.issue?.id
-  if (!props.modelValue || !issueId) return
+  if (!props.modelValue || !issueId) return false
   const request = ++requestNo
   loading.value = true; error.value = ''
   try {
     const result = await getTeamIterationIssueWorklogs(props.iterationId, issueId)
-    if (request === requestNo) entries.value = result
-  } catch (failure) { if (request === requestNo) error.value = failure instanceof Error ? failure.message : '工时记录加载失败' }
-  finally { if (request === requestNo) loading.value = false }
+    if (request !== requestNo) return false
+    entries.value = result
+    return true
+  } catch (failure) {
+    if (request === requestNo) error.value = failure instanceof Error ? failure.message : '工时记录加载失败'
+    return false
+  } finally { if (request === requestNo) loading.value = false }
 }
+const refreshWorklogs = async () => {
+  if (loading.value || deletingId.value) return
+  if (await reload()) ElMessage.success('工时记录已刷新')
+}
+
 watch(() => [props.modelValue, props.iterationId, props.issue?.id] as const, ([visible]) => {
   ++requestNo; entries.value = []; error.value = ''; loading.value = false
   if (visible) void reload()

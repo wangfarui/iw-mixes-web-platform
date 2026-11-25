@@ -175,7 +175,7 @@
                 <span v-if="scope.row.issueType === 'DEFECT'">线上 Bug：{{ scope.row.onlineBug === undefined || scope.row.onlineBug === null ? '-' : scope.row.onlineBug ? '是' : '否' }}</span>
                 <span v-if="scope.row.issueType === 'DEFECT'">优先级：{{ scope.row.bugPriority || '-' }}</span>
                 <template v-if="scope.row.issueType === 'SUB_TASK'">
-                  <el-button link type="primary" @click="openWorklogDetails(scope.row)">已登记：{{ worklogTotal(scope.row) }} h / {{ worklogCount(scope.row) }} 次</el-button>
+                  <button type="button" class="worklog-details-link" @click="openWorklogDetails(scope.row)">已登记：{{ worklogTotal(scope.row) }} h / {{ worklogCount(scope.row) }} 次</button>
                   <button v-for="worklog in failedWorklogs(scope.row)" :key="worklog.id" type="button" class="retry-link" @click="retryWorklog(scope.row, worklog.id)">重试 {{ formatDate(worklog.registeredAt) }} 的工时</button>
                 </template>
               </div>
@@ -1298,6 +1298,9 @@ watch(() => route.params.iterationId, () => {
 .status-select { width: 100%; }
 .issue-description { max-width: 560px; margin: 7px 0 0; overflow: hidden; color: #69768a; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .issue-meta { display: grid; gap: 4px; color: #69768a; font-size: 12px; }
+.worklog-details-link { justify-self: start; padding: 0; color: var(--el-color-primary); font: inherit; line-height: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }
+.worklog-details-link:hover { color: var(--el-color-primary-light-3); }
+.worklog-details-link:focus-visible { outline: 2px solid var(--el-color-primary-light-5); outline-offset: 2px; }
 .retry-link { width: fit-content; padding: 0; color: #d14949; font-size: 12px; background: transparent; border: 0; cursor: pointer; }
 .typed-fields { min-height: 44px; }
 .child-entry-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; }
