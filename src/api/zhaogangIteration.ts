@@ -9,6 +9,7 @@ import type {
   TeamIterationIssueType,
   TeamIterationParentIssueOption,
   TeamIterationIssueWorklog,
+  TeamIterationRemoveIssuesResult,
   TeamIterationSelectionOption,
   TeamIterationMemberInput,
   TeamIterationPage,
@@ -164,13 +165,19 @@ export const retryTeamIterationIssueWorklog = (id: number, issueId: number, work
     `/iterations/${id}/issues/${issueId}/worklogs/${worklogId}/retry`, { method: 'POST' }
   )
 
-export const removeTeamIterationIssue = (id: number, issueId: number) => zhaogangRequest<void>(
+export const getTeamIterationIssueWorklogs = (id: number, issueId: number) =>
+  zhaogangRequest<TeamIterationIssueWorklog[]>(`/iterations/${id}/issues/${issueId}/worklogs`)
+
+export const deleteTeamIterationIssueWorklog = (id: number, issueId: number, worklogId: number) =>
+  zhaogangRequest<void>(`/iterations/${id}/issues/${issueId}/worklogs/${worklogId}`, { method: 'DELETE' })
+
+export const removeTeamIterationIssue = (id: number, issueId: number) => zhaogangRequest<TeamIterationRemoveIssuesResult>(
   `/iterations/${id}/issues/${issueId}`, { method: 'DELETE' }
 )
 
-export const removeTeamIterationIssues = (id: number, issueIds: number[]) => zhaogangRequest<void>(
+export const removeTeamIterationIssues = (id: number, issueIds: number[], deleteCoding = false, expectedIssueIds?: number[]) => zhaogangRequest<TeamIterationRemoveIssuesResult>(
   `/iterations/${id}/issues/batch-delete`, {
-    method: 'POST', body: JSON.stringify({ issueIds })
+    method: 'POST', body: JSON.stringify({ issueIds, deleteCoding, expectedIssueIds })
   }
 )
 

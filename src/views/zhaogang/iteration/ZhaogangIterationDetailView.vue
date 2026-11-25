@@ -175,7 +175,7 @@
                 <span v-if="scope.row.issueType === 'DEFECT'">线上 Bug：{{ scope.row.onlineBug === undefined || scope.row.onlineBug === null ? '-' : scope.row.onlineBug ? '是' : '否' }}</span>
                 <span v-if="scope.row.issueType === 'DEFECT'">优先级：{{ scope.row.bugPriority || '-' }}</span>
                 <template v-if="scope.row.issueType === 'SUB_TASK'">
-                  <span>已登记：{{ worklogTotal(scope.row) }} h / {{ worklogCount(scope.row) }} 次</span>
+                  <el-button link type="primary" @click="openWorklogDetails(scope.row)">已登记：{{ worklogTotal(scope.row) }} h / {{ worklogCount(scope.row) }} 次</el-button>
                   <button v-for="worklog in failedWorklogs(scope.row)" :key="worklog.id" type="button" class="retry-link" @click="retryWorklog(scope.row, worklog.id)">重试 {{ formatDate(worklog.registeredAt) }} 的工时</button>
                 </template>
               </div>
@@ -388,6 +388,15 @@
       </el-form>
       <template #footer><el-button @click="worklogDialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!worklogSubmitEnabled" @click="saveWorklog">登记</el-button></template>
     </el-dialog>
+    <IterationIssueWorklogsDialog v-model="worklogDetailsVisible" :iteration-id="id()" :issue="worklogDetailsIssue"
+      :can-edit="!!detail?.permissions.canEdit" @changed="refreshAfterWorklogDeletion" />
+    <IterationRemoveIssuesDialog v-model="removeIssuesVisible" :issues="detail?.issues || []" :selected-ids="removingIssueIds"
+      :submitting="deletingIssues" :error="removeIssuesError" @confirm="confirmRemoveIssues" />
+    <el-dialog v-model="removeFailuresVisible" title="部分事项未移除" width="min(620px, calc(100% - 28px))">
+      <p>已移除 {{ removedIssueCount }} 个事项，以下事项已保留。</p>
+      <div class="removal-failures" style="max-height: 55vh; overflow: auto; overflow-wrap: anywhere"><p v-for="failure in removeFailures" :key="failure.issueId"><strong>{{ failure.title }}</strong>：{{ failure.reason }}</p></div>
+      <template #footer><el-button @click="removeFailuresVisible = false">关闭</el-button></template>
+    </el-dialog>
   </section>
 </template>
 
@@ -407,6 +416,9 @@ import type {
   TeamIterationParentIssueOption, TeamIterationReleasePlan, TeamIterationSelectionOption, TeamIterationStage, TeamIterationTeamOption, TeamIterationUser
 } from '@/types/zhaogangIteration'
 import type { ZhaogangPreferences } from '@/types/zhaogang'
+import IterationIssueWorklogsDialog from './components/IterationIssueWorklogsDialog.vue'
+import IterationRemoveIssuesDialog from './components/IterationRemoveIssuesDialog.vue'
+import type { TeamIterationCodingSyncFailure } from '@/types/zhaogangIteration'
 import IterationHoursInput from './components/IterationHoursInput.vue'
 import IterationIssueEditorDialog from './components/IterationIssueEditorDialog.vue'
 import IterationPrototypeLinkDialog from './components/IterationPrototypeLinkDialog.vue'
@@ -435,6 +447,20 @@ const loading = ref(false)
 const saving = ref(false)
 const syncingCoding = ref(false)
 const deletingIssues = ref(false)
+const worklogDetailsVisible = ref(false)
+const worklogDetailsIssue = ref<TeamIterationIssue>()
+const removeIssuesVisible = ref(false)
+const removingIssueIds = ref<number[]>([])
+const removeIssuesError = ref('')
+const removeFailuresVisible = ref(false)
+const removeFailures = ref<TeamIterationCodingSyncFailure[]>([])
+const removedIssueCount = ref(0)
+const openWorklogDetails = (issue: TeamIterationIssue) => {
+  worklogDetailsIssue.value = issue; worklogDetailsVisible.value = true
+}
+const refreshAfterWorklogDeletion = async () => {
+  await load('工时已删除，事项汇总刷新失败，请稍后刷新')
+}
 const detail = ref<TeamIterationDetail>()
 const selectedIterationId = ref<number>()
 const iterationOptions = ref<TeamIterationListItem[]>([])
@@ -573,7 +599,7 @@ const showCodingIssueAssociationFailures = (failures: CodingIssueAssociationFail
   }).catch(() => undefined)
 }
 
-const load = async () => {
+const load = async (refreshFailureMessage?: string) => {
   const iterationId = id()
   const requestId = ++detailRequestId
   const preserveExpansion = expandedIterationId === iterationId
@@ -599,7 +625,10 @@ const load = async () => {
       : []
     expandedIterationId = iterationId
   } catch (error) {
-    if (requestId === detailRequestId) ElMessage.error(error instanceof Error ? error.message : '迭代详情加载失败')
+    if (requestId === detailRequestId) {
+      if (refreshFailureMessage) ElMessage.warning(refreshFailureMessage)
+      else ElMessage.error(error instanceof Error ? error.message : '迭代详情加载失败')
+    }
   } finally { if (requestId === detailRequestId) loading.value = false }
 }
 
@@ -1129,32 +1158,28 @@ const handleIssueSelectionChange = (issues: TeamIterationIssue[]) => {
   selectedIssues.value = issues
 }
 
-const removeSelectedIssues = async () => {
-  const issueIds = selectedIssueIds.value
-  if (!issueIds.length) return
-  try {
-    await ElMessageBox.confirm(
-      `确认删除已勾选的 ${issueIds.length} 个事项？若包含父事项，其子事项也会一起从 Dev Hub 删除；不会删除 CODING 事项。`,
-      '批量删除事项',
-      { type: 'warning' }
-    )
-    deletingIssues.value = true
-    await removeTeamIterationIssues(id(), issueIds)
-    await load()
-    ElMessage.success('已删除所选迭代事项')
-  } catch (error) {
-    if (error instanceof Error && error.message !== 'cancel') ElMessage.error(error.message)
-  } finally {
-    deletingIssues.value = false
-  }
+const openRemoveIssues = (issueIds: number[]) => {
+  if (!issueIds.length || deletingIssues.value) return
+  removingIssueIds.value = [...issueIds]; removeIssuesError.value = ''; removeIssuesVisible.value = true
 }
-
-const removeIssue = async (issue: TeamIterationIssue) => {
+const removeSelectedIssues = () => openRemoveIssues(selectedIssueIds.value)
+const removeIssue = (issue: TeamIterationIssue) => openRemoveIssues([issue.id])
+const confirmRemoveIssues = async (deleteCoding: boolean, expectedIssueIds: number[]) => {
+  if (deletingIssues.value) return
+  const iterationId = id()
+  deletingIssues.value = true; removeIssuesError.value = ''
   try {
-    await ElMessageBox.confirm('移除后只删除 Dev Hub 中的该事项及其子事项，不会删除 CODING 数据。', '移除事项', { type: 'warning' })
-    await removeTeamIterationIssue(id(), issue.id)
-    await load()
-  } catch (error) { if (error instanceof Error) ElMessage.error(error.message) }
+    const result = await removeTeamIterationIssues(iterationId, removingIssueIds.value, deleteCoding, expectedIssueIds)
+    if (iterationId !== id()) return
+    removeIssuesVisible.value = false
+    removedIssueCount.value = result.removedIssueIds.length
+    removeFailures.value = result.failures
+    if (result.failures.length) removeFailuresVisible.value = true
+    else ElMessage.success(`已移除 ${result.removedIssueIds.length} 个迭代事项`)
+    await load('移除结果已保存，列表刷新失败，请稍后刷新')
+  } catch (error) {
+    if (iterationId === id()) removeIssuesError.value = error instanceof Error ? error.message : '移除失败，请稍后重试'
+  } finally { deletingIssues.value = false }
 }
 
 const removeIteration = async () => {
@@ -1205,6 +1230,7 @@ const formatDate = (value: string) => value?.replace('T', ' ').slice(0, 16) || '
 
 onMounted(load)
 watch(() => route.params.iterationId, () => {
+  worklogDetailsVisible.value = false; removeIssuesVisible.value = false; removeFailuresVisible.value = false
   prototypeVisible.value = false
   bindingVisible.value = false
   childDialogVisible.value = false

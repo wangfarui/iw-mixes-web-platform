@@ -87,7 +87,15 @@ export interface TeamIterationIssue {
   children: TeamIterationIssue[]
 }
 
+export interface TeamIterationRemoveIssuesResult {
+  removedIssueIds: number[]
+  failures: TeamIterationCodingSyncFailure[]
+}
+
 export interface TeamIterationIssueWorklog {
+  codingWorklogId?: number | null
+  source?: 'WORKBENCH' | 'CODING'
+  canDelete?: boolean
   id: number
   spendHours: number
   registeredAt: string

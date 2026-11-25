@@ -171,7 +171,7 @@ const iterationApi = await import(pathToFileURL(apiOutfile).href)
 await iterationApi.removeTeamIterationIssues(7, [11, 12])
 assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/issues/batch-delete')
 assert.equal(capturedRequest.init.method, 'POST')
-assert.deepEqual(JSON.parse(capturedRequest.init.body), {issueIds: [11, 12]})
+assert.deepEqual(JSON.parse(capturedRequest.init.body), {issueIds: [11, 12], deleteCoding: false})
 await iterationApi.addTeamIterationChildIssue(7, 11, {
   issueType: 'SUB_TASK', title: '实现接口', priority: '1', syncToCoding: true
 })
@@ -309,3 +309,27 @@ assert.equal(prototypeLinkError(maxPrototype), '')
 assert.match(prototypeLinkError(maxPrototype + 'a'), /255/)
 
 console.log('zhaogang iteration tests passed')
+
+// Removal scope includes descendants hidden by filters, deduplicates parent/child selection,
+// and preserves the tree depth needed by the reviewable confirmation list.
+const scopeFile = path.join(tempDir, 'iteration-removal-scope.mjs')
+await build({ entryPoints: [path.join(root, 'src/views/zhaogang/iteration/iterationRemovalScope.ts')], outfile: scopeFile,
+  bundle: true, platform: 'browser', format: 'esm', target: 'es2020', logLevel: 'silent' })
+const { iterationRemovalScope, removalCodingCount } = await import(pathToFileURL(scopeFile).href)
+const subtree = [{ id: 1, projectName: 'p', issueCode: 100, children: [
+  { id: 2, projectName: 'p', issueCode: 101, children: [] }, { id: 3, children: [] }] },
+  { id: 4, projectName: 'p', issueCode: 200, children: [] }]
+const scope = iterationRemovalScope(subtree, [1, 2, 1])
+assert.deepEqual(scope.map(row => [row.issue.id, row.depth, row.selected]), [[1, 0, true], [2, 1, true], [3, 1, false]])
+assert.equal(removalCodingCount(scope), 2)
+assert.deepEqual(iterationRemovalScope(subtree, [2]).map(row => [row.issue.id, row.depth]), [[2, 0]])
+assert.deepEqual(iterationRemovalScope(subtree, []), [])
+await iterationApi.removeTeamIterationIssues(7, [11], true, [11, 12])
+assert.deepEqual(JSON.parse(capturedRequest.init.body), { issueIds: [11], deleteCoding: true, expectedIssueIds: [11, 12] })
+await iterationApi.getTeamIterationIssueWorklogs(7, 11)
+assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/issues/11/worklogs')
+assert.equal(capturedRequest.init.method, undefined)
+await iterationApi.deleteTeamIterationIssueWorklog(7, 11, 99)
+assert.equal(capturedRequest.url, '/external-service/api/zhaogang/iterations/7/issues/11/worklogs/99')
+assert.equal(capturedRequest.init.method, 'DELETE')
+console.log('Iteration removal scope and local worklog API checks passed')

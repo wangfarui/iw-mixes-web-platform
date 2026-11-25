@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-20-02",
+  "currentReleaseId": "zg-2026-11-25-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -771,6 +771,21 @@
         {
           "type": "IMPROVEMENT",
           "text": "团队工时优先使用成员个人令牌，未绑定时使用团队管理令牌，同一成员跨团队复用统计结果。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-25-01",
+      "version": "2.3.0",
+      "publishedAt": "2026-11-25T14:50:28+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "迭代事项支持查看和删除已保存的工时记录，已同步记录会同时从 CODING 删除。"
+        },
+        {
+          "type": "FEATURE",
+          "text": "单条和批量移除迭代事项时，可选择同步删除 CODING 事项。"
         }
       ]
     }
