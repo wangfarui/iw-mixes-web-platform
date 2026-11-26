@@ -3,6 +3,7 @@ import type {
   ZhaogangCodeScanStatus,
   ZhaogangCodeStatsCoverage,
   ZhaogangCodeStatsDaily,
+  ZhaogangCodeStatsRepository,
   ZhaogangCodeStatsScan,
   ZhaogangCodeStatsSync,
   ZhaogangCodeStatsScanMonth
@@ -113,6 +114,14 @@ export const codeSyncWarningText = (sync?: ZhaogangCodeStatsSync) => {
 
 export const dailyCodeDetails = (day: ZhaogangCodeStatsDaily) =>
   `${day.date} · 提交 ${formatCodeNumber(day.commitCount)} 次 · 新增 ${formatCodeNumber(day.additions)} 行 · 删除 ${formatCodeNumber(day.deletions)} 行 · 净增 ${formatSignedNumber(day.netLines)} 行`
+
+export const repositoryBarItems = (repositories: ZhaogangCodeStatsRepository[]) => repositories.map(item => ({
+  key: item.depotId,
+  label: item.depotName,
+  sublabel: item.projectDisplayName || item.projectName,
+  value: item.commitCount,
+  detail: item.lineStatsExcluded ? '仅统计提交次数' : `+${formatCodeNumber(item.additions)} / -${formatCodeNumber(item.deletions)}`
+}))
 
 export const hasCodeScanIssues = (scan: ZhaogangCodeStatsScan, coverage: ZhaogangCodeStatsCoverage) =>
   Boolean(coverage.failedDiffCount || coverage.repoIssues?.length || coverage.memberIssues?.length

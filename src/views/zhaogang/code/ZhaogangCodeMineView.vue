@@ -167,7 +167,7 @@ import {
   dailyCodeDetails,
   formatCodeClock,
   formatCodeDuration,
-  formatCodeNumber,
+  repositoryBarItems,
   latestSuccessfulAt
 } from './codeStatsPresentation'
 import { monthText, resolveCodeStatsRange, type ResolvedCodeStatsRange } from '@/services/zhaogangCodeStatsRange'
@@ -242,13 +242,7 @@ const hourlyItems = computed<CodeStatsBarItem[]>(() => (statistics.value?.hourly
   value: item.commitCount,
   title: `${item.hour}:00 - ${item.hour}:59 · 提交 ${item.commitCount} 次`
 })))
-const repositoryItems = computed<CodeStatsHorizontalItem[]>(() => (statistics.value?.repositories || []).map(item => ({
-  key: item.depotId,
-  label: item.depotName,
-  sublabel: item.projectDisplayName || item.projectName,
-  value: item.commitCount,
-  detail: item.lineStatsExcluded ? '仅统计提交次数' : `+${formatCodeNumber(item.additions)} / -${formatCodeNumber(item.deletions)}`
-})))
+const repositoryItems = computed(() => repositoryBarItems(statistics.value?.repositories || []))
 const branchItems = computed<CodeStatsHorizontalItem[]>(() => (statistics.value?.branches || []).slice(0, 10).map(item => ({
   key: `${item.depotName}|${item.branchName}`,
   label: item.branchName,

@@ -49,6 +49,23 @@
           <CodeStatsCommitScatter :items="data.commitChanges" />
         </div>
       </div>
+      <div class="panel-grid">
+        <div class="chart-panel">
+          <h4>仓库提交频率</h4>
+          <CodeStatsHorizontalBarChart
+            v-if="repositories"
+            :items="repositoryItems"
+            :scroll-rows="5"
+            aria-label="仓库提交频率"
+          />
+          <el-skeleton v-else-if="entriesLoading" :rows="3" animated />
+          <div v-else-if="entriesError" class="panel-empty">仓库提交频率加载失败</div>
+        </div>
+        <div class="chart-panel">
+          <h4>提交日历热力图</h4>
+          <CodeStatsCalendarHeatmap :daily="data.daily" />
+        </div>
+      </div>
     </template>
     <el-empty v-else-if="!error" description="选择成员后查看汇总和趋势" :image-size="70" />
     <CodeCommitTable
@@ -62,7 +79,7 @@
       :range-label="`${from} 至 ${to}`"
       :keyword="keyword"
       :depot-id="depotId"
-      :repositories="repositories"
+      :repositories="repositories || []"
       show-repository-filter
       sortable
       empty-text="当前成员在所选范围及筛选条件下没有提交"
@@ -88,7 +105,9 @@ import CodeStatsKpiCards from './CodeStatsKpiCards.vue'
 import CodeStatsLineBarChart from './CodeStatsLineBarChart.vue'
 import CodeStatsFileTypePie from './CodeStatsFileTypePie.vue'
 import CodeStatsCommitScatter from './CodeStatsCommitScatter.vue'
-import { dailyCodeDetails } from '../codeStatsPresentation'
+import CodeStatsHorizontalBarChart from './CodeStatsHorizontalBarChart.vue'
+import CodeStatsCalendarHeatmap from './CodeStatsCalendarHeatmap.vue'
+import { dailyCodeDetails, repositoryBarItems } from '../codeStatsPresentation'
 
 const props = defineProps<{
   members: ZhaogangCodeStatsMember[]
@@ -105,7 +124,7 @@ const loading = ref(false)
 const error = ref('')
 let sequence = 0
 const entries = ref<ZhaogangCodeStatsEntryPage | null>(null)
-const repositories = ref<ZhaogangCodeStatsRepository[]>([])
+const repositories = ref<ZhaogangCodeStatsRepository[] | null>(null)
 const entriesLoading = ref(false)
 const entriesError = ref('')
 const keyword = ref('')
@@ -121,6 +140,7 @@ const dailyBarItems = computed<CodeStatsBarItem[]>(() => (data.value?.daily || [
   title: dailyCodeDetails(item),
   rest: item.dayType === 'REST_DAY'
 })))
+const repositoryItems = computed(() => repositoryBarItems(repositories.value || []))
 
 const changeMember = (value: number) => {
   emit('update:selectedMemberId', value)
@@ -208,7 +228,7 @@ const changePage = (value: number) => {
 
 watch(() => [props.selectedMemberId, props.workbenchTeamId, props.from, props.to], () => {
   entries.value = null
-  repositories.value = []
+  repositories.value = null
   keyword.value = ''
   depotId.value = null
   pageNumber.value = 1
