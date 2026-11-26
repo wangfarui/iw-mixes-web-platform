@@ -79,8 +79,9 @@ function defaultCustomRange(period: Exclude<Period, 'CUSTOM'>): [string, string]
   return range[0] <= range[1] ? range : null
 }
 const roleLabel = (value: StatisticsRole | null) => value === 'UNSET' || !value ? '未设置' : codingRoleLabels[value]
-const abnormal = (item: StatisticsMember) => item.issues.some(issue => !['NO_WORKDAYS', 'CODE_NOT_APPLICABLE'].includes(issue.reasonCode))
-const issueMessages = (item: StatisticsMember) => Array.from(new Set(item.issues.map(issue => issue.safeMessage))).join('；')
+const statusIssues = (member: StatisticsMember) => member.issues.filter(issue => issue.reasonCode !== 'CODE_NOT_APPLICABLE')
+const abnormal = (member: StatisticsMember) => statusIssues(member).some(issue => issue.reasonCode !== 'NO_WORKDAYS')
+const issueMessages = (member: StatisticsMember) => Array.from(new Set(statusIssues(member).map(issue => issue.safeMessage))).join('；')
 
 function stopPolling() {
   window.clearTimeout(pollTimer)
@@ -430,7 +431,7 @@ onBeforeUnmount(() => {
                 <td :title="member.comparisonReason || comparisonText"
                   :class="{ up: (member.rankDelta ?? 0) > 0, down: (member.rankDelta ?? 0) < 0 }">{{ formatDelta(member.rankDelta) }}</td>
                 <td>
-                  <el-tooltip v-if="member.issues.length" :content="issueMessages(member)" placement="top">
+                  <el-tooltip v-if="statusIssues(member).length" :content="issueMessages(member)" placement="top">
                     <span tabindex="0" :class="abnormal(member) ? 'statistics-warning' : 'statistics-muted'">
                       <el-icon v-if="abnormal(member)"><WarningFilled /></el-icon>{{ abnormal(member) ? '异常' : '部分不适用' }}
                     </span>
