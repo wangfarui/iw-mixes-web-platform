@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "currentReleaseId": "zg-2026-11-25-01",
+  "currentReleaseId": "zg-2026-11-26-01",
   "releases": [
     {
       "id": "zg-2026-11-04-01",
@@ -786,6 +786,21 @@
         {
           "type": "FEATURE",
           "text": "单条和批量移除迭代事项时，可选择同步删除 CODING 事项。"
+        }
+      ]
+    },
+    {
+      "id": "zg-2026-11-26-01",
+      "version": "2.4.0",
+      "publishedAt": "2026-11-26T15:13:20+08:00",
+      "items": [
+        {
+          "type": "FEATURE",
+          "text": "新增「全员统计」，支持按日期查看组织内成员的工时、加班、代码排行和明细。"
+        },
+        {
+          "type": "IMPROVEMENT",
+          "text": "加快团队代码同步，同步期间继续展示上次可用的代码榜，变化分支留到下轮补齐。"
         }
       ]
     }

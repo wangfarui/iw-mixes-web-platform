@@ -58,6 +58,12 @@ const zhaogangRoute: RouteRecordRaw = {
       meta: { public: true, title: '工时', zhaogangView: 'worklog', workbenchContentPadding: 'none' }
     },
     {
+      path: 'statistics',
+      name: 'Dev Hub 全员统计',
+      component: () => import('@/views/zhaogang/statistics/ZhaogangStatisticsView.vue'),
+      meta: { public: true, title: '全员统计', zhaogangView: 'statistics', workbenchContentPadding: 'none' }
+    },
+    {
       path: 'calendar',
       name: '找钢日历',
       component: () => import('@/views/zhaogang/calendar/ZhaogangCalendarView.vue'),

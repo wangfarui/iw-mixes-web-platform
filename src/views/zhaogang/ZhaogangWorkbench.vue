@@ -116,6 +116,10 @@
           <el-icon><DataAnalysis /></el-icon>
           <span class="workspace-nav-label">代码</span>
         </button>
+        <button :class="{ active: activeTab === 'statistics' }" type="button" aria-label="统计" :title="navCollapsed ? '统计' : undefined" @click="navigateTab('statistics')">
+          <el-icon><Histogram /></el-icon>
+          <span class="workspace-nav-label">统计</span>
+        </button>
         <button :class="{ active: activeTab === 'team' }" type="button" aria-label="团队" :title="navCollapsed ? '团队' : undefined" @click="navigateTab('team')">
           <el-icon><UserFilled /></el-icon>
           <span class="workspace-nav-label">团队</span>
@@ -155,7 +159,7 @@
           @open="openTokenCreation"
           @dismiss="permissionPrompt = null"
         />
-        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'code' || activeTab === 'calendar' || activeTab === 'services' || activeTab === 'skills' || route.name === '找钢 Agent 使用教程'">
+        <template v-if="activeTab === 'iteration' || activeTab === 'team' || activeTab === 'code' || activeTab === 'statistics' || activeTab === 'calendar' || activeTab === 'services' || activeTab === 'skills' || route.name === '找钢 Agent 使用教程'">
           <router-view v-slot="{ Component }">
             <Suspense>
               <component :is="Component" @coding-role-updated="syncOwnCodingRole" />
@@ -360,6 +364,7 @@
                         <el-radio-button value="code">代码</el-radio-button>
                         <el-radio-button value="calendar">日历</el-radio-button>
                         <el-radio-button value="worklog">工时</el-radio-button>
+                        <el-radio-button value="statistics">统计</el-radio-button>
                         <el-radio-button value="services">K8s</el-radio-button>
                       </el-radio-group>
                     </el-form-item>
@@ -546,7 +551,7 @@ import { devHubBrand } from '@/utils/devHubBrand'
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Collection, Calendar, DataAnalysis, DocumentCopy, Expand, Fold, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Collection, Calendar, DataAnalysis, DocumentCopy, Expand, Fold, Histogram, Link, Loading, Monitor, Promotion, Refresh, RefreshLeft, RefreshRight, Search, Setting, Star, StarFilled, SwitchButton, Tickets, Timer, TopRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 import ToolboxIcon from '@/assets/icons/toolbox.svg'
 import ZhaogangMobileSettings from './settings/ZhaogangMobileSettings.vue'
 import {
@@ -583,7 +588,7 @@ import ZhaogangPermissionPrompt from './components/ZhaogangPermissionPrompt.vue'
 import ZhaogangReleaseHistoryDrawer from './components/ZhaogangReleaseHistoryDrawer.vue'
 import ZhaogangAgentSettings from './settings/ZhaogangAgentSettings.vue'
 
-type TabKey = 'skills' | 'release' | 'team' | 'iteration' | 'code' | 'calendar' | 'worklog' | 'services' | 'settings'
+type TabKey = 'skills' | 'release' | 'team' | 'iteration' | 'code' | 'calendar' | 'worklog' | 'statistics' | 'services' | 'settings'
 type ViewMode = 'table' | 'card'
 type BuildabilityFilter = 'buildable' | 'unbuildable' | 'all'
 type PlanWithBuild = ZhaogangBuildPlan
@@ -722,7 +727,7 @@ const showPermissionPrompt = (event: Event) => {
 
 const routeTab = (): TabKey => {
   const view = route.meta.zhaogangView
-  return view === 'team' || view === 'iteration' || view === 'code' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'skills' || view === 'settings'
+  return view === 'team' || view === 'iteration' || view === 'code' || view === 'statistics' || view === 'calendar' || view === 'worklog' || view === 'services' || view === 'skills' || view === 'settings'
     ? view
     : 'release'
 }
