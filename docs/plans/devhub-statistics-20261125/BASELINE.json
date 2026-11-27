@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-26T03:48:09.905878+00:00",
+  "repos": {
+    "iw-mixes-server": {
+      "head": "c37fad6eb16e393968f93c24a593f66428c71e25",
+      "branch": "main"
+    },
+    "iw-mixes-web-platform": {
+      "head": "832d259fc607e7de660ff567b1e46d7bae36c517",
+      "branch": "dev"
+    }
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "3e058639ed2a5898a744a095790dc9b9270198a997c05cdccc61bd184ee45004",
+      "tracked": null
+    },
+    {
+      "path": "iw-mixes-server/AGENTS.md",
+      "sha256": "90cff9a99988347de3f01e7d85c9814bb199ba7393095ebae492866ea82af62f",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/scripts/iw-external-init.sql",
+      "sha256": "4157ffc40bba0d5c2af5aa8ae4cb389de410ed77568cc9f1daa37692ef6c340e",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/mapper/ZhaogangCodeCommitMapper.java",
+      "sha256": "167eecd050a3259516bf56cc61333d3e25a47e0a7737eb3694e5ad88d91b9c08",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/mapper/ZhaogangWorkbenchProfileMapper.java",
+      "sha256": "9f40e3b478d62504e2037c27f05ad501f1a4750d6bf3b6de04669628f854ca65",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/calendar/WorkCalendarResolver.java",
+      "sha256": "7d5321f5ccb8fea3ed9f8114e76e6100b9f334bf9b84dcc6c20aa4e43bdb5f18",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeIdentityResolver.java",
+      "sha256": "57779275dd9b23ab8d00347a41f5889d751ee61c945180dc6696a9ee4607ea38",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeLinePolicy.java",
+      "sha256": "de6a51e1aaf70e5d2287f7965cd3368dfd4a4e6c557ab930fb08ceea1dea0c13",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeScanService.java",
+      "sha256": "053d868f78ad79c4564ff50086c8f002d5c3e3d26f51965978e3026e6187bd73",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/codestats/CodeScanWorker.java",
+      "sha256": "ffbf2b4387c05469559b14e3c41ea2c8e3b7992a3b8e4ed79a37c2cfd2911c91",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/team/MybatisWorkbenchTeamRepository.java",
+      "sha256": "df4e8c0ce8a062cf7cca321b27d291a4260bcd368f960e7c4d33c61406c1d3b5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirror.java",
+      "sha256": "055a2d2bd1152b0548d373cac629755ba7fc9e478134a2c4ca6de5c1d48ede37",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogMirrorRepository.java",
+      "sha256": "654e56e60ddd70c9a51a0c24bab9b8fa4ca9f924c0d49deba8c5ddd4541e929b",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/iw-packaging-parent/iw-external/src/main/java/com/itwray/iw/external/zhaogang/worklog/WorklogQueryService.java",
+      "sha256": "e4613c693216c86302a3e8f013a20fdd21d37eb4c27587a067c6e65ca9b1f39b",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-server/scripts/local-backend.sh",
+      "sha256": "e068372a6f8bbd17e370ea474b8e8805eb6123798d6987b6f565a4309bde3f2d",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/AGENTS.md",
+      "sha256": "b7611beddd999c4c3e46389a1f0bd0ba80b1d9bd0f063a813a2b935b387324e5",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/docs/plans/devhub-statistics-20261125/PROMPT.md",
+      "sha256": "5e988bcaec1e3e694eec834b1f19f986ddfc010dd21eef2417c0bf2c7fe8a74b",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-web-platform/docs/plans/devhub-statistics-20261125/QUERY_DESIGN.md",
+      "sha256": "8820bea15ad2c174a74c4e36fd85d0a7332f9bdec5f915f5af2bcf50ca2db147",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-web-platform/docs/plans/devhub-statistics-20261125/README.md",
+      "sha256": "070666cf029aba689e9898aad3a65d1a48b7146b3bca3fac78fa1a57e0b64bcf",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-web-platform/docs/plans/devhub-statistics-20261125/STORAGE_AND_REFRESH.md",
+      "sha256": "6ee45571773edeb0c127d8d65dfb277c0d98fe277cee4cd37d4a3d72d80a743a",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-web-platform/docs/plans/devhub-statistics-20261125/assets/statistics-preview-v3.png",
+      "sha256": "1fd3bebe6fc12a503984a6d6bb17f79ba9c80c9d91f487ec3bc7c624098d3727",
+      "tracked": false
+    },
+    {
+      "path": "iw-mixes-web-platform/src/router/zhaogang.ts",
+      "sha256": "4c567800f77383da4d5141e8327857f5bdecfb8b0299cd4afb528e6de549d491",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/types/zhaogang.ts",
+      "sha256": "30d0509d8e172830e271328b0869d47552511e00512c57d5185b30700d34dee7",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/types/zhaogangCodeStats.ts",
+      "sha256": "86ea961a107dffec6c624adfb39a64b9241c191777528b3e24308acee4c50a63",
+      "tracked": true
+    },
+    {
+      "path": "iw-mixes-web-platform/src/views/zhaogang/ZhaogangWorkbench.vue",
+      "sha256": "0ea23adcf170826d9a615c886ef2cb3395612fc688991d86dc67e7de7fd31d49",
+      "tracked": true
+    }
+  ]
+}

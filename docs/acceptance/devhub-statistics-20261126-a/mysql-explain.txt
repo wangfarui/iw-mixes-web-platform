@@ -1,0 +1,79 @@
+--------------
+EXPLAIN ANALYZE SELECT s.coding_user_id,
+ DATE_ADD('1970-01-01', INTERVAL FLOOR((e.start_at+28800000)/86400000) DAY) AS stat_date,SUM(e.hours)
+FROM external_zhaogang_worklog_entry e JOIN external_zhaogang_worklog_source s ON s.source_key=e.source_key
+WHERE e.source_key IN (SHA2('MEMBER:9782601:97826011',256),SHA2('MEMBER:9782601:97826012',256))
+ AND s.blocked=0 AND e.missing=0 AND e.start_at>=1793462400000 AND e.start_at<1796054400000
+ AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_issue_key k
+  WHERE k.coding_team_id=e.coding_team_id AND k.project_name=e.project_name AND k.issue_code=e.issue_code)
+ AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_entry w
+  WHERE w.coding_team_id=e.coding_team_id AND w.worklog_id=e.worklog_id)
+ AND NOT EXISTS (SELECT 1 FROM external_zhaogang_worklog_deleted_issue d
+  WHERE d.coding_team_id=e.coding_team_id AND d.coding_issue_id=e.issue_id)
+GROUP BY s.coding_user_id,stat_date
+--------------
+
+EXPLAIN
+-> Table scan on <temporary>  (actual time=0.568..0.571 rows=40 loops=1)
+    -> Aggregate using temporary table  (actual time=0.566..0.566 rows=40 loops=1)
+        -> Nested loop antijoin  (cost=8.01 rows=8) (actual time=0.168..0.44 rows=40 loops=1)
+            -> Nested loop antijoin  (cost=7.11 rows=8) (actual time=0.158..0.412 rows=40 loops=1)
+                -> Nested loop antijoin  (cost=6.21 rows=8) (actual time=0.151..0.391 rows=40 loops=1)
+                    -> Inner hash join (e.source_key = s.source_key)  (cost=4.61 rows=8) (actual time=0.137..0.354 rows=40 loops=1)
+                        -> Index range scan on e using idx_worklog_page over (source_key = '550d3a61d225b59cce4fdb4a31f60aaa17f07ddaeb4f2d0bded89edcfd0f6ab0' AND missing = 0 AND 1793462400000 <= start_at < 1796054400000) OR (source_key = 'fc8261c3fdbfb2980a3a2eae2a5df099b263dee0f39ff1a69d41aed310dfe446' AND missing = 0 AND 1793462400000 <= start_at < 1796054400000), with index condition: ((e.missing = 0) and (e.start_at >= 1793462400000) and (e.start_at < 1796054400000))  (cost=34.5 rows=40) (actual time=0.0767..0.276 rows=40 loops=1)
+                        -> Hash
+                            -> Filter: ((s.blocked = 0) and (s.source_key in (<cache>(convert(sha2('MEMBER:9782601:97826011',256) using utf8mb4)),<cache>(convert(sha2('MEMBER:9782601:97826012',256) using utf8mb4)))))  (cost=0.91 rows=0.2) (actual time=0.042..0.0464 rows=2 loops=1)
+                                -> Index range scan on s using PRIMARY over (source_key = '550d3a61d225b59cce4fdb4a31f60aaa17f07ddaeb4f2d0bded89edcfd0f6ab0') OR (source_key = 'fc8261c3fdbfb2980a3a2eae2a5df099b263dee0f39ff1a69d41aed310dfe446')  (cost=0.91 rows=2) (actual time=0.0368..0.0402 rows=2 loops=1)
+                    -> Single-row index lookup on <subquery2> using <auto_distinct_key> (coding_team_id=e.coding_team_id, project_name=e.project_name, issue_code=e.issue_code)  (cost=1.35..1.35 rows=1) (actual time=721e-6..721e-6 rows=0 loops=40)
+                        -> Materialize with deduplication  (cost=0.45..0.45 rows=1) (actual time=0.0095..0.0095 rows=0 loops=1)
+                            -> Filter: ((k.coding_team_id is not null) and (k.project_name is not null) and (k.issue_code is not null))  (cost=0.35 rows=1) (actual time=0.00783..0.00783 rows=0 loops=1)
+                                -> Covering index scan on k using PRIMARY  (cost=0.35 rows=1) (actual time=0.00737..0.00737 rows=0 loops=1)
+                -> Single-row index lookup on <subquery3> using <auto_distinct_key> (coding_team_id=e.coding_team_id, worklog_id=e.worklog_id)  (cost=0.65..0.65 rows=1) (actual time=407e-6..407e-6 rows=0 loops=40)
+                    -> Materialize with deduplication  (cost=0.45..0.45 rows=1) (actual time=0.00542..0.00542 rows=0 loops=1)
+                        -> Filter: ((w.coding_team_id is not null) and (w.worklog_id is not null))  (cost=0.35 rows=1) (actual time=0.00496..0.00496 rows=0 loops=1)
+                            -> Covering index scan on w using PRIMARY  (cost=0.35 rows=1) (actual time=0.00479..0.00479 rows=0 loops=1)
+            -> Filter: ((e.coding_team_id = `<subquery4>`.coding_team_id) and (e.issue_id = `<subquery4>`.coding_issue_id))  (cost=0.2..0.2 rows=1) (actual time=534e-6..534e-6 rows=0 loops=40)
+                -> Single-row index lookup on <subquery4> using <auto_distinct_key> (coding_team_id=e.coding_team_id, coding_issue_id=e.issue_id)  (cost=0.65..0.65 rows=1) (actual time=437e-6..437e-6 rows=0 loops=40)
+                    -> Materialize with deduplication  (cost=0.45..0.45 rows=1) (actual time=0.00775..0.00775 rows=0 loops=1)
+                        -> Filter: ((d.coding_team_id is not null) and (d.coding_issue_id is not null))  (cost=0.35 rows=1) (actual time=0.00725..0.00725 rows=0 loops=1)
+                            -> Covering index scan on d using PRIMARY  (cost=0.35 rows=1) (actual time=0.00721..0.00721 rows=0 loops=1)
+
+--------------
+EXPLAIN ANALYZE SELECT c.id,c.depot_id,c.sha,c.depot_name,c.commit_at,c.commit_date,c.author_email_hash,c.author_name_key,
+ c.is_merge,c.diff_status,c.additions,c.deletions,
+ EXISTS(SELECT 1 FROM external_zhaogang_code_commit d FORCE INDEX (idx_org_depot_sha)
+  WHERE d.coding_team_id=c.coding_team_id AND d.scope_type='WORKBENCH_TEAM' AND d.scope_id IN (978261,978262)
+   AND d.depot_id=c.depot_id AND d.sha=c.sha AND d.month<>c.month) AS date_conflict
+FROM external_zhaogang_code_commit c
+WHERE c.coding_team_id=9782601 AND c.scope_type='WORKBENCH_TEAM' AND c.scope_id IN (978261,978262)
+ AND c.month='2026-11' AND c.depot_id>0
+ORDER BY c.depot_id,c.sha,c.id LIMIT 1500
+--------------
+
+EXPLAIN
+-> Limit: 1500 row(s)  (cost=40.8 rows=18) (actual time=0.0686..0.196 rows=90 loops=1)
+    -> Filter: (c.scope_id in (978261,978262))  (cost=40.8 rows=18) (actual time=0.0682..0.19 rows=90 loops=1)
+        -> Index range scan on c using idx_org_month_depot_sha over (coding_team_id = 9782601 AND scope_type = 'WORKBENCH_TEAM' AND month = '2026-11' AND 0 < depot_id), with index condition: ((c.`month` = '2026-11') and (c.scope_type = 'WORKBENCH_TEAM') and (c.coding_team_id = 9782601) and (c.depot_id > 0))  (cost=40.8 rows=90) (actual time=0.0677..0.184 rows=90 loops=1)
+-> Select #2 (subquery in projection; dependent)
+    -> Limit: 1 row(s)  (cost=0.926 rows=0.185) (actual time=0.00391..0.00391 rows=0 loops=90)
+        -> Filter: ((d.scope_id in (978261,978262)) and (d.`month` <> c.`month`))  (cost=0.926 rows=0.185) (actual time=0.00382..0.00382 rows=0 loops=90)
+            -> Covering index lookup on d using idx_org_depot_sha (coding_team_id=c.coding_team_id, scope_type='WORKBENCH_TEAM', depot_id=c.depot_id, sha=c.sha)  (cost=0.926 rows=1.03) (actual time=0.00325..0.0036 rows=1.07 loops=90)
+
+--------------
+EXPLAIN ANALYZE SELECT coding_user_id,stat_date,worklog_hours,eligible_workday
+FROM external_zhaogang_statistics_day
+WHERE coding_team_id=9782601 AND stat_date BETWEEN '2026-11-01' AND '2026-11-25'
+--------------
+
+EXPLAIN
+-> Filter: ((external_zhaogang_statistics_day.coding_team_id = 9782601) and (external_zhaogang_statistics_day.stat_date between '2026-11-01' and '2026-11-25'))  (cost=75.6 rows=375) (actual time=0.0319..0.182 rows=375 loops=1)
+    -> Index range scan on external_zhaogang_statistics_day using PRIMARY over (coding_team_id = 9782601 AND '2026-11-01' <= stat_date <= '2026-11-25')  (cost=75.6 rows=375) (actual time=0.0291..0.104 rows=375 loops=1)
+
+--------------
+EXPLAIN ANALYZE SELECT snapshot_id,visibility_version,policy_key,source_version,generated_at,payload
+FROM external_zhaogang_statistics_report WHERE coding_team_id=9782601
+ AND range_key='2026-11-01/2026-11-25/2026-10-01/2026-10-25'
+--------------
+
+EXPLAIN
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=83e-6..83e-6 rows=1 loops=1)
