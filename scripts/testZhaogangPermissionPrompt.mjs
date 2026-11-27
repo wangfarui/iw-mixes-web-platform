@@ -90,6 +90,18 @@ await api.zhaogangRequest('/legacy-partial-permission-error')
 assert.equal(permissionEvents.length, 1, '旧版部分失败响应中的明确权限错误字段仍应兼容提示')
 
 permissionEvents.length = 0
+response.body.data = {
+  diffFailures: [{
+    sha: '0123456789abcdef',
+    reasonCode: 'UPSTREAM_LIMIT',
+    reason: 'CODING 拒绝返回过大的 diff，Git 凭证无权读取，未统计行数'
+  }]
+}
+const failures = await api.zhaogangRequest('/code-stats/scan/1/failures')
+assert.equal(failures.diffFailures[0].reason, response.body.data.diffFailures[0].reason)
+assert.equal(permissionEvents.length, 0, '提交级 Git 权限原因只留在失败明细中')
+
+permissionEvents.length = 0
 response = {
   status: 200,
   body: {code: 500, message: 'Forbidden', data: null}

@@ -48,6 +48,8 @@ const legacyPermissionMessageIn = (value: unknown, depth = 0): string => {
     return ''
   }
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    // 提交补算使用范围内的统计凭证，失败详情由代码页逐条显示。
+    if (key === 'diffFailures') continue
     if (legacyErrorFields.has(key) && typeof child === 'string' && explicitErrorSignal.test(child)) return child
     const message = legacyPermissionMessageIn(child, depth + 1)
     if (message) return message
