@@ -249,8 +249,10 @@ watch(() => session?.value, () => {
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibility)
   midnightTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible' && lastDay !== shanghaiDate()) onVisibility()
-  }, 30_000)
+    if (document.visibilityState !== 'visible') return
+    if (lastDay !== shanghaiDate()) onVisibility()
+    else if (!pending.value && !isUpdating.value && !error.value) void load()
+  }, 15_000)
 })
 onBeforeUnmount(() => {
   request?.abort()

@@ -19,7 +19,7 @@
       </el-select>
     </header>
     <el-alert v-if="error" type="error" :closable="false" show-icon :title="error">
-      <template #default><el-button link type="primary" @click="load">重试</el-button></template>
+      <template #default><el-button link type="primary" @click="load()">重试</el-button></template>
     </el-alert>
     <div v-if="!members.length" class="panel-empty">团队还没有可分析的成员</div>
     <div v-else-if="loading" class="panel-loading"><el-skeleton :rows="5" animated /></div>
@@ -146,9 +146,9 @@ const changeMember = (value: number) => {
   emit('update:selectedMemberId', value)
 }
 
-const load = async () => {
+const load = async (retainData = false) => {
   const current = ++sequence
-  data.value = null
+  if (!retainData) data.value = null
   error.value = ''
   if (!props.workbenchTeamId || !props.selectedMemberId || !props.from || !props.to) {
     loading.value = false
@@ -165,6 +165,7 @@ const load = async () => {
     if (current === sequence) data.value = result
   } catch (requestError) {
     if (current === sequence) {
+      data.value = null
       error.value = requestError instanceof Error ? requestError.message : '成员代码统计加载失败'
     }
   } finally {
@@ -192,6 +193,12 @@ const loadEntries = async () => {
     // Older backends ignore team/member parameters and return personal entries.
     if (!Array.isArray(result.repositories) || result.items.some(item => typeof item.depotId !== 'number')) {
       throw new Error('成员提交明细暂不可用，请联系管理员更新后端服务后重试')
+    }
+    if (depotId.value !== null && !result.repositories.some(repo => repo.depotId === depotId.value)) {
+      depotId.value = null
+      pageNumber.value = 1
+      void loadEntries()
+      return
     }
     entries.value = result
     repositories.value = result.repositories
@@ -237,6 +244,9 @@ watch(() => [props.selectedMemberId, props.workbenchTeamId, props.from, props.to
   void load()
   void loadEntries()
 }, { immediate: true })
+defineExpose({
+  refresh: async () => { await Promise.all([load(true), loadEntries()]) }
+})
 onBeforeUnmount(() => { sequence += 1; entriesSequence += 1 })
 </script>
 

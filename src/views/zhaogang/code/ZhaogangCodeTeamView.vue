@@ -94,7 +94,7 @@
           </article>
         </div>
         <CodeStatsSelectedMemberPanel
-          :key="panelKey"
+          ref="memberPanel"
           v-model:selected-member-id="selectedMemberId"
           :members="statistics.members"
           :workbench-team-id="teamId"
@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, User } from '@element-plus/icons-vue'
@@ -179,12 +179,24 @@ const myIdentityVisible = ref(false)
 const scanScopeVisible = ref(false)
 const scanDetailsVisible = ref(false)
 const rescanning = ref(false)
-const panelKey = ref(0)
+const memberPanel = ref<InstanceType<typeof CodeStatsSelectedMemberPanel> | null>(null)
 let statisticsSequence = 0
 
 const teams = computed(() => options.value?.teams || [])
 const selectedTeam = computed(() => teams.value.find(team => team.id === teamId.value) || null)
+const session = inject<Ref<object | null>>('zhaogangSession')
+let viewGeneration = 0
+const scopeKey = () => teamId.value && session?.value
+  ? [viewGeneration, activeRange.value.from, activeRange.value.to, teamId.value].join(':') : ''
+
 const polling = useCodeStatsScanPolling({
+  scopeKey,
+  onLocalRefresh: async () => {
+    if (!statisticsLoading.value) {
+      await loadStatistics()
+      await memberPanel.value?.refresh()
+    }
+  },
   fetchScan: () => teamId.value
     ? getCodeStatsScan({
       from: activeRange.value.from,
@@ -196,11 +208,13 @@ const polling = useCodeStatsScanPolling({
   onScan: (scan) => {
     if (statistics.value) statistics.value = { ...statistics.value, scan }
   },
-  onProgress: async () => { await loadStatistics() },
+  onProgress: async () => {
+    await loadStatistics()
+    await memberPanel.value?.refresh()
+  },
   onFinished: (scan) => {
     if (statistics.value) statistics.value = { ...statistics.value, scan }
-    void loadStatistics()
-    panelKey.value += 1
+    void loadStatistics().then(() => memberPanel.value?.refresh())
   }
 })
 
@@ -219,8 +233,11 @@ const rescanTip = computed(() => {
 const loadOptions = async () => {
   optionsLoading.value = true
   optionsError.value = ''
+  const current = viewGeneration
   try {
-    options.value = await getCodeStatsOptions()
+    const result = await getCodeStatsOptions()
+    if (current !== viewGeneration) return
+    options.value = result
     if (!teams.value.length) {
       teamId.value = null
       return
@@ -229,9 +246,10 @@ const loadOptions = async () => {
       teamId.value = teams.value[0].id
     }
   } catch (error) {
+    if (current !== viewGeneration) return
     optionsError.value = error instanceof Error ? error.message : 'Dev Hub 团队加载失败'
   } finally {
-    optionsLoading.value = false
+    if (current === viewGeneration) optionsLoading.value = false
   }
 }
 
@@ -265,16 +283,19 @@ const loadStatistics = async () => {
 }
 
 const changeTeam = () => {
+  polling.stop()
+  statisticsSequence += 1
+  statisticsLoading.value = false
   statistics.value = null
   selectedMemberId.value = null
   statisticsError.value = ''
-  panelKey.value += 1
   void loadStatistics()
 }
 
 const changeRange = (range: ResolvedCodeStatsRange) => {
+  polling.stop()
+  statistics.value = null
   activeRange.value = { from: range.from, to: range.to, label: range.label }
-  panelKey.value += 1
   void loadStatistics()
 }
 
@@ -291,6 +312,7 @@ const applyScan = (scan: ZhaogangCodeStatsScan) => {
 const rescan = async () => {
   if (rescanDisabled.value || !teamId.value) return
   rescanning.value = true
+  const requestScope = scopeKey()
   try {
     const result = await triggerCodeStatsScan({
       scope: 'WORKBENCH_TEAM',
@@ -299,6 +321,7 @@ const rescan = async () => {
       to: activeRange.value.to,
       mode: 'SYNC'
     })
+    if (requestScope !== scopeKey()) return
     applyScan(result.scan)
     if (result.accepted) {
       ElMessage.success('已提交本轮团队代码同步')
@@ -313,7 +336,7 @@ const rescan = async () => {
       ElMessage.warning(skipped || `暂时无法重扫：${result.reason}`)
     }
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '同步失败')
+    if (requestScope === scopeKey()) ElMessage.error(error instanceof Error ? error.message : '同步失败')
   } finally {
     rescanning.value = false
   }
@@ -322,14 +345,30 @@ const rescan = async () => {
 const identityChanged = async () => {
   await loadOptions()
   await loadStatistics()
-  panelKey.value += 1
+  await memberPanel.value?.refresh()
 }
 
 const openTeams = () => { void router.push('/zhaogang/teams') }
 
-onMounted(async () => {
+const resetForSession = async () => {
+  viewGeneration += 1
+  const current = viewGeneration
+  polling.stop()
+  statisticsSequence += 1
+  statistics.value = null
+  options.value = null
+  teamId.value = null
+  selectedMemberId.value = null
+  if (!session?.value) return
   await loadOptions()
+  if (current !== viewGeneration) return
   await loadStatistics()
+}
+watch(() => session?.value, () => { void resetForSession() })
+onMounted(resetForSession)
+onBeforeUnmount(() => {
+  viewGeneration += 1
+  statisticsSequence += 1
 })
 </script>
 

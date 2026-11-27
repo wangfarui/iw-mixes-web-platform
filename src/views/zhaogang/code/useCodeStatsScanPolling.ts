@@ -1,10 +1,12 @@
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { activeScanMonth } from './codeStatsPresentation'
 import type { ZhaogangCodeStatsScan } from '@/types/zhaogangCodeStats'
 
 export const useCodeStatsScanPolling = (options: {
   fetchScan: () => Promise<ZhaogangCodeStatsScan>
   onScan: (scan: ZhaogangCodeStatsScan) => void
+  scopeKey: () => string
+  onLocalRefresh: () => Promise<void>
   onProgress?: () => Promise<void>
   onFinished: (scan: ZhaogangCodeStatsScan) => void
 }) => {
@@ -12,6 +14,9 @@ export const useCodeStatsScanPolling = (options: {
   let timer: number | undefined
   let inFlight = false
   let progressTicks = 0
+  let localTimer: number | undefined
+  let disposed = false
+  let refreshingLocal = false
 
   const stop = () => {
     polling.value = false
@@ -37,8 +42,10 @@ export const useCodeStatsScanPolling = (options: {
   const poll = async () => {
     if (document.visibilityState !== 'visible' || inFlight) return
     inFlight = true
+    const scope = options.scopeKey()
     try {
       const scan = await options.fetchScan()
+      if (disposed || scope !== options.scopeKey()) return
       options.onScan(scan)
       if (!isActive(scan)) {
         stop()
@@ -53,7 +60,27 @@ export const useCodeStatsScanPolling = (options: {
     }
   }
 
-  onBeforeUnmount(stop)
+  const refreshLocal = async (regainedFocus = false) => {
+    if (disposed || refreshingLocal || !options.scopeKey() || document.visibilityState !== 'visible'
+      || (!regainedFocus && polling.value)) return
+    refreshingLocal = true
+    try {
+      await options.onLocalRefresh()
+    } finally {
+      refreshingLocal = false
+    }
+  }
+  const onVisibility = () => { void refreshLocal(true) }
+  onMounted(() => {
+    document.addEventListener('visibilitychange', onVisibility)
+    localTimer = window.setInterval(() => { void refreshLocal() }, 15_000)
+  })
+  onBeforeUnmount(() => {
+    disposed = true
+    stop()
+    window.clearInterval(localTimer)
+    document.removeEventListener('visibilitychange', onVisibility)
+  })
 
   return { polling, begin, stop }
 }

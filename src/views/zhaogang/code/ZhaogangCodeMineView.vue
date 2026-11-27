@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading, User } from '@element-plus/icons-vue'
 import {
@@ -196,7 +196,16 @@ const rescanning = ref(false)
 let statisticsSequence = 0
 let entriesSequence = 0
 
+const session = inject<Ref<object | null>>('zhaogangSession')
+let viewGeneration = 0
+const scopeKey = () => session?.value
+  ? [viewGeneration, activeRange.value.from, activeRange.value.to].join(':') : ''
+
 const polling = useCodeStatsScanPolling({
+  scopeKey,
+  onLocalRefresh: async () => {
+    if (!statisticsLoading.value && !entriesLoading.value) await Promise.all([loadStatistics(), loadEntries()])
+  },
   fetchScan: () => getCodeStatsScan({
     from: activeRange.value.from,
     to: activeRange.value.to,
@@ -252,9 +261,13 @@ const branchItems = computed<CodeStatsHorizontalItem[]>(() => (statistics.value?
 
 const loadOptions = async () => {
   optionsError.value = ''
+  const current = viewGeneration
   try {
-    options.value = await getCodeStatsOptions()
+    const result = await getCodeStatsOptions()
+    if (current !== viewGeneration) return
+    options.value = result
   } catch (error) {
+    if (current !== viewGeneration) return
     optionsError.value = error instanceof Error ? error.message : '代码统计选项加载失败'
   }
 }
@@ -305,6 +318,9 @@ const loadEntries = async () => {
 }
 
 const changeRange = (range: ResolvedCodeStatsRange) => {
+  polling.stop()
+  statistics.value = null
+  entries.value = null
   activeRange.value = { from: range.from, to: range.to, label: range.label }
   keyword.value = ''
   pageNumber.value = 1
@@ -330,6 +346,7 @@ const applyScan = (scan: ZhaogangCodeStatsScan) => {
 const rescan = async () => {
   if (rescanDisabled.value) return
   rescanning.value = true
+  const requestScope = scopeKey()
   try {
     const result = await triggerCodeStatsScan({
       scope: 'SELF',
@@ -337,6 +354,7 @@ const rescan = async () => {
       to: activeRange.value.to,
       mode: 'SYNC'
     })
+    if (requestScope !== scopeKey()) return
     applyScan(result.scan)
     if (result.accepted) {
       ElMessage.success('已提交本轮代码同步')
@@ -351,7 +369,7 @@ const rescan = async () => {
       ElMessage.warning(skipped || `暂时无法重扫：${result.reason}`)
     }
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '同步失败')
+    if (requestScope === scopeKey()) ElMessage.error(error instanceof Error ? error.message : '同步失败')
   } finally {
     rescanning.value = false
   }
@@ -363,10 +381,27 @@ const identityChanged = async () => {
   await loadEntries()
 }
 
-onMounted(async () => {
+const resetForSession = async () => {
+  viewGeneration += 1
+  const current = viewGeneration
+  polling.stop()
+  statisticsSequence += 1
+  statistics.value = null
+  options.value = null
+  entriesSequence += 1
+  entries.value = null
+  if (!session?.value) return
   await loadOptions()
+  if (current !== viewGeneration) return
   await loadStatistics()
-  await loadEntries()
+  if (current === viewGeneration) await loadEntries()
+}
+watch(() => session?.value, () => { void resetForSession() })
+onMounted(resetForSession)
+onBeforeUnmount(() => {
+  viewGeneration += 1
+  statisticsSequence += 1
+  entriesSequence += 1
 })
 </script>
 

@@ -102,7 +102,7 @@
       <el-skeleton v-if="statisticsLoading && !statistics" :rows="6" animated />
       <div v-else-if="scope === 'WORKBENCH_TEAM' && !workbenchTeamId" class="selection-placeholder">{{ teamSelectionHint }}</div>
       <WorklogRanking
-        v-else-if="statistics && scope === 'WORKBENCH_TEAM' && presentationMode === 'RANKING'"
+        v-else-if="statistics && !statisticsUnavailable && scope === 'WORKBENCH_TEAM' && presentationMode === 'RANKING'"
         :from="report!.from"
         :to-exclusive="report!.rankingToExclusive"
         v-model:metric="rankingMetric"
@@ -320,8 +320,8 @@ const memberStatistics = computed(() => statistics.value?.memberDailyTotals.find
 const memberStatisticsIssue = computed(() => statistics.value?.coverage.memberIssues?.find(item => item.user.id === trendMember.value?.id))
 const trendDailyTotals = computed(() => (trendMember.value ? memberStatistics.value?.dailyTotals : statistics.value?.dailyTotals) ?? [])
 const rangeTotal = computed(() => trendDailyTotals.value.reduce((sum, item) => sum + Number(item.hours || 0), 0))
-const statisticsUnavailable = computed(() => !!statistics.value?.coverage.memberCount && statistics.value.coverage.failedMemberCount >= statistics.value.coverage.memberCount)
-const entriesUnavailable = computed(() => !!entries.value?.coverage.memberCount && entries.value.coverage.failedMemberCount >= entries.value.coverage.memberCount)
+const statisticsUnavailable = computed(() => Boolean(statistics.value?.coverage.partial && rangeTotal.value === 0))
+const entriesUnavailable = computed(() => Boolean(entries.value?.coverage.partial && !entries.value.items.length))
 const hasMemberTrend = computed(() => !!memberStatistics.value && (!memberStatisticsIssue.value || rangeTotal.value > 0))
 const teamSelectionHint = computed(() => options.value?.teams.length ? '请选择 Dev Hub 团队' : '还没有加入 Dev Hub 团队')
 const teamSelectWidth = computed(() => {
@@ -329,13 +329,14 @@ const teamSelectWidth = computed(() => {
   const longestLength = Math.max(0, ...labels.map(label => Array.from(label).length))
   return `${Math.min(280, Math.max(128, longestLength * 14 + 44))}px`
 })
-const emptyStatistics = { overtimeDays: 0, overtimeHours: 0, averageHours: 0 }
 const summary = computed(() => {
   if (scope.value === 'WORKBENCH_TEAM' && !workbenchTeamId.value) return teamSelectionHint.value
+  if (!statistics.value) return statisticsLoading.value ? '正在读取工时' : ''
   if (statisticsUnavailable.value) return syncBusy.value ? '工时正在同步' : '工时数据暂不可用'
   if (trendMember.value && !hasMemberTrend.value) return ''
 
-  const metrics = (trendMember.value ? memberStatistics.value?.summary : statistics.value?.summary) ?? emptyStatistics
+  const metrics = trendMember.value ? memberStatistics.value?.summary : statistics.value.summary
+  if (!metrics) return ''
   const count = statistics.value?.coverage.memberCount ?? selectedTeam.value?.memberCount ?? 0
   const teamCount = scope.value === 'WORKBENCH_TEAM' && !trendMember.value ? ` · ${count} 人` : ''
   return `总计工时 ${formatHours(rangeTotal.value)}h${teamCount} · 加班天数 ${metrics.overtimeDays}天 · 加班工时 ${formatHours(metrics.overtimeHours)}h · 平均工时 ${formatAverageHours(metrics.averageHours)}h`
